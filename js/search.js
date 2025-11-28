@@ -21,8 +21,8 @@ class SearchManager {
     initializeSupabase() {
         // Initialize Supabase client
         this.supabase = supabase.createClient(
-            'YOUR_SUPABASE_URL',
-            'YOUR_SUPABASE_ANON_KEY'
+            'https://hbbbsreonwhvqfvbszne.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyOTc5ODYsImV4cCI6MjA3OTg3Mzk4Nn0.LvqmdOqetnMrH8bnkJY6_S-dsGD8gnvpFczSCJPy-Q4'
         );
     }
 
