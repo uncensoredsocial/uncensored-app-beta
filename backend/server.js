@@ -27,8 +27,8 @@ app.use(express.json());
 app.use(
   cors({
     origin: [
-      'https://spepdb.github.io',                           // GitHub Pages
-      'https://uncensored-app-beta-production.up.railway.app' // (if you ever hit it directly)
+      'https://spepdb.github.io',
+      'https://uncensored-app-beta-production.up.railway.app'
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -122,8 +122,8 @@ app.post('/api/auth/signup', async (req, res) => {
       password_hash: passwordHash,
       avatar_url: null,
       bio: '',
-      created_at: now,
-      last_login_at: now
+      created_at: now
+      // ❌ last_login_at removed because the column doesn't exist
     };
 
     console.log('Inserting user:', newUser);
@@ -190,13 +190,10 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
-    const token = signToken(user);
+    // we NO LONGER update last_login_at here,
+    // because that column doesn't exist in your table.
 
-    // update last_login_at
-    await supabase
-      .from('users')
-      .update({ last_login_at: new Date().toISOString() })
-      .eq('id', user.id);
+    const token = signToken(user);
 
     res.json({
       user: {
