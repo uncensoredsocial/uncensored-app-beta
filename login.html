@@ -14,7 +14,7 @@
             <p class="auth-subtitle">Sign in to your private account</p>
             
             <!-- ID changed to login-form to match auth.js -->
-            <form id="login-form" class="auth-form">
+            <form id="loginForm" class="auth-form" onsubmit="return handleLogin(event)">
                 <div class="form-group">
                     <label for="login-email">Email</label>
                     <!-- ID changed to login-email to match auth.js -->
