@@ -1,550 +1,290 @@
 // js/profile.js
-
 const API_BASE_URL = 'https://uncensored-app-beta-production.up.railway.app/api';
 
 class ProfilePage {
     constructor() {
-        this.profile = null;
-        this.isOwnProfile = false;
+        this.user = null;
+        this.init();
     }
 
     async init() {
-        // 🔐 Hard gate: if not logged in, send to signup
-        if (!window.isLoggedIn || !isLoggedIn()) {
+        // Require auth
+        if (typeof isLoggedIn === 'function' && !isLoggedIn()) {
             window.location.href = 'signup.html';
             return;
         }
 
-        this.cacheDom();
-        this.bindEvents();
-        this.updateAuthUI();
+        this.cacheElements();
+        this.setupEvents();
 
         await this.loadProfile();
-        await Promise.all([
-            this.loadPosts(),
-            this.loadLikes()
-        ]);
+        this.loadPostsPlaceholder();
     }
 
-    cacheDom() {
-        this.headerProfileImg = document.getElementById('headerProfileImg');
-        this.profileSection = document.getElementById('profileSection');
-        this.authButtons = document.getElementById('authButtons');
-
-        this.profileAvatar = document.getElementById('profileAvatar');
-        this.profileDisplayName = document.getElementById('profileDisplayName');
-        this.profileUsername = document.getElementById('profileUsername');
-        this.profileBio = document.getElementById('profileBio');
-        this.profileJoinDate = document.getElementById('profileJoinDate');
-        this.profileFollowers = document.getElementById('profileFollowers');
-        this.profileFollowing = document.getElementById('profileFollowing');
-        this.profileActions = document.getElementById('profileActions');
+    cacheElements() {
+        this.displayNameEl = document.getElementById('profileDisplayName');
+        this.usernameEl = document.getElementById('profileUsername');
+        this.bioEl = document.getElementById('profileBio');
+        this.joinedEl = document.getElementById('profileJoined');
+        this.avatarEl = document.getElementById('profileAvatar');
+        this.postsCountEl = document.getElementById('profilePostsCount');
+        this.followersCountEl = document.getElementById('profileFollowersCount');
+        this.followingCountEl = document.getElementById('profileFollowingCount');
 
         this.postsContainer = document.getElementById('profilePosts');
-        this.likesContainer = document.getElementById('profileLikes');
-        this.postsLoading = document.getElementById('postsLoading');
-        this.likesLoading = document.getElementById('likesLoading');
 
-        this.avatarEditBtn = document.getElementById('avatarEditBtn');
-        this.avatarFileInput = document.getElementById('avatarFileInput');
-
-        this.editProfileModalOverlay = document.getElementById('editProfileModalOverlay');
-        this.editProfileForm = document.getElementById('editProfileForm');
+        // Edit modal
+        this.editModal = document.getElementById('editProfileModal');
         this.editDisplayName = document.getElementById('editDisplayName');
-        this.editUsername = document.getElementById('editUsername');
         this.editBio = document.getElementById('editBio');
-        this.editProfileMessage = document.getElementById('editProfileMessage');
-        this.closeEditProfileModalBtn = document.getElementById('closeEditProfileModal');
-        this.cancelEditProfileBtn = document.getElementById('cancelEditProfile');
+        this.editAvatarUrl = document.getElementById('editAvatarUrl');
+        this.bioCharCounter = document.getElementById('bioCharCounter');
+        this.editError = document.getElementById('editProfileError');
+        this.editSuccess = document.getElementById('editProfileSuccess');
     }
 
-    bindEvents() {
+    setupEvents() {
+        // Settings button -> settings.html (placeholder)
+        const settingsButton = document.getElementById('settingsButton');
+        if (settingsButton) {
+            settingsButton.addEventListener('click', () => {
+                // you can create settings.html later
+                window.location.href = 'settings.html';
+            });
+        }
+
         // Tabs
-        const tabs = document.querySelectorAll('.profile-tab');
-        tabs.forEach(tab => {
-            tab.addEventListener('click', () => this.handleTabClick(tab));
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
         });
 
-        // Avatar edit
-        if (this.avatarEditBtn) {
-            this.avatarEditBtn.addEventListener('click', () => {
-                if (!this.isOwnProfile) return;
-                this.avatarFileInput.click();
-            });
-        }
+        // Edit profile open/close
+        document.getElementById('editProfileButton')?.addEventListener('click', () => this.openEditModal());
+        document.getElementById('closeEditProfile')?.addEventListener('click', () => this.closeEditModal());
+        document.getElementById('cancelEditProfile')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.closeEditModal();
+        });
 
-        if (this.avatarFileInput) {
-            this.avatarFileInput.addEventListener('change', (e) => this.handleAvatarFileChange(e));
-        }
+        document.getElementById('saveEditProfile')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.saveProfile();
+        });
 
-        // Edit profile modal
-        if (this.editProfileForm) {
-            this.editProfileForm.addEventListener('submit', (e) => this.handleEditProfileSubmit(e));
-        }
+        // Bio counter
+        this.editBio?.addEventListener('input', () => this.updateBioCounter());
 
-        if (this.closeEditProfileModalBtn) {
-            this.closeEditProfileModalBtn.addEventListener('click', () => this.closeEditProfileModal());
-        }
-
-        if (this.cancelEditProfileBtn) {
-            this.cancelEditProfileBtn.addEventListener('click', () => this.closeEditProfileModal());
-        }
-
-        // Close modal when clicking outside
-        if (this.editProfileModalOverlay) {
-            this.editProfileModalOverlay.addEventListener('click', (e) => {
-                if (e.target === this.editProfileModalOverlay) {
-                    this.closeEditProfileModal();
-                }
-            });
-        }
+        // Close modal on backdrop click
+        this.editModal?.addEventListener('click', (e) => {
+            if (e.target === this.editModal) this.closeEditModal();
+        });
     }
-
-    updateAuthUI() {
-        const loggedIn = isLoggedIn?.();
-
-        if (this.authButtons) {
-            this.authButtons.style.display = loggedIn ? 'none' : 'flex';
-        }
-        if (this.profileSection) {
-            this.profileSection.style.display = loggedIn ? 'flex' : 'none';
-        }
-
-        const currentUser = getCurrentUser?.();
-        if (loggedIn && currentUser?.avatar_url && this.headerProfileImg) {
-            this.headerProfileImg.src = currentUser.avatar_url;
-        }
-    }
-
-    getUsernameFromUrl() {
-        const params = new URLSearchParams(window.location.search);
-        const userParam = params.get('user');
-
-        if (!userParam || userParam === 'me') {
-            return null; // "current user"
-        }
-
-        return userParam.replace(/^@/, '').trim();
-    }
-
-    /* ---------------- PROFILE LOAD ---------------- */
 
     async loadProfile() {
-        const urlUsername = this.getUsernameFromUrl();
-        const currentUser = getCurrentUser?.();
-
         try {
-            let res;
-            if (!urlUsername) {
-                // Own profile via /auth/me
-                res = await fetch(`${API_BASE_URL}/auth/me`, {
-                    headers: {
-                        'Authorization': `Bearer ${getAuthToken?.() || ''}`
-                    }
-                });
-                this.isOwnProfile = true;
-            } else {
-                // Someone else's profile via /users/:username
-                res = await fetch(`${API_BASE_URL}/users/${encodeURIComponent(urlUsername)}`);
-                this.isOwnProfile = !!(currentUser && currentUser.username === urlUsername);
+            const token = typeof getAuthToken === 'function' ? getAuthToken() : null;
+            if (!token) {
+                window.location.href = 'signup.html';
+                return;
             }
 
+            const res = await fetch(`${API_BASE_URL}/users/me`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
             if (!res.ok) {
-                throw new Error('Failed to load profile');
+                console.error('Profile load failed', await res.text());
+                window.location.href = 'signup.html';
+                return;
             }
 
             const data = await res.json();
-            // Expecting: id, username, display_name, email, avatar_url, bio?, created_at?, followers_count?, following_count?
-            this.profile = data;
+            this.user = data;
 
-            this.renderProfileHeader();
+            // Fallbacks
+            this.user.display_name = this.user.display_name || this.user.username;
+            this.user.bio = this.user.bio || '';
+
+            // Update UI
+            this.renderProfile();
+
+            // Refresh localStorage copy so other pages see updated data
+            if (typeof setCurrentUser === 'function') {
+                setCurrentUser(this.user);
+            }
 
         } catch (err) {
-            console.error('Profile load error:', err);
-            if (this.profileDisplayName) this.profileDisplayName.textContent = 'Profile not found';
-            if (this.profileUsername) this.profileUsername.textContent = '';
-            if (this.profileBio) this.profileBio.textContent = 'Unable to load this profile.';
+            console.error('Error loading profile:', err);
         }
     }
 
-    renderProfileHeader() {
-        if (!this.profile) return;
+    renderProfile() {
+        if (!this.user) return;
 
-        const {
-            display_name,
-            username,
-            avatar_url,
-            bio,
-            created_at,
-            followers_count,
-            following_count
-        } = this.profile;
+        const displayName = this.user.display_name || this.user.username;
+        this.displayNameEl.textContent = displayName;
+        this.usernameEl.textContent = `@${this.user.username}`;
+        this.bioEl.textContent = this.user.bio || 'No bio yet.';
+        this.joinedEl.textContent = this.formatJoined(this.user.created_at);
 
-        if (this.profileDisplayName) {
-            this.profileDisplayName.textContent = display_name || username || 'User';
-        }
-        if (this.profileUsername) {
-            this.profileUsername.textContent = username ? `@${username}` : '';
-        }
-        if (this.profileBio) {
-            this.profileBio.textContent = bio || '';
-        }
-        if (this.profileAvatar && avatar_url) {
-            this.profileAvatar.src = avatar_url;
-        }
-        if (this.headerProfileImg && this.isOwnProfile && avatar_url) {
-            this.headerProfileImg.src = avatar_url;
+        if (this.user.avatar_url) {
+            this.avatarEl.src = this.user.avatar_url;
+        } else {
+            this.avatarEl.src = 'assets/icons/default-profile.png';
         }
 
-        if (this.profileJoinDate) {
-            if (created_at) {
-                const date = new Date(created_at);
-                const formatted = date.toLocaleDateString(undefined, {
-                    year: 'numeric',
-                    month: 'short'
-                });
-                this.profileJoinDate.textContent = `Joined ${formatted}`;
-            } else {
-                this.profileJoinDate.textContent = '';
-            }
-        }
-
-        if (this.profileFollowers) {
-            this.profileFollowers.textContent = followers_count ?? 0;
-        }
-        if (this.profileFollowing) {
-            this.profileFollowing.textContent = following_count ?? 0;
-        }
-
-        // Actions
-        if (this.profileActions) {
-            this.profileActions.innerHTML = '';
-            if (this.isOwnProfile) {
-                const btn = document.createElement('button');
-                btn.className = 'btn btn-secondary';
-                btn.textContent = 'Edit Profile';
-                btn.addEventListener('click', () => this.openEditProfileModal());
-                this.profileActions.appendChild(btn);
-            } else {
-                const followBtn = document.createElement('button');
-                followBtn.className = 'btn btn-primary btn-sm';
-                followBtn.textContent = 'Follow';
-                followBtn.disabled = true; // hook up later
-                this.profileActions.appendChild(followBtn);
-
-                const msgBtn = document.createElement('button');
-                msgBtn.className = 'btn btn-secondary btn-sm';
-                msgBtn.textContent = 'Message';
-                msgBtn.disabled = true; // hook up later
-                this.profileActions.appendChild(msgBtn);
-            }
-        }
+        // For now, counts are 0 until you wire follow/post systems
+        this.postsCountEl.textContent = this.user.posts_count || 0;
+        this.followersCountEl.textContent = this.user.followers_count || 0;
+        this.followingCountEl.textContent = this.user.following_count || 0;
     }
 
-    /* ---------------- POSTS / LIKES ---------------- */
+    loadPostsPlaceholder() {
+        if (!this.postsContainer) return;
 
-    async loadPosts() {
-        if (!this.postsContainer || !this.profile?.username) return;
-
-        try {
-            // You will need a backend route like:
-            // GET /api/users/:username/posts
-            const res = await fetch(
-                `${API_BASE_URL}/users/${encodeURIComponent(this.profile.username)}/posts`
-            );
-
-            if (!res.ok) throw new Error('Failed to load posts');
-
-            const posts = await res.json();
-            this.postsLoading?.remove();
-
-            if (!posts || posts.length === 0) {
-                this.postsContainer.innerHTML = `
-                    <div class="empty-state">
-                        <h3>No posts yet</h3>
-                        <p>${this.isOwnProfile ? 'Start posting to see them here.' : 'This user hasn\'t posted yet.'}</p>
-                    </div>
-                `;
-                return;
-            }
-
-            this.renderPostList(this.postsContainer, posts);
-
-        } catch (err) {
-            console.error('Error loading posts:', err);
-            this.postsContainer.innerHTML = `
-                <div class="empty-state">
-                    <h3>Error loading posts</h3>
-                    <p>Please try again later.</p>
-                </div>
-            `;
-        }
+        this.postsContainer.innerHTML = `
+            <div class="empty-state">
+                <h3>No posts yet</h3>
+                <p>Share your first post from the home feed.</p>
+                <button class="btn btn-primary mt-3" onclick="window.location.href='index.html'">
+                    Go to Home
+                </button>
+            </div>
+        `;
     }
 
-    async loadLikes() {
-        if (!this.likesContainer || !this.profile?.username) return;
+    switchTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tab);
+        });
 
-        try {
-            // You will need a backend route like:
-            // GET /api/users/:username/likes
-            const res = await fetch(
-                `${API_BASE_URL}/users/${encodeURIComponent(this.profile.username)}/likes`
-            );
-
-            if (!res.ok) throw new Error('Failed to load likes');
-
-            const posts = await res.json();
-            this.likesLoading?.remove();
-
-            if (!posts || posts.length === 0) {
-                this.likesContainer.innerHTML = `
-                    <div class="empty-state">
-                        <h3>No likes yet</h3>
-                        <p>${this.isOwnProfile ? 'Posts you like will appear here.' : 'This user hasn\'t liked any posts yet.'}</p>
-                    </div>
-                `;
-                return;
-            }
-
-            this.renderPostList(this.likesContainer, posts);
-
-        } catch (err) {
-            console.error('Error loading likes:', err);
-            this.likesContainer.innerHTML = `
-                <div class="empty-state">
-                    <h3>Error loading likes</h3>
-                    <p>Please try again later.</p>
-                </div>
-            `;
-        }
-    }
-
-    renderPostList(container, posts) {
-        container.innerHTML = '';
-        posts.forEach(post => {
-            const el = this.createPostElement(post);
-            container.appendChild(el);
+        document.querySelectorAll('.tab-pane').forEach(pane => {
+            pane.classList.toggle('active', pane.id === `${tab}Tab`);
         });
     }
 
-    createPostElement(post) {
-        const user = post.user || this.profile || {};
-        const displayName = user.display_name || user.username || 'User';
-        const username = user.username || '';
-        const avatar = user.avatar_url || 'assets/icons/default-profile.png';
+    openEditModal() {
+        if (!this.user || !this.editModal) return;
 
-        const div = document.createElement('article');
-        div.className = 'post';
+        this.editDisplayName.value = this.user.display_name || '';
+        this.editBio.value = this.user.bio || '';
+        this.editAvatarUrl.value = this.user.avatar_url || '';
+        this.updateBioCounter();
 
-        const created_at = post.created_at || post.createdAt;
-        const time = created_at ? new Date(created_at) : null;
-        let timeLabel = '·';
-        if (time && !Number.isNaN(time.getTime())) {
-            const now = new Date();
-            const diffMs = now - time;
-            const diffMins = Math.floor(diffMs / 60000);
-            const diffHours = Math.floor(diffMs / 3600000);
-            const diffDays = Math.floor(diffMs / 86400000);
-            if (diffMins < 60) timeLabel = `${diffMins}m`;
-            else if (diffHours < 24) timeLabel = `${diffHours}h`;
-            else if (diffDays < 7) timeLabel = `${diffDays}d`;
-            else timeLabel = time.toLocaleDateString();
+        this.clearEditMessages();
+        this.editModal.classList.add('open');
+        this.editModal.setAttribute('aria-hidden', 'false');
+    }
+
+    closeEditModal() {
+        if (!this.editModal) return;
+        this.editModal.classList.remove('open');
+        this.editModal.setAttribute('aria-hidden', 'true');
+    }
+
+    updateBioCounter() {
+        if (!this.editBio || !this.bioCharCounter) return;
+        const len = this.editBio.value.length;
+        this.bioCharCounter.textContent = `${len}/160`;
+
+        this.bioCharCounter.classList.remove('warning', 'error');
+        if (len > 160) {
+            this.bioCharCounter.classList.add('error');
+        } else if (len > 140) {
+            this.bioCharCounter.classList.add('warning');
         }
-
-        div.innerHTML = `
-            <div class="post-header">
-                <img src="${avatar}" alt="${displayName}" class="post-user-avatar"
-                     onerror="this.src='assets/icons/default-profile.png'">
-                <div class="post-user-info">
-                    <div class="post-display-name">${this.escape(displayName)}</div>
-                    <div class="post-username">@${this.escape(username)}</div>
-                </div>
-                <div class="post-time">${timeLabel}</div>
-            </div>
-            <div class="post-content">
-                <p>${this.formatPostContent(post.content || '')}</p>
-            </div>
-        `;
-
-        return div;
     }
 
-    formatPostContent(content) {
-        let txt = this.escape(content);
-
-        txt = txt.replace(
-            /(https?:\/\/[^\s]+)/g,
-            '<a href="$1" target="_blank" rel="noopener">$1</a>'
-        );
-        txt = txt.replace(
-            /#(\w+)/g,
-            '<span class="hashtag">#$1</span>'
-        );
-        txt = txt.replace(
-            /@(\w+)/g,
-            '<span class="mention">@$1</span>'
-        );
-
-        return txt;
+    clearEditMessages() {
+        if (this.editError) {
+            this.editError.classList.add('hidden');
+            this.editError.textContent = '';
+        }
+        if (this.editSuccess) {
+            this.editSuccess.classList.add('hidden');
+            this.editSuccess.textContent = '';
+        }
     }
 
-    /* ---------------- EDIT PROFILE ---------------- */
-
-    openEditProfileModal() {
-        if (!this.isOwnProfile || !this.profile) return;
-
-        this.editDisplayName.value = this.profile.display_name || '';
-        this.editUsername.value = this.profile.username || '';
-        this.editBio.value = this.profile.bio || '';
-        this.editProfileMessage.textContent = '';
-
-        this.editProfileModalOverlay.classList.remove('hidden');
+    showEditError(msg) {
+        if (!this.editError) return;
+        this.editError.textContent = msg;
+        this.editError.classList.remove('hidden');
     }
 
-    closeEditProfileModal() {
-        this.editProfileModalOverlay.classList.add('hidden');
+    showEditSuccess(msg) {
+        if (!this.editSuccess) return;
+        this.editSuccess.textContent = msg;
+        this.editSuccess.classList.remove('hidden');
     }
 
-    async handleEditProfileSubmit(e) {
-        e.preventDefault();
-        if (!this.isOwnProfile) return;
+    async saveProfile() {
+        if (!this.user) return;
 
-        const displayName = this.editDisplayName.value.trim();
-        const username = this.editUsername.value.trim().replace(/^@/, '');
+        const display_name = this.editDisplayName.value.trim();
         const bio = this.editBio.value.trim();
+        const avatar_url = this.editAvatarUrl.value.trim() || null;
 
-        if (!displayName || !username) {
-            this.editProfileMessage.textContent = 'Display name and username are required.';
-            this.editProfileMessage.className = 'edit-profile-message error';
+        if (!display_name) {
+            this.showEditError('Display name cannot be empty.');
             return;
         }
 
-        try {
-            this.setEditProfileLoading(true);
+        this.clearEditMessages();
 
-            // Needs backend route: PUT /api/users/me
+        try {
+            const token = typeof getAuthToken === 'function' ? getAuthToken() : null;
+            if (!token) {
+                this.showEditError('You are not logged in.');
+                return;
+            }
+
             const res = await fetch(`${API_BASE_URL}/users/me`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${getAuthToken?.() || ''}`
+                    'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({
-                    display_name: displayName,
-                    username,
-                    bio
-                })
+                body: JSON.stringify({ display_name, bio, avatar_url })
             });
 
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.error || 'Failed to update profile');
+                this.showEditError(errData.error || 'Failed to update profile.');
+                return;
             }
 
             const updated = await res.json();
-            this.profile = updated;
-            this.renderProfileHeader();
-            this.editProfileMessage.textContent = 'Profile updated.';
-            this.editProfileMessage.className = 'edit-profile-message success';
+            this.user = updated;
+            this.renderProfile();
 
-            // Optionally update local stored user
-            const currentUser = getCurrentUser?.();
-            if (currentUser) {
-                currentUser.display_name = updated.display_name;
-                currentUser.username = updated.username;
-                currentUser.bio = updated.bio;
-                if (window.setCurrentUser) {
-                    setCurrentUser(currentUser);
-                }
+            if (typeof setCurrentUser === 'function') {
+                setCurrentUser(updated);
             }
 
-            setTimeout(() => this.closeEditProfileModal(), 800);
+            this.showEditSuccess('Profile updated!');
+            setTimeout(() => this.closeEditModal(), 800);
 
         } catch (err) {
-            console.error('Edit profile error:', err);
-            this.editProfileMessage.textContent = err.message || 'Failed to update profile.';
-            this.editProfileMessage.className = 'edit-profile-message error';
-        } finally {
-            this.setEditProfileLoading(false);
+            console.error('Error saving profile:', err);
+            this.showEditError('Unexpected error updating profile.');
         }
     }
 
-    setEditProfileLoading(loading) {
-        const saveBtn = document.getElementById('saveEditProfile');
-        if (!saveBtn) return;
-        saveBtn.disabled = loading;
-        saveBtn.textContent = loading ? 'Saving...' : 'Save';
-    }
-
-    async handleAvatarFileChange(e) {
-        const file = e.target.files[0];
-        if (!file || !this.isOwnProfile) return;
-
-        const formData = new FormData();
-        formData.append('avatar', file);
-
-        try:
-            // Needs backend route: POST /api/users/me/avatar (multipart)
-            const res = await fetch(`${API_BASE_URL}/users/me/avatar`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${getAuthToken?.() || ''}`
-                },
-                body: formData
-            });
-
-            if (!res.ok) {
-                const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.error || 'Failed to upload avatar');
-            }
-
-            const data = await res.json();
-            if (data.avatar_url) {
-                this.profile.avatar_url = data.avatar_url;
-                this.renderProfileHeader();
-            }
-
-        } catch (err) {
-            console.error('Avatar upload error:', err);
-            alert(err.message || 'Failed to upload avatar.');
-        } finally {
-            this.avatarFileInput.value = '';
-        }
-    }
-
-    /* ---------------- TABS ---------------- */
-
-    handleTabClick(tab) {
-        const tabName = tab.dataset.tab;
-        const tabs = document.querySelectorAll('.profile-tab');
-        const panels = document.querySelectorAll('.profile-tab-panel');
-
-        tabs.forEach(t => t.classList.toggle('active', t === tab));
-        panels.forEach(panel => {
-            panel.classList.toggle(
-                'active',
-                panel.id === `profile${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`
-            );
+    formatJoined(dateString) {
+        if (!dateString) return 'Joined —';
+        const d = new Date(dateString);
+        const text = d.toLocaleDateString('en-US', {
+            month: 'long',
+            year: 'numeric'
         });
-    }
-
-    /* ---------------- UTILS ---------------- */
-
-    escape(str = '') {
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
+        return `Joined ${text}`;
     }
 }
 
-/* -------- INIT -------- */
-
+// Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    if (document.getElementById('profileHeader')) {
-        window.profilePage = new ProfilePage();
-        profilePage.init();
-    }
+    new ProfilePage();
 });
