@@ -13,19 +13,34 @@
             <h1 class="auth-title">Welcome Back</h1>
             <p class="auth-subtitle">Sign in to your private account</p>
             
-            <form id="loginForm" class="auth-form">
+            <!-- ID changed to login-form to match auth.js -->
+            <form id="login-form" class="auth-form">
                 <div class="form-group">
-                    <label for="loginIdentifier">Username or Email</label>
-                    <input type="text" id="loginIdentifier" name="loginIdentifier" required 
-                           placeholder="Enter your username or email">
+                    <label for="login-email">Email</label>
+                    <!-- ID changed to login-email to match auth.js -->
+                    <input
+                        type="email"
+                        id="login-email"
+                        name="login-email"
+                        required
+                        placeholder="Enter your email"
+                    >
                 </div>
                 
                 <div class="form-group">
-                    <label for="loginPassword">Password</label>
-                    <input type="password" id="loginPassword" name="loginPassword" required 
-                           placeholder="Enter your password">
+                    <label for="login-password">Password</label>
+                    <!-- ID changed to login-password to match auth.js -->
+                    <input
+                        type="password"
+                        id="login-password"
+                        name="login-password"
+                        required
+                        placeholder="Enter your password"
+                    >
                     <div class="password-actions">
-                        <a href="forgot-password.html" class="forgot-password">Forgot password?</a>
+                        <a href="forgot-password.html" class="forgot-password">
+                            Forgot password?
+                        </a>
                     </div>
                 </div>
                 
