@@ -27,8 +27,8 @@ app.use(express.json());
 app.use(
   cors({
     origin: [
-      'https://spepdb.github.io',
-      'https://uncensored-app-beta-production.up.railway.app'
+      'https://spepdb.github.io',                           // GitHub Pages
+      'https://uncensored-app-beta-production.up.railway.app' // (if you ever hit it directly)
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -69,6 +69,7 @@ app.get('/api/health', async (req, res) => {
     const { count } = await supabase
       .from('users')
       .select('*', { count: 'exact', head: true });
+
     res.json({
       status: 'OK',
       timestamp: new Date().toISOString(),
@@ -76,7 +77,7 @@ app.get('/api/health', async (req, res) => {
     });
   } catch (err) {
     console.error('Health error:', err);
-    res.status(500).json({ status: 'ERROR' });
+    res.status(500).json({ status: 'ERROR', details: err.message || err });
   }
 });
 
@@ -84,6 +85,8 @@ app.get('/api/health', async (req, res) => {
 app.post('/api/auth/signup', async (req, res) => {
   try {
     const { displayName, username, email, password } = req.body;
+
+    console.log('Signup request body:', req.body);
 
     if (!displayName || !username || !email || !password) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -98,7 +101,10 @@ app.post('/api/auth/signup', async (req, res) => {
 
     if (checkError) {
       console.error('Supabase check error:', checkError);
-      return res.status(500).json({ error: 'Error checking user' });
+      return res.status(500).json({
+        error: 'Error checking user',
+        details: checkError.message || checkError
+      });
     }
 
     if (existing && existing.length > 0) {
@@ -120,6 +126,8 @@ app.post('/api/auth/signup', async (req, res) => {
       last_login_at: now
     };
 
+    console.log('Inserting user:', newUser);
+
     const { data: inserted, error: insertError } = await supabase
       .from('users')
       .insert(newUser)
@@ -128,7 +136,10 @@ app.post('/api/auth/signup', async (req, res) => {
 
     if (insertError) {
       console.error('Supabase insert error:', insertError);
-      return res.status(500).json({ error: 'Error creating user' });
+      return res.status(500).json({
+        error: 'Supabase insert error',
+        details: insertError.message || insertError
+      });
     }
 
     const token = signToken(inserted);
@@ -145,7 +156,10 @@ app.post('/api/auth/signup', async (req, res) => {
     });
   } catch (err) {
     console.error('Signup error:', err);
-    res.status(500).json({ error: 'Signup failed' });
+    res.status(500).json({
+      error: 'Signup failed',
+      details: err.message || err
+    });
   }
 });
 
@@ -153,6 +167,8 @@ app.post('/api/auth/signup', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+
+    console.log('Login request body:', req.body);
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Missing email or password' });
@@ -165,6 +181,7 @@ app.post('/api/auth/login', async (req, res) => {
       .single();
 
     if (userError || !user) {
+      console.error('User lookup error:', userError);
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
@@ -174,6 +191,12 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const token = signToken(user);
+
+    // update last_login_at
+    await supabase
+      .from('users')
+      .update({ last_login_at: new Date().toISOString() })
+      .eq('id', user.id);
 
     res.json({
       user: {
@@ -187,7 +210,10 @@ app.post('/api/auth/login', async (req, res) => {
     });
   } catch (err) {
     console.error('Login error:', err);
-    res.status(500).json({ error: 'Login failed' });
+    res.status(500).json({
+      error: 'Login failed',
+      details: err.message || err
+    });
   }
 });
 
@@ -201,6 +227,7 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
       .single();
 
     if (error || !user) {
+      console.error('/auth/me error:', error);
       return res.status(404).json({ error: 'User not found' });
     }
 
