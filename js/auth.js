@@ -1,8 +1,9 @@
-// public/js/auth.js
+// js/auth.js
 
+// === CONFIG ===
 const API_BASE_URL = 'https://uncensored-app-beta-production.up.railway.app/api';
 
-// --- Token helpers ---
+// === TOKEN HELPERS ===
 function getAuthToken() {
   return localStorage.getItem('authToken');
 }
@@ -15,7 +16,7 @@ function setAuthToken(token) {
   }
 }
 
-// --- UI helpers ---
+// === UI HELPERS ===
 function updateAuthUI(isLoggedIn, user) {
   const authButtons = document.getElementById('authButtons');
   const profileSection = document.getElementById('profileSection');
@@ -49,7 +50,7 @@ function updateAuthUI(isLoggedIn, user) {
   }
 }
 
-// --- Fetch helper ---
+// === GENERIC API WRAPPER ===
 async function apiRequest(path, options = {}) {
   const url = `${API_BASE_URL}${path}`;
   const headers = options.headers || {};
@@ -65,11 +66,11 @@ async function apiRequest(path, options = {}) {
 
   const response = await fetch(url, { ...options, headers });
 
-  let data;
+  let data = null;
   try {
     data = await response.json();
   } catch (e) {
-    data = null;
+    // ignore – some responses may be empty
   }
 
   if (!response.ok) {
@@ -82,9 +83,9 @@ async function apiRequest(path, options = {}) {
   return data;
 }
 
-// --- Signup handler ---
+// === SIGNUP HANDLER ===
 async function handleSignup(event) {
-  event.preventDefault();
+  if (event) event.preventDefault(); // stop page reload
 
   const displayName = document.getElementById('displayName')?.value.trim();
   const username = document.getElementById('username')?.value.trim();
@@ -94,12 +95,12 @@ async function handleSignup(event) {
 
   if (!displayName || !username || !email || !password || !confirmPassword) {
     alert('Please fill in all fields.');
-    return;
+    return false;
   }
 
   if (password !== confirmPassword) {
     alert('Passwords do not match.');
-    return;
+    return false;
   }
 
   const signupBtn = document.getElementById('signupBtn');
@@ -114,7 +115,6 @@ async function handleSignup(event) {
       body: JSON.stringify({ displayName, username, email, password })
     });
 
-    // Save token and redirect to home
     setAuthToken(data.token);
     alert('Account created! Redirecting...');
     window.location.href = 'index.html';
@@ -127,22 +127,23 @@ async function handleSignup(event) {
       signupBtn.textContent = 'Create Account';
     }
   }
+
+  return false; // IMPORTANT: prevent normal form submit
 }
 
-// --- Login handler ---
+// === LOGIN HANDLER ===
 async function handleLogin(event) {
-  event.preventDefault();
+  if (event) event.preventDefault(); // stop page reload
 
   const identifier = document.getElementById('loginIdentifier')?.value.trim();
   const password = document.getElementById('loginPassword')?.value;
 
   if (!identifier || !password) {
     alert('Please enter your username/email and password.');
-    return;
+    return false;
   }
 
-  // For now we treat identifier as email (your login form says "username or email"
-  // but backend currently expects email; we can extend later.)
+  // For now treat identifier as email (backend expects email)
   const email = identifier;
 
   const loginBtn = document.getElementById('loginBtn');
@@ -169,16 +170,17 @@ async function handleLogin(event) {
       loginBtn.textContent = 'Sign In';
     }
   }
+
+  return false; // IMPORTANT: prevent normal form submit
 }
 
-// --- Logout (used by index.html onclick="logout()") ---
+// === LOGOUT ===
 function logout() {
   setAuthToken(null);
   window.location.href = 'login.html';
 }
-window.logout = logout; // expose globally
 
-// --- Check auth state on load (for index.html etc.) ---
+// === AUTH STATE ON OTHER PAGES (HOME) ===
 async function checkAuthState() {
   const token = getAuthToken();
   if (!token) {
@@ -196,19 +198,13 @@ async function checkAuthState() {
   }
 }
 
-// --- Attach listeners ---
+// expose handlers so HTML onsubmit can call them
+window.handleSignup = handleSignup;
+window.handleLogin = handleLogin;
+window.logout = logout;
+
+// run on pages that care about auth state
 document.addEventListener('DOMContentLoaded', () => {
-  const signupForm = document.getElementById('signupForm');
-  if (signupForm) {
-    signupForm.addEventListener('submit', handleSignup);
-  }
-
-  const loginForm = document.getElementById('loginForm');
-  if (loginForm) {
-    loginForm.addEventListener('submit', handleLogin);
-  }
-
-  // Only check auth state on pages that have the home UI
   if (document.getElementById('authButtons') || document.getElementById('postCreation')) {
     checkAuthState();
   }
