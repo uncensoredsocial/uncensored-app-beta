@@ -1,290 +1,245 @@
 // js/profile.js
+
 const API_BASE_URL = 'https://uncensored-app-beta-production.up.railway.app/api';
 
 class ProfilePage {
     constructor() {
-        this.user = null;
-        this.init();
+        this.profile = null;
+        this.pendingAvatarDataUrl = null; // used if they upload an image
     }
 
     async init() {
-        // Require auth
-        if (typeof isLoggedIn === 'function' && !isLoggedIn()) {
+        // if not logged in, go to signup
+        if (!isLoggedIn || !getAuthToken || !getCurrentUser || !isLoggedIn()) {
             window.location.href = 'signup.html';
             return;
         }
 
-        this.cacheElements();
-        this.setupEvents();
+        this.cacheDom();
+        this.bindEvents();
 
         await this.loadProfile();
-        this.loadPostsPlaceholder();
     }
 
-    cacheElements() {
+    cacheDom() {
         this.displayNameEl = document.getElementById('profileDisplayName');
-        this.usernameEl = document.getElementById('profileUsername');
-        this.bioEl = document.getElementById('profileBio');
-        this.joinedEl = document.getElementById('profileJoined');
-        this.avatarEl = document.getElementById('profileAvatar');
-        this.postsCountEl = document.getElementById('profilePostsCount');
-        this.followersCountEl = document.getElementById('profileFollowersCount');
-        this.followingCountEl = document.getElementById('profileFollowingCount');
-
+        this.usernameEl    = document.getElementById('profileUsername');
+        this.avatarEl      = document.getElementById('profileAvatar');
+        this.joinDateEl    = document.getElementById('joinDate');
+        this.postsCountEl  = document.getElementById('postsCount');
+        this.followersEl   = document.getElementById('followersCount');
+        this.followingEl   = document.getElementById('followingCount');
         this.postsContainer = document.getElementById('profilePosts');
 
-        // Edit modal
-        this.editModal = document.getElementById('editProfileModal');
-        this.editDisplayName = document.getElementById('editDisplayName');
-        this.editBio = document.getElementById('editBio');
-        this.editAvatarUrl = document.getElementById('editAvatarUrl');
-        this.bioCharCounter = document.getElementById('bioCharCounter');
-        this.editError = document.getElementById('editProfileError');
-        this.editSuccess = document.getElementById('editProfileSuccess');
+        // edit modal elements
+        this.editModal      = document.getElementById('editProfileModal');
+        this.editNameInput  = document.getElementById('editDisplayName');
+        this.editBioInput   = document.getElementById('editBio');
+        this.editAvatarUrlInput = document.getElementById('editAvatarUrl');
+        this.editAvatarFileInput = document.getElementById('editAvatarFile');
+        this.bioCounter     = document.getElementById('bioCharCounter');
     }
 
-    setupEvents() {
-        // Settings button -> settings.html (placeholder)
-        const settingsButton = document.getElementById('settingsButton');
-        if (settingsButton) {
-            settingsButton.addEventListener('click', () => {
-                // you can create settings.html later
-                window.location.href = 'settings.html';
-            });
-        }
-
-        // Tabs
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
+    bindEvents() {
+        // Edit profile button
+        document.getElementById('editProfileBtn')?.addEventListener('click', () => {
+            this.openEditModal();
         });
 
-        // Edit profile open/close
-        document.getElementById('editProfileButton')?.addEventListener('click', () => this.openEditModal());
-        document.getElementById('closeEditProfile')?.addEventListener('click', () => this.closeEditModal());
-        document.getElementById('cancelEditProfile')?.addEventListener('click', (e) => {
-            e.preventDefault();
-            this.closeEditModal();
-        });
+        // Modal close buttons
+        document.getElementById('closeEditModal')?.addEventListener('click', () => this.closeEditModal());
+        document.getElementById('cancelEditBtn')?.addEventListener('click', () => this.closeEditModal());
 
-        document.getElementById('saveEditProfile')?.addEventListener('click', (e) => {
-            e.preventDefault();
-            this.saveProfile();
-        });
+        // Save button
+        document.getElementById('saveProfileBtn')?.addEventListener('click', () => this.saveProfile());
 
         // Bio counter
-        this.editBio?.addEventListener('input', () => this.updateBioCounter());
+        this.editBioInput?.addEventListener('input', () => this.updateBioCounter());
 
-        // Close modal on backdrop click
-        this.editModal?.addEventListener('click', (e) => {
-            if (e.target === this.editModal) this.closeEditModal();
+        // Avatar file upload -> convert to data URL (simple approach)
+        this.editAvatarFileInput?.addEventListener('change', (e) => this.handleAvatarFile(e));
+
+        // Settings icon → settings.html
+        document.getElementById('settingsButton')?.addEventListener('click', () => {
+            window.location.href = 'settings.html';
         });
     }
 
     async loadProfile() {
         try {
-            const token = typeof getAuthToken === 'function' ? getAuthToken() : null;
-            if (!token) {
-                window.location.href = 'signup.html';
-                return;
-            }
-
             const res = await fetch(`${API_BASE_URL}/users/me`, {
                 headers: {
-                    'Authorization': `Bearer ${token}`
+                    'Authorization': `Bearer ${getAuthToken()}`
                 }
             });
 
             if (!res.ok) {
-                console.error('Profile load failed', await res.text());
-                window.location.href = 'signup.html';
-                return;
+                if (res.status === 401) {
+                    // token invalid → force re-login
+                    clearAuth && clearAuth();
+                    window.location.href = 'signup.html';
+                    return;
+                }
+                throw new Error('Failed to load profile');
             }
 
             const data = await res.json();
-            this.user = data;
-
-            // Fallbacks
-            this.user.display_name = this.user.display_name || this.user.username;
-            this.user.bio = this.user.bio || '';
-
-            // Update UI
+            this.profile = data;
             this.renderProfile();
-
-            // Refresh localStorage copy so other pages see updated data
-            if (typeof setCurrentUser === 'function') {
-                setCurrentUser(this.user);
-            }
-
+            this.renderEmptyPosts();
         } catch (err) {
-            console.error('Error loading profile:', err);
+            console.error('loadProfile error:', err);
+            alert('Error loading profile. Please try again.');
         }
     }
 
     renderProfile() {
-        if (!this.user) return;
+        if (!this.profile) return;
 
-        const displayName = this.user.display_name || this.user.username;
-        this.displayNameEl.textContent = displayName;
-        this.usernameEl.textContent = `@${this.user.username}`;
-        this.bioEl.textContent = this.user.bio || 'No bio yet.';
-        this.joinedEl.textContent = this.formatJoined(this.user.created_at);
+        const {
+            display_name,
+            username,
+            avatar_url,
+            bio,
+            created_at
+        } = this.profile;
 
-        if (this.user.avatar_url) {
-            this.avatarEl.src = this.user.avatar_url;
-        } else {
-            this.avatarEl.src = 'assets/icons/default-profile.png';
+        if (this.displayNameEl) this.displayNameEl.textContent = display_name || 'Unnamed';
+        if (this.usernameEl) this.usernameEl.textContent = '@' + (username || 'username');
+        if (this.avatarEl) {
+            this.avatarEl.src = avatar_url || 'assets/icons/default-profile.png';
+            this.avatarEl.onerror = () => {
+                this.avatarEl.src = 'assets/icons/default-profile.png';
+            };
+        }
+        if (this.joinDateEl) {
+            const d = created_at ? new Date(created_at) : new Date();
+            this.joinDateEl.textContent =
+                'Joined ' + d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
         }
 
-        // For now, counts are 0 until you wire follow/post systems
-        this.postsCountEl.textContent = this.user.posts_count || 0;
-        this.followersCountEl.textContent = this.user.followers_count || 0;
-        this.followingCountEl.textContent = this.user.following_count || 0;
+        // We don't have followers / following counts yet – just show 0 safely.
+        if (this.postsCountEl) this.postsCountEl.textContent = '0';
+        if (this.followersEl) this.followersEl.textContent = '0';
+        if (this.followingEl) this.followingEl.textContent = '0';
     }
 
-    loadPostsPlaceholder() {
+    renderEmptyPosts() {
         if (!this.postsContainer) return;
-
         this.postsContainer.innerHTML = `
-            <div class="empty-state">
-                <h3>No posts yet</h3>
-                <p>Share your first post from the home feed.</p>
-                <button class="btn btn-primary mt-3" onclick="window.location.href='index.html'">
-                    Go to Home
-                </button>
-            </div>
+          <div class="empty-state">
+            <h3>No posts yet</h3>
+            <p>Share something on the home feed!</p>
+            <button class="btn btn-primary mt-3" onclick="window.location.href='index.html'">
+              Go to Home
+            </button>
+          </div>
         `;
     }
 
-    switchTab(tab) {
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.tab === tab);
-        });
-
-        document.querySelectorAll('.tab-pane').forEach(pane => {
-            pane.classList.toggle('active', pane.id === `${tab}Tab`);
-        });
-    }
+    // ---- Edit Profile ----
 
     openEditModal() {
-        if (!this.user || !this.editModal) return;
+        if (!this.profile || !this.editModal) return;
 
-        this.editDisplayName.value = this.user.display_name || '';
-        this.editBio.value = this.user.bio || '';
-        this.editAvatarUrl.value = this.user.avatar_url || '';
+        this.editNameInput.value  = this.profile.display_name || '';
+        this.editBioInput.value   = this.profile.bio || '';
+        this.editAvatarUrlInput.value = this.profile.avatar_url || '';
+        this.pendingAvatarDataUrl = null;
+
         this.updateBioCounter();
-
-        this.clearEditMessages();
         this.editModal.classList.add('open');
-        this.editModal.setAttribute('aria-hidden', 'false');
     }
 
     closeEditModal() {
-        if (!this.editModal) return;
-        this.editModal.classList.remove('open');
-        this.editModal.setAttribute('aria-hidden', 'true');
+        if (this.editModal) {
+            this.editModal.classList.remove('open');
+        }
     }
 
     updateBioCounter() {
-        if (!this.editBio || !this.bioCharCounter) return;
-        const len = this.editBio.value.length;
-        this.bioCharCounter.textContent = `${len}/160`;
+        if (!this.bioCounter || !this.editBioInput) return;
+        const len = this.editBioInput.value.length;
+        this.bioCounter.textContent = `${len}/160`;
 
-        this.bioCharCounter.classList.remove('warning', 'error');
+        this.bioCounter.classList.remove('warning', 'error');
         if (len > 160) {
-            this.bioCharCounter.classList.add('error');
+            this.bioCounter.classList.add('error');
         } else if (len > 140) {
-            this.bioCharCounter.classList.add('warning');
+            this.bioCounter.classList.add('warning');
         }
     }
 
-    clearEditMessages() {
-        if (this.editError) {
-            this.editError.classList.add('hidden');
-            this.editError.textContent = '';
-        }
-        if (this.editSuccess) {
-            this.editSuccess.classList.add('hidden');
-            this.editSuccess.textContent = '';
-        }
-    }
-
-    showEditError(msg) {
-        if (!this.editError) return;
-        this.editError.textContent = msg;
-        this.editError.classList.remove('hidden');
-    }
-
-    showEditSuccess(msg) {
-        if (!this.editSuccess) return;
-        this.editSuccess.textContent = msg;
-        this.editSuccess.classList.remove('hidden');
+    handleAvatarFile(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            this.pendingAvatarDataUrl = reader.result; // data:image/... base64
+            // Preview immediately
+            if (this.avatarEl) this.avatarEl.src = this.pendingAvatarDataUrl;
+        };
+        reader.readAsDataURL(file);
     }
 
     async saveProfile() {
-        if (!this.user) return;
+        if (!this.profile) return;
 
-        const display_name = this.editDisplayName.value.trim();
-        const bio = this.editBio.value.trim();
-        const avatar_url = this.editAvatarUrl.value.trim() || null;
+        const display_name = this.editNameInput.value.trim();
+        const bio          = this.editBioInput.value.trim();
+        let avatar_url     = this.editAvatarUrlInput.value.trim() || this.profile.avatar_url || null;
+
+        // If they uploaded a file this session, prefer that
+        if (this.pendingAvatarDataUrl) {
+            avatar_url = this.pendingAvatarDataUrl;
+        }
 
         if (!display_name) {
-            this.showEditError('Display name cannot be empty.');
+            alert('Display name is required.');
+            return;
+        }
+        if (bio.length > 160) {
+            alert('Bio must be 160 characters or less.');
             return;
         }
 
-        this.clearEditMessages();
-
         try {
-            const token = typeof getAuthToken === 'function' ? getAuthToken() : null;
-            if (!token) {
-                this.showEditError('You are not logged in.');
-                return;
-            }
-
             const res = await fetch(`${API_BASE_URL}/users/me`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Authorization': `Bearer ${getAuthToken()}`
                 },
                 body: JSON.stringify({ display_name, bio, avatar_url })
             });
 
             if (!res.ok) {
-                const errData = await res.json().catch(() => ({}));
-                this.showEditError(errData.error || 'Failed to update profile.');
-                return;
+                throw new Error('Failed to update profile');
             }
 
             const updated = await res.json();
-            this.user = updated;
-            this.renderProfile();
+            this.profile = updated;
 
-            if (typeof setCurrentUser === 'function') {
-                setCurrentUser(updated);
+            // also update cached user in localStorage via auth.js helper if present
+            try {
+                if (typeof setCurrentUser === 'function') {
+                    setCurrentUser(updated);
+                }
+            } catch (e) {
+                console.warn('Could not update cached currentUser:', e);
             }
 
-            this.showEditSuccess('Profile updated!');
-            setTimeout(() => this.closeEditModal(), 800);
-
+            this.renderProfile();
+            this.closeEditModal();
+            alert('Profile updated!');
         } catch (err) {
-            console.error('Error saving profile:', err);
-            this.showEditError('Unexpected error updating profile.');
+            console.error('saveProfile error:', err);
+            alert('Error updating profile. Please try again.');
         }
-    }
-
-    formatJoined(dateString) {
-        if (!dateString) return 'Joined —';
-        const d = new Date(dateString);
-        const text = d.toLocaleDateString('en-US', {
-            month: 'long',
-            year: 'numeric'
-        });
-        return `Joined ${text}`;
     }
 }
 
-// Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    new ProfilePage();
+    const page = new ProfilePage();
+    page.init();
 });
