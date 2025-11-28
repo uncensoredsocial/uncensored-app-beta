@@ -1,18 +1,29 @@
-// Search Functionality
+// Search Functionality with Supabase Integration
 class SearchManager {
     constructor() {
         this.currentQuery = '';
         this.currentFilter = 'all';
         this.searchTimeout = null;
         this.isSearching = false;
+        this.supabase = null;
         
         this.init();
     }
 
     init() {
+        this.initializeSupabase();
         this.setupEventListeners();
         this.loadRecentSearches();
+        this.loadTrendingHashtags();
         this.updateUI();
+    }
+
+    initializeSupabase() {
+        // Initialize Supabase client
+        this.supabase = supabase.createClient(
+            'YOUR_SUPABASE_URL',
+            'YOUR_SUPABASE_ANON_KEY'
+        );
     }
 
     setupEventListeners() {
@@ -121,74 +132,122 @@ class SearchManager {
     }
 
     async fetchSearchResults(query, filter) {
-        // Simulate API call - replace with actual backend endpoint
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+            const results = {
+                users: [],
+                posts: [],
+                hashtags: []
+            };
 
-        // Mock data - replace with actual API response
-        const mockResults = {
-            users: [
-                {
-                    id: '1',
-                    username: 'john_doe',
-                    displayName: 'John Doe',
-                    avatar: 'assets/icons/default-profile.png',
-                    bio: 'Digital creator and tech enthusiast',
-                    isFollowing: false
-                },
-                {
-                    id: '2',
-                    username: 'jane_smith',
-                    displayName: 'Jane Smith',
-                    avatar: 'assets/icons/default-profile.png',
-                    bio: 'Photographer and traveler',
-                    isFollowing: true
-                }
-            ],
-            posts: [
-                {
-                    id: '1',
-                    userId: '1',
-                    content: `Just discovered this amazing social platform! The search functionality is incredible. #SocialMedia #Tech`,
-                    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-                    likes: 15,
-                    comments: 3,
-                    user: {
-                        username: 'john_doe',
-                        displayName: 'John Doe',
-                        avatar: 'assets/icons/default-profile.png'
-                    }
-                },
-                {
-                    id: '2',
-                    userId: '2',
-                    content: `Beautiful sunset today! #Photography #Nature`,
-                    createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-                    likes: 42,
-                    comments: 8,
-                    user: {
-                        username: 'jane_smith',
-                        displayName: 'Jane Smith',
-                        avatar: 'assets/icons/default-profile.png'
-                    }
-                }
-            ],
-            hashtags: [
-                {
-                    name: 'SocialMedia',
-                    count: 2540
-                },
-                {
-                    name: 'Tech',
-                    count: 1820
-                },
-                {
-                    name: 'Photography',
-                    count: 1560
-                }
-            ]
-        };
+            // Get current user for follow status checks
+            const currentUser = getCurrentUser();
 
-        return mockResults;
+            // Search users
+            if (filter === 'all' || filter === 'users') {
+                const { data: users, error } = await this.supabase
+                    .rpc('search_users', { 
+                        search_query: query,
+                        result_limit: 20
+                    });
+                
+                if (!error && users) {
+                    // Check follow status for each user if logged in
+                    const usersWithFollowStatus = await Promise.all(
+                        users.map(async (user) => {
+                            let isFollowing = false;
+                            
+                            if (currentUser) {
+                                const { data: follow } = await this.supabase
+                                    .from('follows')
+                                    .select('id')
+                                    .eq('follower_id', currentUser.id)
+                                    .eq('following_id', user.id)
+                                    .single();
+                                
+                                isFollowing = !!follow;
+                            }
+                            
+                            return {
+                                id: user.id,
+                                username: user.username,
+                                displayName: user.display_name || user.username,
+                                avatar: user.avatar_url || 'assets/icons/default-profile.png',
+                                bio: user.bio,
+                                followersCount: user.followers_count || 0,
+                                isFollowing: isFollowing
+                            };
+                        })
+                    );
+                    
+                    results.users = usersWithFollowStatus;
+                } else {
+                    console.error('Error searching users:', error);
+                }
+            }
+
+            // Search posts
+            if (filter === 'all' || filter === 'posts') {
+                const { data: posts, error } = await this.supabase
+                    .rpc('search_posts', { 
+                        search_query: query,
+                        result_limit: 20
+                    });
+                
+                if (!error && posts) {
+                    results.posts = posts.map(post => ({
+                        id: post.id,
+                        userId: post.user_id,
+                        content: post.content,
+                        createdAt: post.created_at,
+                        likes: post.likes_count || 0,
+                        comments: post.comments_count || 0,
+                        user: {
+                            username: post.username,
+                            displayName: post.display_name || post.username,
+                            avatar: post.avatar_url || 'assets/icons/default-profile.png'
+                        }
+                    }));
+                } else {
+                    console.error('Error searching posts:', error);
+                }
+            }
+
+            // Search hashtags
+            if (filter === 'all' || filter === 'hashtags') {
+                const { data: hashtags, error } = await this.supabase
+                    .rpc('search_hashtags', { 
+                        search_query: query,
+                        result_limit: 20
+                    });
+                
+                if (!error && hashtags) {
+                    results.hashtags = hashtags.map(hashtag => ({
+                        name: hashtag.name,
+                        count: hashtag.posts_count || 0,
+                        recentCount: hashtag.recent_posts_count || 0
+                    }));
+                } else {
+                    console.error('Error searching hashtags:', error);
+                }
+            }
+
+            // Log search to history if user is logged in
+            if (currentUser) {
+                const totalResults = Object.values(results).reduce((total, section) => total + section.length, 0);
+                await this.supabase.rpc('log_search', {
+                    search_user_id: currentUser.id,
+                    search_query: query,
+                    search_results_count: totalResults,
+                    search_type: filter
+                });
+            }
+
+            return results;
+
+        } catch (error) {
+            console.error('Search API error:', error);
+            throw error;
+        }
     }
 
     displaySearchResults(results, query) {
@@ -231,18 +290,34 @@ class SearchManager {
 
         usersSection.style.display = 'block';
         usersList.innerHTML = users.map(user => `
-            <a href="profile.html?user=${user.username}" class="user-card">
+            <div class="user-card" data-user-id="${user.id}">
                 <img src="${user.avatar}" alt="${user.displayName}" class="user-avatar" onerror="this.src='assets/icons/default-profile.png'">
                 <div class="user-info">
                     <div class="user-name">${this.escapeHtml(user.displayName)}</div>
                     <div class="user-handle">@${user.username}</div>
                     ${user.bio ? `<div class="user-bio">${this.escapeHtml(user.bio)}</div>` : ''}
+                    <div class="user-stats">
+                        <span class="follower-count">${user.followersCount.toLocaleString()} followers</span>
+                    </div>
                 </div>
-                <button class="btn btn-sm ${user.isFollowing ? 'btn-secondary' : 'btn-primary'} follow-btn">
+                <button class="btn btn-sm ${user.isFollowing ? 'btn-secondary' : 'btn-primary'} follow-btn" 
+                        onclick="searchManager.handleFollow('${user.id}', this)"
+                        ${!getCurrentUser() ? 'disabled' : ''}>
                     ${user.isFollowing ? 'Following' : 'Follow'}
                 </button>
-            </a>
+            </div>
         `).join('');
+
+        // Add click handlers to user cards
+        usersList.querySelectorAll('.user-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                // Don't navigate if clicking the follow button
+                if (!e.target.closest('.follow-btn')) {
+                    const userId = card.dataset.userId;
+                    window.location.href = `profile.html?user=${userId}`;
+                }
+            });
+        });
     }
 
     displayPostsResults(posts) {
@@ -258,7 +333,7 @@ class SearchManager {
 
         postsSection.style.display = 'block';
         postsList.innerHTML = posts.map(post => `
-            <div class="post-card" onclick="window.location.href='post.html?id=${post.id}'">
+            <div class="post-card" data-post-id="${post.id}">
                 <div class="post-header">
                     <img src="${post.user.avatar}" alt="${post.user.displayName}" class="post-user-avatar" onerror="this.src='assets/icons/default-profile.png'">
                     <div class="post-user-info">
@@ -271,17 +346,29 @@ class SearchManager {
                     ${this.formatPostContent(post.content)}
                 </div>
                 <div class="post-actions">
-                    <button class="post-action like-btn">
+                    <button class="post-action like-btn" onclick="searchManager.handleLike('${post.id}', this)" ${!getCurrentUser() ? 'disabled' : ''}>
                         <span>❤️</span>
-                        <span>${post.likes}</span>
+                        <span class="like-count">${post.likes}</span>
                     </button>
-                    <button class="post-action comment-btn">
+                    <button class="post-action comment-btn" onclick="searchManager.handleComment('${post.id}')" ${!getCurrentUser() ? 'disabled' : ''}>
                         <span>💬</span>
-                        <span>${post.comments}</span>
+                        <span class="comment-count">${post.comments}</span>
                     </button>
                 </div>
             </div>
         `).join('');
+
+        // Add click handlers to post cards
+        postsList.querySelectorAll('.post-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                // Don't navigate if clicking action buttons
+                if (!e.target.closest('.post-actions')) {
+                    const postId = card.dataset.postId;
+                    // You can implement a post detail page or show modal
+                    console.log('View post:', postId);
+                }
+            });
+        });
     }
 
     displayHashtagsResults(hashtags) {
@@ -302,9 +389,121 @@ class SearchManager {
                 <div class="hashtag-info">
                     <div class="hashtag-name">#${hashtag.name}</div>
                     <div class="hashtag-count">${hashtag.count.toLocaleString()} posts</div>
+                    ${hashtag.recentCount > 0 ? `<div class="hashtag-recent">${hashtag.recentCount} recent</div>` : ''}
                 </div>
             </a>
         `).join('');
+    }
+
+    async handleFollow(userId, button) {
+        const currentUser = getCurrentUser();
+        if (!currentUser) {
+            this.showMessage('Please log in to follow users', 'error');
+            return;
+        }
+
+        try {
+            const isCurrentlyFollowing = button.textContent === 'Following';
+            
+            if (isCurrentlyFollowing) {
+                // Unfollow
+                const { error } = await this.supabase
+                    .from('follows')
+                    .delete()
+                    .eq('follower_id', currentUser.id)
+                    .eq('following_id', userId);
+                
+                if (!error) {
+                    button.textContent = 'Follow';
+                    button.classList.remove('btn-secondary');
+                    button.classList.add('btn-primary');
+                    this.showMessage('Unfollowed user', 'success');
+                } else {
+                    throw error;
+                }
+            } else {
+                // Follow
+                const { error } = await this.supabase
+                    .from('follows')
+                    .insert({
+                        follower_id: currentUser.id,
+                        following_id: userId
+                    });
+                
+                if (!error) {
+                    button.textContent = 'Following';
+                    button.classList.remove('btn-primary');
+                    button.classList.add('btn-secondary');
+                    this.showMessage('Followed user', 'success');
+                } else {
+                    throw error;
+                }
+            }
+        } catch (error) {
+            console.error('Follow error:', error);
+            this.showMessage('Failed to follow user', 'error');
+        }
+    }
+
+    async handleLike(postId, button) {
+        const currentUser = getCurrentUser();
+        if (!currentUser) {
+            this.showMessage('Please log in to like posts', 'error');
+            return;
+        }
+
+        try {
+            const likeCount = button.querySelector('.like-count');
+            const isCurrentlyLiked = button.classList.contains('liked');
+            
+            if (isCurrentlyLiked) {
+                // Unlike
+                const { error } = await this.supabase
+                    .from('likes')
+                    .delete()
+                    .eq('user_id', currentUser.id)
+                    .eq('post_id', postId);
+                
+                if (!error) {
+                    button.classList.remove('liked');
+                    likeCount.textContent = parseInt(likeCount.textContent) - 1;
+                    this.showMessage('Post unliked', 'success');
+                } else {
+                    throw error;
+                }
+            } else {
+                // Like
+                const { error } = await this.supabase
+                    .from('likes')
+                    .insert({
+                        user_id: currentUser.id,
+                        post_id: postId
+                    });
+                
+                if (!error) {
+                    button.classList.add('liked');
+                    likeCount.textContent = parseInt(likeCount.textContent) + 1;
+                    this.showMessage('Post liked', 'success');
+                } else {
+                    throw error;
+                }
+            }
+        } catch (error) {
+            console.error('Like error:', error);
+            this.showMessage('Failed to like post', 'error');
+        }
+    }
+
+    handleComment(postId) {
+        const currentUser = getCurrentUser();
+        if (!currentUser) {
+            this.showMessage('Please log in to comment', 'error');
+            return;
+        }
+        
+        // You can implement comment functionality here
+        // For now, just show a message
+        this.showMessage('Comment feature coming soon!', 'info');
     }
 
     handleFilterChange(filter) {
@@ -445,6 +644,102 @@ class SearchManager {
         this.displayRecentSearches(recentSearches);
     }
 
+    async loadTrendingHashtags() {
+        try {
+            const { data: trending, error } = await this.supabase
+                .rpc('get_trending_hashtags', { 
+                    limit_count: 10,
+                    days_back: 7
+                });
+            
+            if (!error && trending) {
+                // Update the trending section in your HTML
+                const trendingList = document.querySelector('.trending-list');
+                if (trendingList) {
+                    trendingList.innerHTML = trending.map((item, index) => `
+                        <div class="trending-item" onclick="searchManager.searchHashtag('${item.name}')">
+                            <span class="trending-rank">${index + 1}</span>
+                            <div class="trending-content">
+                                <span class="trending-tag">#${item.name}</span>
+                                <span class="trending-count">${item.posts_count.toLocaleString()} posts</span>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } else {
+                console.error('Error loading trending hashtags:', error);
+                // Fallback to mock data
+                this.loadMockTrendingHashtags();
+            }
+        } catch (error) {
+            console.error('Error loading trending hashtags:', error);
+            // Fallback to mock data
+            this.loadMockTrendingHashtags();
+        }
+    }
+
+    loadMockTrendingHashtags() {
+        const mockTrending = [
+            { name: 'SocialMedia', posts_count: 2540 },
+            { name: 'Tech', posts_count: 1820 },
+            { name: 'Uncensored', posts_count: 1200 },
+            { name: 'Freedom', posts_count: 950 },
+            { name: 'Community', posts_count: 870 }
+        ];
+
+        const trendingList = document.querySelector('.trending-list');
+        if (trendingList) {
+            trendingList.innerHTML = mockTrending.map((item, index) => `
+                <div class="trending-item" onclick="searchManager.searchHashtag('${item.name}')">
+                    <span class="trending-rank">${index + 1}</span>
+                    <div class="trending-content">
+                        <span class="trending-tag">#${item.name}</span>
+                        <span class="trending-count">${item.posts_count.toLocaleString()} posts</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+    }
+
+    searchHashtag(hashtag) {
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.value = `#${hashtag}`;
+            this.performSearch(`#${hashtag}`);
+        }
+    }
+
+    showMessage(message, type = 'info') {
+        // Remove existing message
+        const existingMsg = document.querySelector('.status-message');
+        if (existingMsg) existingMsg.remove();
+
+        // Create new message
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `status-message status-${type}`;
+        messageDiv.textContent = message;
+        messageDiv.style.cssText = `
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10000;
+            max-width: 90%;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+        `;
+
+        document.body.appendChild(messageDiv);
+
+        // Auto remove after 3 seconds
+        setTimeout(() => {
+            if (messageDiv.parentNode) {
+                messageDiv.parentNode.removeChild(messageDiv);
+            }
+        }, 3000);
+    }
+
     // Utility functions
     formatTime(timestamp) {
         const date = new Date(timestamp);
@@ -468,13 +763,13 @@ class SearchManager {
         let formatted = this.escapeHtml(content);
         
         // Convert URLs to links
-        formatted = formatted.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color: var(--primary-color);">$1</a>');
+        formatted = formatted.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color: var(--primary-color); text-decoration: none;">$1</a>');
         
         // Convert hashtags
-        formatted = formatted.replace(/#(\w+)/g, '<span style="color: var(--primary-color);">#$1</span>');
+        formatted = formatted.replace(/#(\w+)/g, '<span style="color: var(--primary-color); font-weight: 500;">#$1</span>');
         
         // Convert mentions
-        formatted = formatted.replace(/@(\w+)/g, '<span style="color: var(--primary-color);">@$1</span>');
+        formatted = formatted.replace(/@(\w+)/g, '<span style="color: var(--primary-color); font-weight: 500;">@$1</span>');
         
         return formatted;
     }
@@ -530,3 +825,6 @@ let searchManager;
 document.addEventListener('DOMContentLoaded', () => {
     searchManager = new SearchManager();
 });
+
+// Make functions globally available for onclick handlers
+window.searchManager = searchManager;
