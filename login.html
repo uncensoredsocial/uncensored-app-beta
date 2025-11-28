@@ -1,62 +1,108 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Social Platform</title>
-    <link rel="stylesheet" href="css/styles.css">
-    <link rel="stylesheet" href="css/auth-styles.css">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Log In – UncensoredSocial</title>
+
+    <!-- Global + auth styles -->
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/auth-styles.css" />
 </head>
 <body>
-    <div class="auth-container">
-        <div class="auth-card">
-            <h1 class="auth-title">Welcome Back</h1>
+    <!-- HEADER (same pattern as index) -->
+    <header class="header">
+        <div class="header-left">
+            <div class="profile-section" id="profileSection">
+                <button class="profile-icon" id="profileButton" type="button">
+                    <img id="headerProfileImg" src="assets/icons/default-profile.png" alt="Profile" />
+                </button>
+            </div>
+        </div>
+
+        <h1 class="logo">Uncensored<span>Social</span></h1>
+
+        <div class="header-actions">
+            <div class="auth-buttons" id="authButtons">
+                <a href="login.html" class="btn btn-ghost btn-sm">Log In</a>
+                <a href="signup.html" class="btn btn-signup btn-sm">Sign Up</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="auth-main">
+        <section class="auth-card">
+            <h2 class="auth-title">Welcome Back</h2>
             <p class="auth-subtitle">Sign in to your private account</p>
-            
-            <!-- ID changed to login-form to match auth.js -->
-            <form id="loginForm" class="auth-form" onsubmit="return handleLogin(event)">
+
+            <!-- IMPORTANT: no action / method / onsubmit -->
+            <form id="loginForm" novalidate>
                 <div class="form-group">
-                    <label for="login-email">Email</label>
-                    <!-- ID changed to login-email to match auth.js -->
+                    <label for="loginIdentifier">Email or Username</label>
                     <input
-                        type="email"
-                        id="login-email"
-                        name="login-email"
-                        required
-                        placeholder="Enter your email"
-                    >
+                        type="text"
+                        id="loginIdentifier"
+                        autocomplete="username"
+                        placeholder="you@example.com or @username"
+                    />
                 </div>
-                
+
                 <div class="form-group">
-                    <label for="login-password">Password</label>
-                    <!-- ID changed to login-password to match auth.js -->
+                    <label for="loginPassword">Password</label>
                     <input
                         type="password"
-                        id="login-password"
-                        name="login-password"
-                        required
-                        placeholder="Enter your password"
-                    >
-                    <div class="password-actions">
-                        <a href="forgot-password.html" class="forgot-password">
-                            Forgot password?
-                        </a>
-                    </div>
+                        id="loginPassword"
+                        autocomplete="current-password"
+                        placeholder="••••••••"
+                    />
                 </div>
-                
-                <button type="submit" class="auth-btn" id="loginBtn">
+
+                <div id="errorMessage" class="auth-message auth-error hidden"></div>
+                <div id="successMessage" class="auth-message auth-success hidden"></div>
+
+                <button type="submit" id="loginBtn" class="btn btn-primary btn-lg auth-submit">
                     Sign In
                 </button>
-            </form>
-            
-            <div class="auth-links">
-                <p>Don't have an account? <a href="signup.html">Sign up</a></p>
-            </div>
-            
-            <div id="errorMessage" class="error-message hidden"></div>
-        </div>
-    </div>
 
+                <p class="auth-footer-text">
+                    Don’t have an account?
+                    <a href="signup.html">Sign up</a>
+                </p>
+            </form>
+        </section>
+    </main>
+
+    <!-- Bottom nav if you want it on auth pages -->
+    <nav class="bottom-nav">
+        <a href="index.html" class="nav-item">
+            <span class="icon">🏠</span>
+            <span class="nav-label">Home</span>
+        </a>
+        <a href="search.html" class="nav-item">
+            <span class="icon">🔍</span>
+            <span class="nav-label">Search</span>
+        </a>
+        <a href="notifications.html" class="nav-item">
+            <span class="icon">🔔</span>
+            <span class="nav-label">Alerts</span>
+        </a>
+        <a href="dms.html" class="nav-item">
+            <span class="icon">✉️</span>
+            <span class="nav-label">Messages</span>
+        </a>
+    </nav>
+
+    <!-- Scripts: auth.js MUST be included; no inline alerts, no old login() -->
     <script src="js/auth.js"></script>
+    <script>
+        // Clicking profile icon goes to your own profile when logged in
+        document.getElementById('profileButton')?.addEventListener('click', () => {
+            if (window.isLoggedIn && window.isLoggedIn()) {
+                window.location.href = 'profile.html';
+            } else {
+                window.location.href = 'signup.html';
+            }
+        });
+    </script>
 </body>
 </html>
