@@ -14,7 +14,7 @@
             <p class="auth-subtitle">The private social network</p>
             
             <!-- ID changed to signup-form to match auth.js -->
-            <form id="signup-form" class="auth-form">
+            <form id="signupForm" class="auth-form" onsubmit="return handleSignup(event)">
                 <div class="form-group">
                     <label for="displayName">Display Name</label>
                     <input
