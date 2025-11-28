@@ -1,5 +1,5 @@
 // Feed Management System
-const API_BASE_URL = 'https://uncensored-app-beta-production.up.railway.app/';
+const API_BASE_URL = 'https://uncensored-app-beta-production.up.railway.app/api';
 
 class FeedManager {
     constructor() {
