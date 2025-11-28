@@ -9,33 +9,22 @@
     <link rel="stylesheet" href="css/styles.css" />
     <link rel="stylesheet" href="css/auth-styles.css" />
 </head>
-<body>
-    <!-- HEADER (same pattern as index) -->
-    <header class="header">
-        <div class="header-left">
-            <div class="profile-section" id="profileSection">
-                <button class="profile-icon" id="profileButton" type="button">
-                    <img id="headerProfileImg" src="assets/icons/default-profile.png" alt="Profile" />
-                </button>
-            </div>
-        </div>
+<body class="auth-page">
+    <!-- SIMPLE HEADER (no profile image) -->
+    <header class="header auth-header">
+        <div class="header-left"></div>
 
         <h1 class="logo">Uncensored<span>Social</span></h1>
 
-        <div class="header-actions">
-            <div class="auth-buttons" id="authButtons">
-                <a href="login.html" class="btn btn-ghost btn-sm">Log In</a>
-                <a href="signup.html" class="btn btn-signup btn-sm">Sign Up</a>
-            </div>
-        </div>
+        <div class="header-actions"></div>
     </header>
 
+    <!-- Centered auth content -->
     <main class="auth-main">
         <section class="auth-card">
             <h2 class="auth-title">Welcome Back</h2>
             <p class="auth-subtitle">Sign in to your private account</p>
 
-            <!-- IMPORTANT: no action / method / onsubmit -->
             <form id="loginForm" novalidate>
                 <div class="form-group">
                     <label for="loginIdentifier">Email or Username</label>
@@ -72,7 +61,7 @@
         </section>
     </main>
 
-    <!-- Bottom nav if you want it on auth pages -->
+    <!-- Bottom nav -->
     <nav class="bottom-nav">
         <a href="index.html" class="nav-item">
             <span class="icon">🏠</span>
@@ -92,17 +81,7 @@
         </a>
     </nav>
 
-    <!-- Scripts: auth.js MUST be included; no inline alerts, no old login() -->
+    <!-- Auth logic (already working) -->
     <script src="js/auth.js"></script>
-    <script>
-        // Clicking profile icon goes to your own profile when logged in
-        document.getElementById('profileButton')?.addEventListener('click', () => {
-            if (window.isLoggedIn && window.isLoggedIn()) {
-                window.location.href = 'profile.html';
-            } else {
-                window.location.href = 'signup.html';
-            }
-        });
-    </script>
 </body>
 </html>
