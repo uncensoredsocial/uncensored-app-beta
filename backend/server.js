@@ -17,28 +17,25 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-  console.error('❌ Missing SUPABASE_URL or SUPABASE_SERVICE_KEY');
+  console.error('❌ Missing SUPABASE_URL or SUPABASE_SERVICE_KEY in .env');
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 // --- Middleware ---
 app.use(express.json());
-
 app.use(
   cors({
     origin: [
-      'https://spepdb.github.io',
-      'https://uncensored-app-beta-production.up.railway.app',
-      'http://localhost:3000',
-      'http://127.0.0.1:5500'
+      'https://spepdb.github.io', // your GitHub Pages frontend
+      'https://uncensored-app-beta-production.up.railway.app' // backend origin for tests / health
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
   })
 );
 
-// --- Helpers ---
+// --- Auth helpers ---
 function signToken(user) {
   const payload = { id: user.id, username: user.username, email: user.email };
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -46,9 +43,7 @@ function signToken(user) {
 
 function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization || '';
-  const token = authHeader.startsWith('Bearer ')
-    ? authHeader.slice(7)
-    : null;
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
   if (!token) {
     return res.status(401).json({ error: 'Missing auth token' });
@@ -64,18 +59,32 @@ function authMiddleware(req, res, next) {
   }
 }
 
-// --- Routes ---
+// --- Utility: profile stats (posts/followers/following) ---
+async function getUserStats(userId) {
+  const [{ count: postsCount }, { count: followersCount }, { count: followingCount }] =
+    await Promise.all([
+      supabase.from('posts').select('*', { count: 'exact', head: true }).eq('user_id', userId),
+      supabase.from('follows').select('*', { count: 'exact', head: true }).eq('followed_id', userId),
+      supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', userId)
+    ]);
+
+  return {
+    posts_count: postsCount || 0,
+    followers_count: followersCount || 0,
+    following_count: followingCount || 0
+  };
+}
+
+// ======================================================
+//                    AUTH ROUTES
+// ======================================================
 
 // Health check
 app.get('/api/health', async (req, res) => {
   try {
-    const { count, error } = await supabase
+    const { count } = await supabase
       .from('users')
       .select('*', { count: 'exact', head: true });
-
-    if (error) {
-      console.error('Health error:', error);
-    }
 
     res.json({
       status: 'OK',
@@ -88,8 +97,6 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// ---------- AUTH ----------
-
 // Signup
 app.post('/api/auth/signup', async (req, res) => {
   try {
@@ -99,7 +106,7 @@ app.post('/api/auth/signup', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Check if username or email already exists
+    // Check if username/email already exists
     const { data: existing, error: checkError } = await supabase
       .from('users')
       .select('id')
@@ -125,14 +132,16 @@ app.post('/api/auth/signup', async (req, res) => {
       display_name: displayName,
       password_hash: passwordHash,
       avatar_url: null,
+      banner_url: null,
       bio: '',
-      created_at: now
+      created_at: now,
+      last_login_at: now
     };
 
     const { data: inserted, error: insertError } = await supabase
       .from('users')
       .insert(newUser)
-      .select('id,username,email,display_name,avatar_url,bio,created_at')
+      .select('*')
       .single();
 
     if (insertError) {
@@ -141,9 +150,20 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 
     const token = signToken(inserted);
+    const stats = await getUserStats(inserted.id);
 
     res.status(201).json({
-      user: inserted,
+      user: {
+        id: inserted.id,
+        username: inserted.username,
+        email: inserted.email,
+        display_name: inserted.display_name,
+        avatar_url: inserted.avatar_url,
+        banner_url: inserted.banner_url,
+        bio: inserted.bio,
+        created_at: inserted.created_at,
+        ...stats
+      },
       token
     });
   } catch (err) {
@@ -152,48 +172,54 @@ app.post('/api/auth/signup', async (req, res) => {
   }
 });
 
-// Login (email OR username + password)
+// Login (email or username + password)
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { identifier, email, username, password } = req.body;
-    const loginId = (identifier || email || username || '').trim();
+    const { identifier, password } = req.body; // identifier = email OR username
 
-    if (!loginId || !password) {
-      return res
-        .status(400)
-        .json({ error: 'Please enter your username/email and password.' });
+    if (!identifier || !password) {
+      return res.status(400).json({ error: 'Missing email/username or password' });
     }
 
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('*')
-      .or(`email.eq.${loginId},username.eq.${loginId}`)
-      .single();
+    const isEmail = identifier.includes('@');
+    const query = supabase.from('users').select('*').limit(1);
 
-    if (userError || !user) {
-      console.error('Login user error:', userError);
+    const { data, error: userError } = isEmail
+      ? await query.eq('email', identifier)
+      : await query.eq('username', identifier);
+
+    if (userError || !data || data.length === 0) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
+
+    const user = data[0];
 
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
-    const token = signToken(user);
+    // Update last_login_at
+    await supabase
+      .from('users')
+      .update({ last_login_at: new Date().toISOString() })
+      .eq('id', user.id);
 
-    const safeUser = {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      display_name: user.display_name,
-      avatar_url: user.avatar_url,
-      bio: user.bio || '',
-      created_at: user.created_at
-    };
+    const token = signToken(user);
+    const stats = await getUserStats(user.id);
 
     res.json({
-      user: safeUser,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        display_name: user.display_name,
+        avatar_url: user.avatar_url,
+        banner_url: user.banner_url,
+        bio: user.bio,
+        created_at: user.created_at,
+        ...stats
+      },
       token
     });
   } catch (err) {
@@ -202,12 +228,12 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Current user (simple)
+// Get current user (for profile / app.js)
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
   try {
     const { data: user, error } = await supabase
       .from('users')
-      .select('id,username,email,display_name,avatar_url,bio,created_at')
+      .select('id,username,email,display_name,avatar_url,banner_url,bio,created_at')
       .eq('id', req.user.id)
       .single();
 
@@ -215,124 +241,84 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json(user);
+    const stats = await getUserStats(user.id);
+
+    res.json({
+      ...user,
+      ...stats
+    });
   } catch (err) {
-    console.error('/api/auth/me error:', err);
+    console.error('/auth/me error:', err);
     res.status(500).json({ error: 'Failed to load user' });
   }
 });
 
-// ---------- PROFILE / USERS ----------
-
-// Get current user's profile (for profile.html)
-app.get('/api/users/me', authMiddleware, async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('id,username,email,display_name,avatar_url,bio,created_at')
-      .eq('id', req.user.id)
-      .single();
-
-    if (error || !data) {
-      console.error('/api/users/me error:', error);
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    res.json(data);
-  } catch (err) {
-    console.error('/api/users/me unexpected error:', err);
-    res.status(500).json({ error: 'Failed to load profile' });
-  }
-});
-
 // Update current user's profile
-app.put('/api/users/me', authMiddleware, async (req, res) => {
+app.put('/api/auth/me', authMiddleware, async (req, res) => {
   try {
-    const { display_name, bio, avatar_url } = req.body;
+    const { display_name, bio, avatar_url, banner_url } = req.body;
 
-    if (!display_name || !display_name.trim()) {
-      return res.status(400).json({ error: 'Display name is required' });
-    }
+    const updates = {};
+    if (typeof display_name === 'string') updates.display_name = display_name.trim();
+    if (typeof bio === 'string') updates.bio = bio.trim();
+    if (typeof avatar_url === 'string') updates.avatar_url = avatar_url.trim() || null;
+    if (typeof banner_url === 'string') updates.banner_url = banner_url.trim() || null;
 
-    const updates = {
-      display_name: display_name.trim(),
-      bio: bio ? bio.trim() : '',
-      avatar_url: avatar_url || null,
-      updated_at: new Date().toISOString()
-    };
-
-    const { data, error } = await supabase
+    const { data: updated, error } = await supabase
       .from('users')
       .update(updates)
       .eq('id', req.user.id)
-      .select('id,username,email,display_name,avatar_url,bio,created_at')
+      .select('id,username,email,display_name,avatar_url,banner_url,bio,created_at')
       .single();
 
-    if (error || !data) {
-      console.error('update /api/users/me error:', error);
+    if (error) {
+      console.error('Profile update error:', error);
       return res.status(500).json({ error: 'Failed to update profile' });
     }
 
-    res.json(data);
+    const stats = await getUserStats(updated.id);
+
+    res.json({
+      ...updated,
+      ...stats
+    });
   } catch (err) {
-    console.error('update /api/users/me unexpected error:', err);
-    res.status(500).json({ error: 'Failed to update profile' });
+    console.error('PUT /auth/me error:', err);
+    res.status(500).json({ error: 'Profile update failed' });
   }
 });
 
-// ---------- POSTS (basic) ----------
-// Supabase table "posts": id uuid, user_id uuid, content text, created_at timestamptz
+// ======================================================
+//                      POSTS
+// ======================================================
 
-// Get latest posts
+// Get global feed (For You – simple version)
 app.get('/api/posts', async (req, res) => {
   try {
-    const { data: posts, error } = await supabase
+    const { data, error } = await supabase
       .from('posts')
-      .select('id,user_id,content,created_at')
+      .select(`
+        id,
+        content,
+        created_at,
+        user:users (
+          id,
+          username,
+          display_name,
+          avatar_url
+        )
+      `)
       .order('created_at', { ascending: false })
       .limit(50);
 
     if (error) {
-      console.error('/api/posts error:', error);
+      console.error('Get posts error:', error);
       return res.status(500).json({ error: 'Failed to load posts' });
     }
 
-    if (!posts || posts.length === 0) {
-      return res.json([]);
-    }
-
-    const userIds = [...new Set(posts.map(p => p.user_id).filter(Boolean))];
-
-    let usersById = {};
-    if (userIds.length > 0) {
-      const { data: users, error: usersError } = await supabase
-        .from('users')
-        .select('id,username,display_name,avatar_url')
-        .in('id', userIds);
-
-      if (usersError) {
-        console.error('users lookup error:', usersError);
-      } else {
-        usersById = (users || []).reduce((acc, u) => {
-          acc[u.id] = u;
-          return acc;
-        }, {});
-      }
-    }
-
-    const result = posts.map(p => ({
-      id: p.id,
-      content: p.content,
-      created_at: p.created_at,
-      user: usersById[p.user_id] || null,
-      likes: [],
-      comments: [],
-      reposts: []
-    }));
-
-    res.json(result);
+    res.json(data || []);
   } catch (err) {
-    console.error('GET /api/posts unexpected error:', err);
+    console.error('GET /posts error:', err);
     res.status(500).json({ error: 'Failed to load posts' });
   }
 });
@@ -343,72 +329,366 @@ app.post('/api/posts', authMiddleware, async (req, res) => {
     const { content } = req.body;
 
     if (!content || !content.trim()) {
-      return res.status(400).json({ error: 'Post content cannot be empty' });
+      return res.status(400).json({ error: 'Post content is required' });
     }
-
     if (content.length > 280) {
       return res.status(400).json({ error: 'Post must be 280 characters or less' });
     }
 
-    const now = new Date().toISOString();
-    const newPost = {
+    const post = {
       id: uuidv4(),
       user_id: req.user.id,
       content: content.trim(),
-      created_at: now
+      created_at: new Date().toISOString()
     };
 
     const { data: inserted, error } = await supabase
       .from('posts')
-      .insert(newPost)
-      .select('id,user_id,content,created_at')
+      .insert(post)
+      .select('*')
       .single();
 
-    if (error || !inserted) {
-      console.error('POST /api/posts insert error:', error);
+    if (error) {
+      console.error('Create post error:', error);
       return res.status(500).json({ error: 'Failed to create post' });
     }
 
-    const { data: user, error: userError } = await supabase
+    // Attach user object for frontend
+    const { data: user } = await supabase
       .from('users')
       .select('id,username,display_name,avatar_url')
       .eq('id', req.user.id)
       .single();
 
-    if (userError || !user) {
-      console.error('author lookup error:', userError);
-    }
-
-    const response = {
-      id: inserted.id,
-      content: inserted.content,
-      created_at: inserted.created_at,
-      user: user || null,
-      likes: [],
-      comments: [],
-      reposts: []
-    };
-
-    res.status(201).json(response);
+    res.status(201).json({
+      ...inserted,
+      user
+    });
   } catch (err) {
-    console.error('POST /api/posts unexpected error:', err);
+    console.error('POST /posts error:', err);
     res.status(500).json({ error: 'Failed to create post' });
   }
 });
 
-// Like / unlike post (stub for now so front-end doesn't break)
+// Like/unlike post
 app.post('/api/posts/:id/like', authMiddleware, async (req, res) => {
   try {
-    // TODO: Implement a "post_likes" table later.
-    // Just return a dummy response for now.
-    res.json({ liked: true, likes: 1 });
+    const postId = req.params.id;
+    const userId = req.user.id;
+
+    // Check if like already exists
+    const { data: existing, error: checkError } = await supabase
+      .from('post_likes')
+      .select('id')
+      .eq('post_id', postId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (checkError) {
+      console.error('Like check error:', checkError);
+      return res.status(500).json({ error: 'Failed to like post' });
+    }
+
+    let liked;
+
+    if (existing) {
+      // Unlike
+      const { error: delError } = await supabase
+        .from('post_likes')
+        .delete()
+        .eq('id', existing.id);
+
+      if (delError) {
+        console.error('Unlike error:', delError);
+        return res.status(500).json({ error: 'Failed to unlike post' });
+      }
+      liked = false;
+    } else {
+      // Like
+      const { error: insError } = await supabase
+        .from('post_likes')
+        .insert({
+          id: uuidv4(),
+          post_id: postId,
+          user_id: userId
+        });
+
+      if (insError) {
+        console.error('Like error:', insError);
+        return res.status(500).json({ error: 'Failed to like post' });
+      }
+      liked = true;
+    }
+
+    // Get updated count
+    const { count } = await supabase
+      .from('post_likes')
+      .select('*', { count: 'exact', head: true })
+      .eq('post_id', postId);
+
+    res.json({
+      liked,
+      likes: count || 0
+    });
   } catch (err) {
-    console.error('POST /api/posts/:id/like error:', err);
+    console.error('POST /posts/:id/like error:', err);
     res.status(500).json({ error: 'Failed to like post' });
   }
 });
 
-// ---------- START SERVER ----------
+// ======================================================
+//                   PROFILE / FOLLOWS
+// ======================================================
+
+// Get user by username (for visiting other profiles later)
+app.get('/api/users/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id,username,display_name,avatar_url,banner_url,bio,created_at')
+      .eq('username', username)
+      .single();
+
+    if (error || !user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const stats = await getUserStats(user.id);
+    res.json({ ...user, ...stats });
+  } catch (err) {
+    console.error('GET /users/:username error:', err);
+    res.status(500).json({ error: 'Failed to load profile' });
+  }
+});
+
+// Get posts for a given username (for profile page)
+app.get('/api/users/:username/posts', async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+
+    if (userError || !user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const { data: posts, error } = await supabase
+      .from('posts')
+      .select('id,content,created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Get profile posts error:', error);
+      return res.status(500).json({ error: 'Failed to load posts' });
+    }
+
+    res.json(posts || []);
+  } catch (err) {
+    console.error('GET /users/:username/posts error:', err);
+    res.status(500).json({ error: 'Failed to load posts' });
+  }
+});
+
+// Follow / unfollow user by username
+app.post('/api/users/:username/follow', authMiddleware, async (req, res) => {
+  try {
+    const { username } = req.params;
+    const currentUserId = req.user.id;
+
+    // Find target user
+    const { data: target, error: targetError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+
+    if (targetError || !target) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (target.id === currentUserId) {
+      return res.status(400).json({ error: 'You cannot follow yourself' });
+    }
+
+    // Check existing follow
+    const { data: existing, error: checkError } = await supabase
+      .from('follows')
+      .select('id')
+      .eq('follower_id', currentUserId)
+      .eq('followed_id', target.id)
+      .maybeSingle();
+
+    if (checkError) {
+      console.error('Follow check error:', checkError);
+      return res.status(500).json({ error: 'Failed to update follow status' });
+    }
+
+    let following;
+
+    if (existing) {
+      // Unfollow
+      const { error: delError } = await supabase
+        .from('follows')
+        .delete()
+        .eq('id', existing.id);
+
+      if (delError) {
+        console.error('Unfollow error:', delError);
+        return res.status(500).json({ error: 'Failed to unfollow' });
+      }
+      following = false;
+    } else {
+      // Follow
+      const { error: insError } = await supabase
+        .from('follows')
+        .insert({
+          id: uuidv4(),
+          follower_id: currentUserId,
+          followed_id: target.id
+        });
+
+      if (insError) {
+        console.error('Follow error:', insError);
+        return res.status(500).json({ error: 'Failed to follow' });
+      }
+      following = true;
+    }
+
+    const stats = await getUserStats(target.id);
+
+    res.json({
+      following,
+      ...stats
+    });
+  } catch (err) {
+    console.error('POST /users/:username/follow error:', err);
+    res.status(500).json({ error: 'Failed to update follow status' });
+  }
+});
+
+// ======================================================
+//                        SEARCH
+// ======================================================
+
+// Search users + posts + hashtags
+app.get('/api/search', async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    if (!q) {
+      return res.status(400).json({ error: 'Missing search query' });
+    }
+
+    const pattern = `%${q}%`;
+
+    const [
+      { data: users, error: usersError },
+      { data: posts, error: postsError },
+      { data: hashtags, error: tagsError }
+    ] = await Promise.all([
+      supabase
+        .from('users')
+        .select('id,username,display_name,avatar_url,bio')
+        .or(`username.ilike.${pattern},display_name.ilike.${pattern}`)
+        .limit(10),
+      supabase
+        .from('posts')
+        .select(`
+          id,
+          content,
+          created_at,
+          user:users (
+            id,
+            username,
+            display_name,
+            avatar_url
+          )
+        `)
+        .ilike('content', pattern)
+        .order('created_at', { ascending: false })
+        .limit(20),
+      supabase
+        .from('hashtags')
+        .select('id,tag')
+        .ilike('tag', pattern)
+        .limit(10)
+    ]);
+
+    if (usersError || postsError || tagsError) {
+      console.error('Search errors:', { usersError, postsError, tagsError });
+      return res.status(500).json({ error: 'Search failed' });
+    }
+
+    res.json({
+      users: users || [],
+      posts: posts || [],
+      hashtags: hashtags || []
+    });
+  } catch (err) {
+    console.error('GET /search error:', err);
+    res.status(500).json({ error: 'Search failed' });
+  }
+});
+
+// Save search query to history
+app.post('/api/search/history', authMiddleware, async (req, res) => {
+  try {
+    const { query } = req.body;
+    if (!query || !query.trim()) {
+      return res.status(400).json({ error: 'Missing query' });
+    }
+
+    const item = {
+      id: uuidv4(),
+      user_id: req.user.id,
+      query: query.trim(),
+      created_at: new Date().toISOString()
+    };
+
+    const { error } = await supabase.from('search_history').insert(item);
+    if (error) {
+      console.error('Insert search history error:', error);
+      return res.status(500).json({ error: 'Failed to save search history' });
+    }
+
+    res.status(201).json({ success: true });
+  } catch (err) {
+    console.error('POST /search/history error:', err);
+    res.status(500).json({ error: 'Failed to save search history' });
+  }
+});
+
+// Get current user's recent search history
+app.get('/api/search/history', authMiddleware, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('search_history')
+      .select('id,query,created_at')
+      .eq('user_id', req.user.id)
+      .order('created_at', { ascending: false })
+      .limit(15);
+
+    if (error) {
+      console.error('Get search history error:', error);
+      return res.status(500).json({ error: 'Failed to load search history' });
+    }
+
+    res.json(data || []);
+  } catch (err) {
+    console.error('GET /search/history error:', err);
+    res.status(500).json({ error: 'Failed to load search history' });
+  }
+});
+
+// ======================================================
+//                     START SERVER
+// ======================================================
 
 app.listen(PORT, () => {
   console.log(`🚀 Backend API listening on port ${PORT}`);
