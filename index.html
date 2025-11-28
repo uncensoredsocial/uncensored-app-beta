@@ -12,14 +12,14 @@
     <!-- Top Header -->
     <header class="header">
         <div class="header-left">
+            <!-- Profile Section - Shown when logged in -->
             <div class="profile-section" id="profileSection">
-                <!-- Shown when logged in -->
                 <div class="profile-icon" id="profileMenuBtn">
                     <img src="assets/icons/default-profile.png" alt="Profile" id="headerProfileImg">
                 </div>
             </div>
             
-            <!-- Shown when guest -->
+            <!-- Auth Buttons - Shown when guest -->
             <div class="auth-buttons" id="authButtons">
                 <a href="login.html" class="btn btn-sm btn-login">Log In</a>
                 <a href="signup.html" class="btn btn-sm btn-signup">Sign Up</a>
@@ -35,60 +35,83 @@
         </div>
     </header>
 
-    <!-- Main Feed -->
-    <main class="main-content">
-        <!-- Post Creation - Only shown when logged in -->
-        <div class="post-creation auth-dependent" id="postCreation">
-            <div class="post-input-container">
-                <img src="assets/icons/default-profile.png" alt="You" class="post-avatar" id="postUserAvatar">
-                <textarea id="postInput" placeholder="What's happening?" maxlength="280"></textarea>
-            </div>
-            <div class="post-actions-bar">
-                <div class="post-options">
-                    <span class="char-counter" id="charCounter">0/280</span>
+    <!-- Main Content Area -->
+    <div class="content-wrapper">
+        <!-- Side Navigation - Desktop -->
+        <nav class="side-nav" id="sideNav">
+            <a href="index.html" class="nav-item active">
+                <span class="icon icon-home"></span>
+                <span class="nav-label">Home</span>
+            </a>
+            <a href="search.html" class="nav-item">
+                <span class="icon icon-search"></span>
+                <span class="nav-label">Search</span>
+            </a>
+            <a href="notifications.html" class="nav-item">
+                <span class="icon icon-notifications"></span>
+                <span class="nav-label">Alerts</span>
+            </a>
+            <a href="dms.html" class="nav-item">
+                <span class="icon icon-messages"></span>
+                <span class="nav-label">Messages</span>
+            </a>
+        </nav>
+
+        <!-- Main Feed -->
+        <main class="main-content">
+            <!-- Post Creation - Only shown when logged in -->
+            <div class="post-creation auth-dependent" id="postCreation">
+                <div class="post-input-container">
+                    <img src="assets/icons/default-profile.png" alt="You" class="post-avatar" id="postUserAvatar">
+                    <textarea id="postInput" placeholder="What's happening?" maxlength="280"></textarea>
                 </div>
-                <button class="btn btn-primary" id="postButton" disabled>Post</button>
-            </div>
-        </div>
-
-        <!-- Guest Message - Shown when not logged in -->
-        <div class="guest-message" id="guestMessage">
-            <div class="guest-content">
-                <h2>Join the Conversation</h2>
-                <p>Sign up to connect with others, share your thoughts, and be part of our community.</p>
-                <div class="guest-actions">
-                    <a href="signup.html" class="btn btn-primary btn-lg">Create Account</a>
-                    <a href="login.html" class="btn btn-secondary btn-lg">Log In</a>
+                <div class="post-actions-bar">
+                    <div class="post-options">
+                        <span class="char-counter" id="charCounter">0/280</span>
+                    </div>
+                    <button class="btn btn-primary" id="postButton" disabled>Post</button>
                 </div>
             </div>
-        </div>
 
-        <!-- Feed Content -->
-        <div class="feed" id="feedContainer">
-            <div class="loading-indicator" id="feedLoading">
-                <div class="loading-spinner"></div>
-                <span>Loading posts...</span>
+            <!-- Guest Message - Shown when not logged in -->
+            <div class="guest-message" id="guestMessage">
+                <div class="guest-content">
+                    <h2>Join the Conversation</h2>
+                    <p>Sign up to connect with others, share your thoughts, and be part of our community.</p>
+                    <div class="guest-actions">
+                        <a href="signup.html" class="btn btn-primary btn-lg">Create Account</a>
+                        <a href="login.html" class="btn btn-secondary btn-lg">Log In</a>
+                    </div>
+                </div>
             </div>
-        </div>
-    </main>
 
-    <!-- Bottom Navigation -->
-    <nav class="bottom-nav">
+            <!-- Feed Content -->
+            <div class="feed" id="feedContainer">
+                <div class="loading-indicator" id="feedLoading">
+                    <div class="loading-spinner"></div>
+                    <span>Loading posts...</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Bottom Navigation - Mobile -->
+    <nav class="bottom-nav" id="bottomNav">
         <a href="index.html" class="nav-item active">
             <span class="icon icon-home"></span>
-            <span>Home</span>
+            <span class="nav-label">Home</span>
         </a>
         <a href="search.html" class="nav-item">
             <span class="icon icon-search"></span>
-            <span>Search</span>
+            <span class="nav-label">Search</span>
         </a>
         <a href="notifications.html" class="nav-item">
             <span class="icon icon-notifications"></span>
-            <span>Alerts</span>
+            <span class="nav-label">Alerts</span>
         </a>
         <a href="dms.html" class="nav-item">
             <span class="icon icon-messages"></span>
-            <span>Messages</span>
+            <span class="nav-label">Messages</span>
         </a>
     </nav>
 
