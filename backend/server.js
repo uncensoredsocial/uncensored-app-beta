@@ -1,3 +1,4 @@
+// backend/server.js
 require('dotenv').config();
 
 const express = require('express');
@@ -11,239 +12,324 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// --- Supabase Client ---
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY || !JWT_SECRET) {
+  console.error('Missing SUPABASE_URL, SUPABASE_SERVICE_KEY, or JWT_SECRET in environment.');
+  process.exit(1);
+}
+
+// Supabase client (use service role key)
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY // Service key, NOT anon key
+  process.env.SUPABASE_SERVICE_KEY
 );
 
-// --- Middleware ---
-app.use(cors({
-    origin: ['https://spepdb.github.io', 'http://localhost:8000'],
-    credentials: true
-}));
+// --------- Middleware ---------
+app.use(cors()); // open CORS so mobile / any origin can hit the API
 app.use(express.json());
 
-// --- Auth Middleware ---
-const authenticateToken = (req, res, next) => {
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(" ")[1];
+// --------- Auth middleware ---------
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Access token required' });
 
-    if (!token) return res.status(401).json({ error: "Token required" });
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded; // { userId }
+    next();
+  } catch (err) {
+    return res.status(403).json({ error: 'Invalid or expired token' });
+  }
+}
 
-    try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        req.user = decoded;
-        next();
-    } catch (err) {
-        return res.status(403).json({ error: "Invalid token" });
-    }
-};
+// --------- Routes ---------
 
-// --- Health Check ---
-app.get("/api/health", async (req, res) => {
-    res.json({ status: "OK", timestamp: new Date().toISOString() });
+// Health check
+app.get('/api/health', async (req, res) => {
+  try {
+    const { count: userCount } = await supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true });
+
+    const { count: postCount } = await supabase
+      .from('posts')
+      .select('*', { count: 'exact', head: true });
+
+    res.json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      users: userCount ?? 0,
+      posts: postCount ?? 0
+    });
+  } catch (err) {
+    console.error('Health error:', err);
+    res.status(500).json({ status: 'ERROR' });
+  }
 });
 
+// ---------- AUTH ----------
 
-// ============================================================
-// 🔐 AUTH ROUTES
-// ============================================================
-
-// --- Signup ---
-app.post("/api/auth/signup", async (req, res) => {
+// POST /api/auth/signup
+app.post('/api/auth/signup', async (req, res) => {
+  try {
     const { email, password, username, displayName } = req.body;
 
-    if (!email || !password || !username)
-        return res.status(400).json({ error: "Email, password and username required" });
+    if (!email || !password || !username) {
+      return res.status(400).json({ error: 'Email, password, and username are required' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
 
-    if (password.length < 6)
-        return res.status(400).json({ error: "Password must be 6+ characters" });
+    // Check email exists
+    const { data: existingEmail } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
 
-    // Check if user exists
-    const { data: existingUser } = await supabase
-        .from("users")
-        .select("*")
-        .or(`email.eq.${email},username.eq.${username}`)
-        .maybeSingle();
+    if (existingEmail) {
+      return res.status(400).json({ error: 'Email is already in use' });
+    }
 
-    if (existingUser)
-        return res.status(400).json({ error: "Email or username already exists" });
+    // Check username exists
+    const { data: existingUsername } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .maybeSingle();
+
+    if (existingUsername) {
+      return res.status(400).json({ error: 'Username is already taken' });
+    }
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Insert new user
-    const { data, error } = await supabase
-        .from("users")
-        .insert([{
-            id: uuidv4(),
-            email,
-            username,
-            display_name: displayName || username,
-            password_hash: passwordHash,
-        }])
-        .select()
-        .single();
+    const { data: user, error } = await supabase
+      .from('users')
+      .insert([
+        {
+          id: uuidv4(),
+          email,
+          username,
+          display_name: displayName || username,
+          password_hash: passwordHash
+        }
+      ])
+      .select()
+      .single();
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      console.error('Signup insert error:', error);
+      return res.status(500).json({ error: 'Failed to create user' });
+    }
 
-    const token = jwt.sign({ userId: data.id }, JWT_SECRET, { expiresIn: "24h" });
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '24h' });
 
-    res.status(201).json({ user: data, token });
+    res.status(201).json({
+      user,
+      token
+    });
+  } catch (err) {
+    console.error('Signup error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
+// POST /api/auth/login
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body; // we’re logging in by email for now
 
-// --- Login ---
-app.post("/api/auth/login", async (req, res) => {
-    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
 
     const { data: user, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("email", email)
-        .single();
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .single();
 
-    if (!user) return res.status(401).json({ error: "Invalid login" });
+    if (error || !user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
 
-    const validPassword = await bcrypt.compare(password, user.password_hash);
-    if (!validPassword) return res.status(401).json({ error: "Invalid login" });
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
 
-    const token = jwt.sign(
-        { userId: user.id },
-        JWT_SECRET,
-        { expiresIn: "24h" }
-    );
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '24h' });
 
     res.json({ user, token });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
+// GET /api/auth/me
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
+  try {
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id, email, username, display_name, avatar_url, created_at')
+      .eq('id', req.user.userId)
+      .single();
 
-// --- Get Logged-in User ---
-app.get("/api/auth/me", authenticateToken, async (req, res) => {
-    const { data: user } = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", req.user.userId)
-        .single();
-
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (error || !user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
 
     res.json(user);
+  } catch (err) {
+    console.error('Auth/me error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
+// ---------- POSTS ----------
 
-// ============================================================
-// 📝 POSTS
-// ============================================================
-
-// --- Get All Posts ---
-app.get("/api/posts", async (req, res) => {
+// GET /api/posts
+app.get('/api/posts', async (req, res) => {
+  try {
     const { data: posts, error } = await supabase
-        .from("posts")
-        .select(`
-            id,
-            content,
-            created_at,
-            user_id,
-            users (
-                username,
-                display_name,
-                avatar_url
-            ),
-            likes(count),
-            comments(count)
-        `)
-        .order("created_at", { ascending: false });
+      .from('posts')
+      .select('id, user_id, content, created_at')
+      .order('created_at', { ascending: false });
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      console.error('Get posts error:', error);
+      return res.status(500).json({ error: 'Failed to fetch posts' });
+    }
 
-    res.json(posts);
+    if (!posts || posts.length === 0) {
+      return res.json([]);
+    }
+
+    // Attach user info for each post
+    const userIds = [...new Set(posts.map(p => p.user_id))];
+
+    const { data: users, error: userErr } = await supabase
+      .from('users')
+      .select('id, username, display_name, avatar_url')
+      .in('id', userIds);
+
+    if (userErr) {
+      console.error('Get post users error:', userErr);
+      return res.status(500).json({ error: 'Failed to fetch users for posts' });
+    }
+
+    const userMap = {};
+    (users || []).forEach(u => { userMap[u.id] = u; });
+
+    const postsWithUsers = posts.map(p => ({
+      ...p,
+      user: userMap[p.user_id] || null
+    }));
+
+    res.json(postsWithUsers);
+  } catch (err) {
+    console.error('Posts error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
-
-// --- Create Post ---
-app.post("/api/posts", authenticateToken, async (req, res) => {
+// POST /api/posts  (create post)
+app.post('/api/posts', authenticateToken, async (req, res) => {
+  try {
     const { content } = req.body;
 
-    if (!content || content.trim().length === 0)
-        return res.status(400).json({ error: "Content required" });
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: 'Post content is required' });
+    }
+    if (content.length > 280) {
+      return res.status(400).json({ error: 'Post must be 280 characters or less' });
+    }
 
-    if (content.length > 280)
-        return res.status(400).json({ error: "Max 280 chars" });
+    const { data: post, error } = await supabase
+      .from('posts')
+      .insert([
+        {
+          id: uuidv4(),
+          user_id: req.user.userId,
+          content: content.trim()
+        }
+      ])
+      .select()
+      .single();
 
-    const { data, error } = await supabase
-        .from("posts")
-        .insert([{
-            id: uuidv4(),
-            user_id: req.user.userId,
-            content: content.trim()
-        }])
-        .select()
-        .single();
+    if (error) {
+      console.error('Create post error:', error);
+      return res.status(500).json({ error: 'Failed to create post' });
+    }
 
-    if (error) return res.status(500).json({ error: error.message });
-
-    res.status(201).json(data);
+    res.status(201).json(post);
+  } catch (err) {
+    console.error('Create post error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
-
-// ============================================================
-// ❤️ LIKE / UNLIKE
-// ============================================================
-
-app.post("/api/posts/:id/like", authenticateToken, async (req, res) => {
+// POST /api/posts/:id/like  (toggle like)
+app.post('/api/posts/:id/like', authenticateToken, async (req, res) => {
+  try {
     const postId = req.params.id;
     const userId = req.user.userId;
 
-    // Check if already liked
-    const { data: existing } = await supabase
-        .from("likes")
-        .select("*")
-        .eq("post_id", postId)
-        .eq("user_id", userId)
-        .maybeSingle();
+    // Does a like already exist?
+    const { data: existing, error: existingErr } = await supabase
+      .from('likes')
+      .select('*')
+      .eq('post_id', postId)
+      .eq('user_id', userId)
+      .maybeSingle();
 
-    if (existing) {
-        // unlike
-        await supabase.from("likes").delete().eq("id", existing.id);
-        return res.json({ liked: false });
+    if (existingErr) {
+      console.error('Like fetch error:', existingErr);
+      return res.status(500).json({ error: 'Failed to update like' });
     }
 
-    // like
-    const { error } = await supabase
-        .from("likes")
-        .insert([{ id: uuidv4(), post_id: postId, user_id: userId }]);
+    if (existing) {
+      // unlike
+      const { error: delErr } = await supabase
+        .from('likes')
+        .delete()
+        .eq('id', existing.id);
 
-    if (error) return res.status(500).json({ error: error.message });
+      if (delErr) {
+        console.error('Unlike error:', delErr);
+        return res.status(500).json({ error: 'Failed to unlike post' });
+      }
 
-    res.json({ liked: true });
+      return res.json({ liked: false });
+    } else {
+      // like
+      const { error: insErr } = await supabase
+        .from('likes')
+        .insert([
+          {
+            id: uuidv4(),
+            post_id: postId,
+            user_id: userId
+          }
+        ]);
+
+      if (insErr) {
+        console.error('Like insert error:', insErr);
+        return res.status(500).json({ error: 'Failed to like post' });
+      }
+
+      return res.json({ liked: true });
+    }
+  } catch (err) {
+    console.error('Like route error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
-
-// ============================================================
-// 👤 USER PROFILE ENDPOINT
-// ============================================================
-
-// /api/users/:username
-app.get("/api/users/:username", async (req, res) => {
-    const username = req.params.username;
-
-    const { data: user, error } = await supabase
-        .from("users")
-        .select("*, follower_count:follows(count), following_count:follows!follows_follower_id_fkey(count)")
-        .eq("username", username)
-        .single();
-
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    res.json(user);
-});
-
-
-// ============================================================
-// 🚀 Start Server
-// ============================================================
-
+// --------- Start server ---------
 app.listen(PORT, () => {
-    console.log(`Supabase backend running on port ${PORT}`);
+  console.log(`Backend API listening on port ${PORT}`);
 });
