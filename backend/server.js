@@ -1,4 +1,5 @@
 // backend/server.js
+
 require('dotenv').config();
 
 const express = require('express');
@@ -10,56 +11,68 @@ const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET;
 
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY || !JWT_SECRET) {
-  console.error('Missing SUPABASE_URL, SUPABASE_SERVICE_KEY, or JWT_SECRET in environment.');
-  process.exit(1);
+// --- Supabase setup ---
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+  console.error('❌ Missing SUPABASE_URL or SUPABASE_SERVICE_KEY');
 }
 
-// Supabase client (use service role key)
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+// --- Middleware ---
+app.use(express.json());
+app.use(
+  cors({
+    origin: [
+      'https://spepdb.github.io',
+      'https://uncensored-app-beta-production.up.railway.app'
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  })
 );
 
-// --------- Middleware ---------
-app.use(cors()); // open CORS so mobile / any origin can hit the API
-app.use(express.json());
+// --- Helpers ---
+function signToken(user) {
+  const payload = { id: user.id, username: user.username, email: user.email };
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
+}
 
-// --------- Auth middleware ---------
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Access token required' });
+function authMiddleware(req, res, next) {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ')
+    ? authHeader.slice(7)
+    : null;
+
+  if (!token) {
+    return res.status(401).json({ error: 'Missing auth token' });
+  }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded; // { userId }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
     next();
   } catch (err) {
-    return res.status(403).json({ error: 'Invalid or expired token' });
+    console.error('JWT error:', err.message);
+    return res.status(401).json({ error: 'Invalid or expired token' });
   }
 }
 
-// --------- Routes ---------
+// --- Routes ---
 
 // Health check
 app.get('/api/health', async (req, res) => {
   try {
-    const { count: userCount } = await supabase
+    const { count } = await supabase
       .from('users')
       .select('*', { count: 'exact', head: true });
-
-    const { count: postCount } = await supabase
-      .from('posts')
-      .select('*', { count: 'exact', head: true });
-
     res.json({
       status: 'OK',
       timestamp: new Date().toISOString(),
-      users: userCount ?? 0,
-      posts: postCount ?? 0
+      users: count ?? 0
     });
   } catch (err) {
     console.error('Health error:', err);
@@ -67,115 +80,124 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// ---------- AUTH ----------
-
-// POST /api/auth/signup
+// Signup
 app.post('/api/auth/signup', async (req, res) => {
   try {
-    const { email, password, username, displayName } = req.body;
+    const { displayName, username, email, password } = req.body;
 
-    if (!email || !password || !username) {
-      return res.status(400).json({ error: 'Email, password, and username are required' });
-    }
-    if (password.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    if (!displayName || !username || !email || !password) {
+      return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Check email exists
-    const { data: existingEmail } = await supabase
+    // Check if username/email already exists
+    const { data: existing, error: checkError } = await supabase
       .from('users')
       .select('id')
-      .eq('email', email)
-      .maybeSingle();
+      .or(`username.eq.${username},email.eq.${email}`)
+      .limit(1);
 
-    if (existingEmail) {
-      return res.status(400).json({ error: 'Email is already in use' });
+    if (checkError) {
+      console.error('Supabase check error:', checkError);
+      return res.status(500).json({ error: 'Error checking user' });
     }
 
-    // Check username exists
-    const { data: existingUsername } = await supabase
-      .from('users')
-      .select('id')
-      .eq('username', username)
-      .maybeSingle();
-
-    if (existingUsername) {
-      return res.status(400).json({ error: 'Username is already taken' });
+    if (existing && existing.length > 0) {
+      return res.status(400).json({ error: 'Username or email already in use' });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    const now = new Date().toISOString();
 
-    const { data: user, error } = await supabase
+    const newUser = {
+      id: uuidv4(),
+      username,
+      email,
+      display_name: displayName,
+      password_hash: passwordHash,
+      avatar_url: null,
+      bio: '',
+      created_at: now,
+      last_login_at: now
+    };
+
+    const { data: inserted, error: insertError } = await supabase
       .from('users')
-      .insert([
-        {
-          id: uuidv4(),
-          email,
-          username,
-          display_name: displayName || username,
-          password_hash: passwordHash
-        }
-      ])
-      .select()
+      .insert(newUser)
+      .select('*')
       .single();
 
-    if (error) {
-      console.error('Signup insert error:', error);
-      return res.status(500).json({ error: 'Failed to create user' });
+    if (insertError) {
+      console.error('Supabase insert error:', insertError);
+      return res.status(500).json({ error: 'Error creating user' });
     }
 
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '24h' });
+    const token = signToken(inserted);
 
     res.status(201).json({
-      user,
+      user: {
+        id: inserted.id,
+        username: inserted.username,
+        email: inserted.email,
+        display_name: inserted.display_name,
+        avatar_url: inserted.avatar_url
+      },
       token
     });
   } catch (err) {
     console.error('Signup error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Signup failed' });
   }
 });
 
-// POST /api/auth/login
+// Login (email + password)
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { email, password } = req.body; // we’re logging in by email for now
+    const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
+      return res.status(400).json({ error: 'Missing email or password' });
     }
 
-    const { data: user, error } = await supabase
+    const { data: user, error: userError } = await supabase
       .from('users')
       .select('*')
       .eq('email', email)
       .single();
 
-    if (error || !user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    if (userError || !user) {
+      return res.status(400).json({ error: 'Invalid email or password' });
     }
 
-    const valid = await bcrypt.compare(password, user.password_hash);
-    if (!valid) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    const match = await bcrypt.compare(password, user.password_hash);
+    if (!match) {
+      return res.status(400).json({ error: 'Invalid email or password' });
     }
 
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '24h' });
+    const token = signToken(user);
 
-    res.json({ user, token });
+    res.json({
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        display_name: user.display_name,
+        avatar_url: user.avatar_url
+      },
+      token
+    });
   } catch (err) {
     console.error('Login error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Login failed' });
   }
 });
 
-// GET /api/auth/me
-app.get('/api/auth/me', authenticateToken, async (req, res) => {
+// Current user
+app.get('/api/auth/me', authMiddleware, async (req, res) => {
   try {
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, email, username, display_name, avatar_url, created_at')
-      .eq('id', req.user.userId)
+      .select('id,username,email,display_name,avatar_url')
+      .eq('id', req.user.id)
       .single();
 
     if (error || !user) {
@@ -184,152 +206,12 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
 
     res.json(user);
   } catch (err) {
-    console.error('Auth/me error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('/auth/me error:', err);
+    res.status(500).json({ error: 'Failed to load user' });
   }
 });
 
-// ---------- POSTS ----------
-
-// GET /api/posts
-app.get('/api/posts', async (req, res) => {
-  try {
-    const { data: posts, error } = await supabase
-      .from('posts')
-      .select('id, user_id, content, created_at')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Get posts error:', error);
-      return res.status(500).json({ error: 'Failed to fetch posts' });
-    }
-
-    if (!posts || posts.length === 0) {
-      return res.json([]);
-    }
-
-    // Attach user info for each post
-    const userIds = [...new Set(posts.map(p => p.user_id))];
-
-    const { data: users, error: userErr } = await supabase
-      .from('users')
-      .select('id, username, display_name, avatar_url')
-      .in('id', userIds);
-
-    if (userErr) {
-      console.error('Get post users error:', userErr);
-      return res.status(500).json({ error: 'Failed to fetch users for posts' });
-    }
-
-    const userMap = {};
-    (users || []).forEach(u => { userMap[u.id] = u; });
-
-    const postsWithUsers = posts.map(p => ({
-      ...p,
-      user: userMap[p.user_id] || null
-    }));
-
-    res.json(postsWithUsers);
-  } catch (err) {
-    console.error('Posts error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// POST /api/posts  (create post)
-app.post('/api/posts', authenticateToken, async (req, res) => {
-  try {
-    const { content } = req.body;
-
-    if (!content || !content.trim()) {
-      return res.status(400).json({ error: 'Post content is required' });
-    }
-    if (content.length > 280) {
-      return res.status(400).json({ error: 'Post must be 280 characters or less' });
-    }
-
-    const { data: post, error } = await supabase
-      .from('posts')
-      .insert([
-        {
-          id: uuidv4(),
-          user_id: req.user.userId,
-          content: content.trim()
-        }
-      ])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Create post error:', error);
-      return res.status(500).json({ error: 'Failed to create post' });
-    }
-
-    res.status(201).json(post);
-  } catch (err) {
-    console.error('Create post error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// POST /api/posts/:id/like  (toggle like)
-app.post('/api/posts/:id/like', authenticateToken, async (req, res) => {
-  try {
-    const postId = req.params.id;
-    const userId = req.user.userId;
-
-    // Does a like already exist?
-    const { data: existing, error: existingErr } = await supabase
-      .from('likes')
-      .select('*')
-      .eq('post_id', postId)
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (existingErr) {
-      console.error('Like fetch error:', existingErr);
-      return res.status(500).json({ error: 'Failed to update like' });
-    }
-
-    if (existing) {
-      // unlike
-      const { error: delErr } = await supabase
-        .from('likes')
-        .delete()
-        .eq('id', existing.id);
-
-      if (delErr) {
-        console.error('Unlike error:', delErr);
-        return res.status(500).json({ error: 'Failed to unlike post' });
-      }
-
-      return res.json({ liked: false });
-    } else {
-      // like
-      const { error: insErr } = await supabase
-        .from('likes')
-        .insert([
-          {
-            id: uuidv4(),
-            post_id: postId,
-            user_id: userId
-          }
-        ]);
-
-      if (insErr) {
-        console.error('Like insert error:', insErr);
-        return res.status(500).json({ error: 'Failed to like post' });
-      }
-
-      return res.json({ liked: true });
-    }
-  } catch (err) {
-    console.error('Like route error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// --------- Start server ---------
+// --- Start server ---
 app.listen(PORT, () => {
-  console.log(`Backend API listening on port ${PORT}`);
+  console.log(`🚀 Backend API listening on port ${PORT}`);
 });
