@@ -3,25 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home - Social Platform</title>
+    <title>Home - Uncensored Social</title>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/feed-styles.css">
+    <link rel="stylesheet" href="css/icons.css">
 </head>
 <body>
     <!-- Top Header -->
     <header class="header">
-        <div class="profile-icon" id="profileMenuBtn">
-            <img src="assets/icons/default-profile.png" alt="Profile" id="headerProfileImg">
+        <div class="header-left">
+            <div class="profile-section" id="profileSection">
+                <!-- Shown when logged in -->
+                <div class="profile-icon" id="profileMenuBtn">
+                    <img src="assets/icons/default-profile.png" alt="Profile" id="headerProfileImg">
+                </div>
+            </div>
+            
+            <!-- Shown when guest -->
+            <div class="auth-buttons" id="authButtons">
+                <a href="login.html" class="btn btn-sm btn-login">Log In</a>
+                <a href="signup.html" class="btn btn-sm btn-signup">Sign Up</a>
+            </div>
         </div>
-        <h1 class="logo">Social</h1>
+
+        <h1 class="logo">Uncensored<span>Social</span></h1>
+        
         <div class="header-actions">
-            <button class="btn btn-ghost" onclick="refreshFeed()" title="Refresh">🔄</button>
+            <button class="btn btn-ghost btn-icon" onclick="refreshFeed()" title="Refresh">
+                <span class="icon icon-refresh"></span>
+            </button>
         </div>
     </header>
 
     <!-- Main Feed -->
     <main class="main-content">
-        <!-- Post Creation -->
+        <!-- Post Creation - Only shown when logged in -->
         <div class="post-creation auth-dependent" id="postCreation">
             <div class="post-input-container">
                 <img src="assets/icons/default-profile.png" alt="You" class="post-avatar" id="postUserAvatar">
@@ -35,29 +51,43 @@
             </div>
         </div>
 
+        <!-- Guest Message - Shown when not logged in -->
+        <div class="guest-message" id="guestMessage">
+            <div class="guest-content">
+                <h2>Join the Conversation</h2>
+                <p>Sign up to connect with others, share your thoughts, and be part of our community.</p>
+                <div class="guest-actions">
+                    <a href="signup.html" class="btn btn-primary btn-lg">Create Account</a>
+                    <a href="login.html" class="btn btn-secondary btn-lg">Log In</a>
+                </div>
+            </div>
+        </div>
+
         <!-- Feed Content -->
         <div class="feed" id="feedContainer">
-            <!-- Posts will be loaded here -->
-            <div class="loading-indicator" id="feedLoading">Loading posts...</div>
+            <div class="loading-indicator" id="feedLoading">
+                <div class="loading-spinner"></div>
+                <span>Loading posts...</span>
+            </div>
         </div>
     </main>
 
     <!-- Bottom Navigation -->
     <nav class="bottom-nav">
         <a href="index.html" class="nav-item active">
-            <span class="icon">🏠</span>
+            <span class="icon icon-home"></span>
             <span>Home</span>
         </a>
         <a href="search.html" class="nav-item">
-            <span class="icon">🔍</span>
+            <span class="icon icon-search"></span>
             <span>Search</span>
         </a>
         <a href="notifications.html" class="nav-item">
-            <span class="icon">🔔</span>
+            <span class="icon icon-notifications"></span>
             <span>Alerts</span>
         </a>
         <a href="dms.html" class="nav-item">
-            <span class="icon">💬</span>
+            <span class="icon icon-messages"></span>
             <span>Messages</span>
         </a>
     </nav>
@@ -65,14 +95,42 @@
     <!-- Sidebar Menu -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-content">
-            <button class="close-sidebar" id="closeSidebar">×</button>
-            <h3>Menu</h3>
+            <div class="sidebar-header">
+                <h3>Menu</h3>
+                <button class="btn btn-ghost btn-icon" id="closeSidebar">
+                    <span class="icon icon-close"></span>
+                </button>
+            </div>
+            
+            <div class="sidebar-user">
+                <img src="assets/icons/default-profile.png" alt="Profile" id="sidebarProfileImg">
+                <div class="sidebar-user-info">
+                    <h4 id="sidebarUserName">Username</h4>
+                    <p id="sidebarUserHandle">@username</p>
+                </div>
+            </div>
+            
             <ul class="menu-items">
-                <li><a href="profile.html?user=me"><span>👤</span> My Profile</a></li>
-                <li><a href="#" id="feedsToggle"><span>📰</span> Feeds: For You</a></li>
-                <li><a href="saved.html"><span>🔖</span> Saved Posts</a></li>
-                <li><a href="settings.html"><span>⚙️</span> Settings</a></li>
-                <li><a href="#" onclick="logout()"><span>🚪</span> Logout</a></li>
+                <li><a href="profile.html?user=me">
+                    <span class="icon icon-profile"></span>
+                    <span>My Profile</span>
+                </a></li>
+                <li><a href="#" id="feedsToggle">
+                    <span class="icon icon-feeds"></span>
+                    <span>Feeds: For You</span>
+                </a></li>
+                <li><a href="saved.html">
+                    <span class="icon icon-saved"></span>
+                    <span>Saved Posts</span>
+                </a></li>
+                <li><a href="settings.html">
+                    <span class="icon icon-settings"></span>
+                    <span>Settings</span>
+                </a></li>
+                <li><a href="#" onclick="logout()">
+                    <span class="icon icon-logout"></span>
+                    <span>Logout</span>
+                </a></li>
             </ul>
         </div>
     </div>
