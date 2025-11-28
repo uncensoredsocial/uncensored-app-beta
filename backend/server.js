@@ -27,17 +27,21 @@ app.use(express.json());
 app.use(
   cors({
     origin: [
-      'https://spepdb.github.io',
-      'https://uncensored-app-beta-production.up.railway.app'
+      'https://spepdb.github.io', // your GitHub Pages
+      'https://uncensored-app-beta-production.up.railway.app' // your backend itself
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
   })
 );
 
-// --- Helpers ---
+// --- Helper: JWT ---
 function signToken(user) {
-  const payload = { id: user.id, username: user.username, email: user.email };
+  const payload = {
+    id: user.id,
+    username: user.username,
+    email: user.email
+  };
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
 }
 
@@ -61,9 +65,7 @@ function authMiddleware(req, res, next) {
   }
 }
 
-// --- Routes ---
-
-// Health check
+// --- Health check ---
 app.get('/api/health', async (req, res) => {
   try {
     const { count } = await supabase
@@ -77,22 +79,22 @@ app.get('/api/health', async (req, res) => {
     });
   } catch (err) {
     console.error('Health error:', err);
-    res.status(500).json({ status: 'ERROR', details: err.message || err });
+    res.status(500).json({ status: 'ERROR' });
   }
 });
 
-// Signup
+// --- AUTH ROUTES ---
+
+// SIGNUP: POST /api/auth/signup
 app.post('/api/auth/signup', async (req, res) => {
   try {
     const { displayName, username, email, password } = req.body;
-
-    console.log('Signup request body:', req.body);
 
     if (!displayName || !username || !email || !password) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Check if username/email already exists
+    // Check uniqueness
     const { data: existing, error: checkError } = await supabase
       .from('users')
       .select('id')
@@ -101,10 +103,7 @@ app.post('/api/auth/signup', async (req, res) => {
 
     if (checkError) {
       console.error('Supabase check error:', checkError);
-      return res.status(500).json({
-        error: 'Error checking user',
-        details: checkError.message || checkError
-      });
+      return res.status(500).json({ error: 'Error checking existing user' });
     }
 
     if (existing && existing.length > 0) {
@@ -113,20 +112,19 @@ app.post('/api/auth/signup', async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 10);
     const now = new Date().toISOString();
+    const userId = uuidv4();
 
     const newUser = {
-      id: uuidv4(),
+      id: userId,
       username,
       email,
       display_name: displayName,
       password_hash: passwordHash,
       avatar_url: null,
       bio: '',
-      created_at: now
-      // ❌ last_login_at removed because the column doesn't exist
+      created_at: now,
+      last_login_at: now
     };
-
-    console.log('Inserting user:', newUser);
 
     const { data: inserted, error: insertError } = await supabase
       .from('users')
@@ -136,10 +134,7 @@ app.post('/api/auth/signup', async (req, res) => {
 
     if (insertError) {
       console.error('Supabase insert error:', insertError);
-      return res.status(500).json({
-        error: 'Supabase insert error',
-        details: insertError.message || insertError
-      });
+      return res.status(500).json({ error: 'Error creating user' });
     }
 
     const token = signToken(inserted);
@@ -150,48 +145,57 @@ app.post('/api/auth/signup', async (req, res) => {
         username: inserted.username,
         email: inserted.email,
         display_name: inserted.display_name,
-        avatar_url: inserted.avatar_url
+        avatar_url: inserted.avatar_url,
+        bio: inserted.bio,
+        created_at: inserted.created_at
       },
       token
     });
   } catch (err) {
     console.error('Signup error:', err);
-    res.status(500).json({
-      error: 'Signup failed',
-      details: err.message || err
-    });
+    res.status(500).json({ error: 'Signup failed' });
   }
 });
 
-// Login (email + password)
+// LOGIN: POST /api/auth/login
+// Accepts either { email, password } OR { identifier, password }
+// identifier can be email OR username
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, identifier, password } = req.body;
 
-    console.log('Login request body:', req.body);
+    const loginId = (identifier || email || '').trim();
 
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Missing email or password' });
+    if (!loginId || !password) {
+      return res.status(400).json({ error: 'Missing email/username or password' });
     }
 
-    const { data: user, error: userError } = await supabase
+    // Decide whether it's an email or username
+    const isEmail = loginId.includes('@');
+
+    const query = supabase
       .from('users')
       .select('*')
-      .eq('email', email)
+      .eq(isEmail ? 'email' : 'username', loginId)
       .single();
+
+    const { data: user, error: userError } = await query;
 
     if (userError || !user) {
       console.error('User lookup error:', userError);
-      return res.status(400).json({ error: 'Invalid email or password' });
+      return res.status(400).json({ error: 'Invalid credentials' });
     }
 
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
-      return res.status(400).json({ error: 'Invalid email or password' });
+      return res.status(400).json({ error: 'Invalid credentials' });
     }
 
-    // we NO LONGER update last_login_at here,
-    // because that column doesn't exist in your table.
+    // Update last_login_at
+    await supabase
+      .from('users')
+      .update({ last_login_at: new Date().toISOString() })
+      .eq('id', user.id);
 
     const token = signToken(user);
 
@@ -201,25 +205,24 @@ app.post('/api/auth/login', async (req, res) => {
         username: user.username,
         email: user.email,
         display_name: user.display_name,
-        avatar_url: user.avatar_url
+        avatar_url: user.avatar_url,
+        bio: user.bio,
+        created_at: user.created_at
       },
       token
     });
   } catch (err) {
     console.error('Login error:', err);
-    res.status(500).json({
-      error: 'Login failed',
-      details: err.message || err
-    });
+    res.status(500).json({ error: 'Login failed' });
   }
 });
 
-// Current user
+// CURRENT USER: GET /api/auth/me
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
   try {
     const { data: user, error } = await supabase
       .from('users')
-      .select('id,username,email,display_name,avatar_url')
+      .select('id,username,email,display_name,avatar_url,bio,created_at')
       .eq('id', req.user.id)
       .single();
 
@@ -230,10 +233,17 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 
     res.json(user);
   } catch (err) {
-    console.error('/auth/me error:', err);
+    console.error('/auth/me server error:', err);
     res.status(500).json({ error: 'Failed to load user' });
   }
 });
+
+// (Optional) YOU WILL LATER ADD:
+// GET /api/users/:username
+// GET /api/users/:username/posts
+// GET /api/users/:username/likes
+// PUT /api/users/me
+// POST /api/users/me/avatar
 
 // --- Start server ---
 app.listen(PORT, () => {
