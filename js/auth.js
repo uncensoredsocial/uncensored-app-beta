@@ -1,141 +1,143 @@
 // auth.js
 
-// Use localhost in dev, Railway in production
-const API_BASE_URL =
-  window.location.hostname === 'localhost'
-    ? 'http://localhost:3000/api'
-    : 'https://uncensored-app-beta-production.up.railway.app/api';
+// 🔗 Always talk to your Railway backend API
+const API_BASE_URL = 'https://uncensored-app-beta-production.up.railway.app/api';
 
 // ========================
 // Session helpers
 // ========================
 
-// Check if user is logged in
+// Is there a logged-in user?
 function isLoggedIn() {
   return localStorage.getItem('authToken') !== null;
 }
 
-// Get current user from localStorage
+// Get the current user object from localStorage
 function getCurrentUser() {
-  const userStr = localStorage.getItem('currentUser');
-  return userStr ? JSON.parse(userStr) : null;
+  const raw = localStorage.getItem('currentUser');
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
-// Get auth token
+// Get stored JWT token
 function getAuthToken() {
   return localStorage.getItem('authToken');
 }
 
-// Save user session
+// Save user + token after login/signup
 function saveUserSession(user, token) {
   localStorage.setItem('currentUser', JSON.stringify(user));
   localStorage.setItem('authToken', token);
 }
 
-// Clear user session
+// Clear auth info
 function clearUserSession() {
   localStorage.removeItem('currentUser');
   localStorage.removeItem('authToken');
+}
+
+// Log out and send to login page
+function logout() {
+  clearUserSession();
+  window.location.href = 'login.html';
 }
 
 // ========================
 // API helpers
 // ========================
 
-// Login function (pure API call)
-async function login(email, password) {
-  const response = await fetch(`${API_BASE_URL}/auth/login`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ email, password })
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error || 'Login failed');
+// Safely parse JSON (avoid JSON.parse errors on empty/body-less responses)
+async function safeJson(response) {
+  try {
+    return await response.json();
+  } catch (err) {
+    console.error('Failed to parse JSON response:', err);
+    return null;
   }
-
-  saveUserSession(data.user, data.token);
-  return data;
 }
 
-// Signup function (pure API call)
+// Signup API call
 async function signup(userData) {
-  const response = await fetch(`${API_BASE_URL}/auth/signup`, {
+  const res = await fetch(`${API_BASE_URL}/auth/signup`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(userData)
   });
 
-  const data = await response.json();
+  const data = await safeJson(res);
 
-  if (!response.ok) {
-    throw new Error(data.error || 'Signup failed');
+  if (!res.ok) {
+    const msg =
+      (data && data.error) ||
+      `Signup failed (status ${res.status})`;
+    throw new Error(msg);
+  }
+
+  if (!data || !data.user || !data.token) {
+    throw new Error('Signup succeeded but response was invalid.');
   }
 
   saveUserSession(data.user, data.token);
   return data;
 }
 
-// Logout function
-function logout() {
-  clearUserSession();
-  window.location.href = 'login.html';
-}
+// Login API call (email + password)
+async function login(email, password) {
+  const res = await fetch(`${API_BASE_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  });
 
-// Verify token and get current user
-async function verifyAuth() {
-  if (!isLoggedIn()) {
-    return null;
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    const msg =
+      (data && data.error) ||
+      `Login failed (status ${res.status})`;
+    throw new Error(msg);
   }
 
+  if (!data || !data.user || !data.token) {
+    throw new Error('Login succeeded but response was invalid.');
+  }
+
+  saveUserSession(data.user, data.token);
+  return data;
+}
+
+// Optional: verify the token with /auth/me
+async function verifyAuth() {
+  if (!isLoggedIn()) return null;
+
+  const token = getAuthToken();
   try {
-    const token = getAuthToken();
-    const response = await fetch(`${API_BASE_URL}/auth/me`, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
+    const res = await fetch(`${API_BASE_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` }
     });
 
-    if (!response.ok) {
+    if (!res.ok) {
       throw new Error('Invalid token');
     }
 
-    const user = await response.json();
-    localStorage.setItem('currentUser', JSON.stringify(user));
+    const user = await safeJson(res);
+    if (user) {
+      localStorage.setItem('currentUser', JSON.stringify(user));
+    }
     return user;
-  } catch (error) {
-    console.error('Auth verification failed:', error);
+  } catch (err) {
+    console.error('verifyAuth failed:', err);
     clearUserSession();
     return null;
   }
 }
 
-// Redirect if not authenticated (for protected pages)
-function requireAuth() {
-  if (!isLoggedIn()) {
-    window.location.href = 'login.html';
-    return false;
-  }
-  return true;
-}
-
-// Redirect if already authenticated (for login/signup pages)
-function redirectIfAuthenticated() {
-  if (isLoggedIn()) {
-    window.location.href = 'feed.html'; // or 'index.html' if you prefer
-    return true;
-  }
-  return false;
-}
-
 // ========================
-// Form wiring (Signup + Login)
+// Form wiring (signup + login)
 // ========================
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -143,22 +145,25 @@ document.addEventListener('DOMContentLoaded', () => {
   const loginForm = document.getElementById('login-form');
   const logoutBtn = document.getElementById('logout-btn');
 
-  // ---- SIGNUP ----
+  // ----- SIGNUP PAGE -----
   if (signupForm) {
-    // if user is already logged in, don’t show signup
-    redirectIfAuthenticated();
-
     signupForm.addEventListener('submit', async (e) => {
-      e.preventDefault(); // IMPORTANT: stops the URL from filling with form data
+      e.preventDefault(); // stop the default HTML submit (no more query string in URL)
 
       const displayName = document.getElementById('displayName')?.value.trim();
       const username = document.getElementById('username')?.value.trim();
       const email = document.getElementById('email')?.value.trim();
       const password = document.getElementById('password')?.value;
       const confirmPassword = document.getElementById('confirmPassword')?.value;
+      const accepted = document.getElementById('privacyPolicy')?.checked;
 
       if (!displayName || !username || !email || !password || !confirmPassword) {
         alert('Please fill in all fields.');
+        return;
+      }
+
+      if (!accepted) {
+        alert('You must agree to the Privacy Policy and Terms of Service.');
         return;
       }
 
@@ -168,32 +173,26 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       try {
-        await signup({
-          displayName,
-          username,
-          email,
-          password
-        });
-
-        // Go to feed after successful signup
+        await signup({ displayName, username, email, password });
+        // On success, go to the feed
         window.location.href = 'feed.html';
       } catch (err) {
         console.error('Signup error:', err);
-        alert(err.message || 'Signup failed.');
+        alert(err.message || 'Signup failed. Please try again.');
       }
     });
   }
 
-  // ---- LOGIN ----
+  // ----- LOGIN PAGE -----
   if (loginForm) {
-    // if user is already logged in, don’t show login
-    redirectIfAuthenticated();
-
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const email = document.getElementById('login-email')?.value.trim();
-      const password = document.getElementById('login-password')?.value;
+      const emailInput = document.getElementById('login-email');
+      const passwordInput = document.getElementById('login-password');
+
+      const email = emailInput?.value.trim();
+      const password = passwordInput?.value;
 
       if (!email || !password) {
         alert('Please enter email and password.');
@@ -205,12 +204,12 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = 'feed.html';
       } catch (err) {
         console.error('Login error:', err);
-        alert(err.message || 'Login failed.');
+        alert(err.message || 'Login failed. Please try again.');
       }
     });
   }
 
-  // ---- LOGOUT BUTTON (optional) ----
+  // ----- LOGOUT BUTTON (if present anywhere) -----
   if (logoutBtn) {
     logoutBtn.addEventListener('click', (e) => {
       e.preventDefault();
