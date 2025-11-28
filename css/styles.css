@@ -94,12 +94,13 @@ body {
     height: 60px;
 }
 
+/* left chunk with auth buttons / profile */
 .header-left {
     display: flex;
     align-items: center;
-    gap: var(--space-4);
-    min-width: 140px;
-    flex: 1;
+    gap: var(--space-3);
+    flex: 0 0 auto;          /* don’t steal space from logo */
+    min-width: 150px;
 }
 
 .logo {
@@ -108,7 +109,7 @@ body {
     color: var(--text-color);
     margin: 0;
     text-align: center;
-    flex: 1;
+    flex: 1 1 auto;
 }
 
 .logo span {
@@ -119,9 +120,9 @@ body {
     display: flex;
     gap: var(--space-3);
     align-items: center;
-    min-width: 140px;
+    flex: 0 0 auto;
+    min-width: 80px;
     justify-content: flex-end;
-    flex: 1;
 }
 
 /* Profile Section */
@@ -154,8 +155,12 @@ body {
 /* Auth Buttons */
 .auth-buttons {
     display: flex;
-    gap: var(--space-3);
+    gap: var(--space-2);
     align-items: center;
+}
+
+.auth-buttons .btn {
+    white-space: nowrap; /* keep “Log In” and “Sign Up” on one line */
 }
 
 .btn-login {
@@ -643,11 +648,11 @@ body {
     }
     
     .auth-buttons {
-        gap: var(--space-2);
+        gap: var(--space-1);
     }
     
     .btn-sm {
-        padding: var(--space-2) var(--space-3);
+        padding: var(--space-1) var(--space-2);
         font-size: var(--font-size-xs);
     }
     
