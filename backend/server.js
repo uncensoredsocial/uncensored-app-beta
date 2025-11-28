@@ -1,54 +1,29 @@
-// server.js
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
-const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: ['https://spepdb.github.io', 'http://localhost:8000'],
+    credentials: true
+}));
 app.use(express.json());
-app.use(express.static('.')); // Serve static files
 
-// In-memory storage (replace with database in production)
+// In-memory storage (will reset on server restart - add database later)
 let users = [];
 let posts = [];
-let sessions = [];
 
-// Ensure data directory exists
-const dataDir = path.join(__dirname, 'data');
-if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir);
-}
-
-// Helper functions
-const saveData = () => {
-    const data = { users, posts, sessions };
-    fs.writeFileSync(path.join(dataDir, 'db.json'), JSON.stringify(data, null, 2));
-};
-
-const loadData = () => {
-    try {
-        const data = JSON.parse(fs.readFileSync(path.join(dataDir, 'db.json')));
-        users = data.users || [];
-        posts = data.posts || [];
-        sessions = data.sessions || [];
-    } catch (error) {
-        // Initialize with default data
-        users = [];
-        posts = [];
-        sessions = [];
-    }
-};
-
-// Load data on startup
-loadData();
+// Helper to find user
+const findUserById = (id) => users.find(u => u.id === id);
+const findUserByEmail = (email) => users.find(u => u.email === email);
+const findUserByUsername = (username) => users.find(u => u.username === username);
 
 // Authentication middleware
 const authenticateToken = (req, res, next) => {
@@ -72,7 +47,12 @@ const authenticateToken = (req, res, next) => {
 
 // Health check
 app.get('/api/health', (req, res) => {
-    res.json({ status: 'OK', timestamp: new Date().toISOString() });
+    res.json({ 
+        status: 'OK', 
+        timestamp: new Date().toISOString(),
+        users: users.length,
+        posts: posts.length
+    });
 });
 
 // User Registration
@@ -80,7 +60,6 @@ app.post('/api/auth/signup', async (req, res) => {
     try {
         const { email, password, username, displayName } = req.body;
 
-        // Validation
         if (!email || !password || !username) {
             return res.status(400).json({ error: 'Email, password, and username are required' });
         }
@@ -90,8 +69,7 @@ app.post('/api/auth/signup', async (req, res) => {
         }
 
         // Check if user already exists
-        const existingUser = users.find(u => u.email === email || u.username === username);
-        if (existingUser) {
+        if (findUserByEmail(email) || findUserByUsername(username)) {
             return res.status(400).json({ error: 'User already exists with this email or username' });
         }
 
@@ -112,7 +90,6 @@ app.post('/api/auth/signup', async (req, res) => {
         };
 
         users.push(user);
-        saveData();
 
         // Generate token
         const token = jwt.sign(
@@ -145,7 +122,7 @@ app.post('/api/auth/login', async (req, res) => {
         }
 
         // Find user
-        const user = users.find(u => u.email === email);
+        const user = findUserByEmail(email);
         if (!user) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
@@ -179,7 +156,7 @@ app.post('/api/auth/login', async (req, res) => {
 
 // Get current user
 app.get('/api/auth/me', authenticateToken, (req, res) => {
-    const user = users.find(u => u.id === req.user.userId);
+    const user = findUserById(req.user.userId);
     if (!user) {
         return res.status(404).json({ error: 'User not found' });
     }
@@ -188,14 +165,12 @@ app.get('/api/auth/me', authenticateToken, (req, res) => {
     res.json(userWithoutPassword);
 });
 
-// Posts
-
-// Get all posts (public - no auth required)
+// Posts - Get all posts (public - no auth required)
 app.get('/api/posts', (req, res) => {
     try {
         // Add user data to posts
         const postsWithUsers = posts.map(post => {
-            const user = users.find(u => u.id === post.userId);
+            const user = findUserById(post.userId);
             return {
                 ...post,
                 user: user ? {
@@ -233,7 +208,7 @@ app.post('/api/posts', authenticateToken, (req, res) => {
             return res.status(400).json({ error: 'Post must be 280 characters or less' });
         }
 
-        const user = users.find(u => u.id === req.user.userId);
+        const user = findUserById(req.user.userId);
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
@@ -248,8 +223,7 @@ app.post('/api/posts', authenticateToken, (req, res) => {
             reposts: []
         };
 
-        posts.unshift(post); // Add to beginning
-        saveData();
+        posts.unshift(post);
 
         // Return post with user data
         const postWithUser = {
@@ -290,8 +264,10 @@ app.post('/api/posts/:id/like', authenticateToken, (req, res) => {
             post.likes.push(userId);
         }
 
-        saveData();
-        res.json({ likes: post.likes.length, liked: likeIndex === -1 });
+        res.json({ 
+            likes: post.likes.length, 
+            liked: likeIndex === -1 
+        });
 
     } catch (error) {
         console.error('Error liking post:', error);
@@ -299,53 +275,34 @@ app.post('/api/posts/:id/like', authenticateToken, (req, res) => {
     }
 });
 
-// Users
+// Add some demo posts if empty
+if (posts.length === 0) {
+    const demoUser = {
+        id: 'demo-user-1',
+        email: 'demo@uncensored.social',
+        username: 'uncensored_demo',
+        displayName: 'Uncensored Demo',
+        password: '$2a$10$demo', // not usable
+        avatar_url: 'assets/icons/default-profile.png',
+        created_at: new Date().toISOString(),
+        followers: [],
+        following: []
+    };
+    users.push(demoUser);
 
-// Get user profile
-app.get('/api/users/:username', (req, res) => {
-    try {
-        const user = users.find(u => u.username === req.params.username);
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        const { password: _, ...userWithoutPassword } = user;
-        
-        // Get user's posts
-        const userPosts = posts
-            .filter(p => p.userId === user.id)
-            .map(post => ({
-                ...post,
-                user: {
-                    id: user.id,
-                    username: user.username,
-                    display_name: user.displayName,
-                    avatar_url: user.avatar_url
-                }
-            }))
-            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-        res.json({
-            user: userWithoutPassword,
-            posts: userPosts,
-            postCount: userPosts.length,
-            followersCount: user.followers.length,
-            followingCount: user.following.length
-        });
-
-    } catch (error) {
-        console.error('Error fetching user:', error);
-        res.status(500).json({ error: 'Failed to fetch user' });
-    }
-});
-
-// Serve the main app
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
+    posts.push({
+        id: 'demo-post-1',
+        userId: demoUser.id,
+        content: 'Welcome to Uncensored Social! This is a live demo post from the backend server.',
+        created_at: new Date().toISOString(),
+        likes: [],
+        comments: [],
+        reposts: []
+    });
+}
 
 // Start server
 app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-    console.log('Social media platform backend is ready!');
+    console.log(`Uncensored Social Backend running on port ${PORT}`);
+    console.log(`Health check: http://localhost:${PORT}/api/health`);
 });
