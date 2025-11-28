@@ -4,7 +4,7 @@ const API_BASE_URL = 'https://uncensored-app-beta-production.up.railway.app/api'
 const TOKEN_KEY = 'us_auth_token';
 const USER_KEY = 'us_current_user';
 
-// ----- Storage helpers -----
+// ===== Storage helpers =====
 function setAuthToken(token) {
     localStorage.setItem(TOKEN_KEY, token);
 }
@@ -40,7 +40,7 @@ function logout() {
     window.location.href = 'index.html';
 }
 
-// Expose to other scripts (feed.js, profile.js, index)
+// expose globally for feed.js / profile.js
 window.setAuthToken = setAuthToken;
 window.getAuthToken = getAuthToken;
 window.setCurrentUser = setCurrentUser;
@@ -48,16 +48,16 @@ window.getCurrentUser = getCurrentUser;
 window.isLoggedIn = isLoggedIn;
 window.logout = logout;
 
-// ----- UI helper -----
+// ===== UI helpers =====
 function showAuthMessage(el, message, type = 'error') {
     if (!el) return;
     el.textContent = message;
     el.classList.remove('hidden');
-    el.classList.toggle('error-message', type === 'error');
-    el.classList.toggle('success-message', type === 'success');
+    el.classList.toggle('auth-error', type === 'error');
+    el.classList.toggle('auth-success', type === 'success');
 }
 
-// ----- SIGNUP HANDLER -----
+// ===== SIGNUP =====
 async function handleSignup(e) {
     e.preventDefault();
 
@@ -71,7 +71,7 @@ async function handleSignup(e) {
     const signupBtn = document.getElementById('signupBtn');
 
     if (!displayNameInput || !usernameInput || !emailInput || !passwordInput || !confirmPasswordInput) {
-        return;
+        return; // not on signup page
     }
 
     errorMessage?.classList.add('hidden');
@@ -99,8 +99,10 @@ async function handleSignup(e) {
     }
 
     try {
-        signupBtn.disabled = true;
-        signupBtn.textContent = 'Creating...';
+        if (signupBtn) {
+            signupBtn.disabled = true;
+            signupBtn.textContent = 'Creating...';
+        }
 
         const res = await fetch(`${API_BASE_URL}/auth/signup`, {
             method: 'POST',
@@ -114,12 +116,10 @@ async function handleSignup(e) {
         });
 
         const data = await res.json().catch(() => ({}));
-
         if (!res.ok) {
             throw new Error(data.error || 'Signup failed');
         }
 
-        // Save auth
         setAuthToken(data.token);
         setCurrentUser(data.user);
 
@@ -132,21 +132,34 @@ async function handleSignup(e) {
         console.error('Signup error:', err);
         showAuthMessage(errorMessage, err.message || 'Signup failed.');
     } finally {
-        signupBtn.disabled = false;
-        signupBtn.textContent = 'Create Account';
+        if (signupBtn) {
+            signupBtn.disabled = false;
+            signupBtn.textContent = 'Create Account';
+        }
     }
 }
 
-// ----- LOGIN HANDLER -----
+// ===== LOGIN =====
 async function handleLogin(e) {
     e.preventDefault();
 
-    const identifierInput = document.getElementById('loginIdentifier');
-    const passwordInput = document.getElementById('loginPassword');
+    // Support multiple possible IDs, just in case
+    const identifierInput =
+        document.getElementById('loginIdentifier') ||
+        document.getElementById('loginEmail') ||
+        document.getElementById('email');
+
+    const passwordInput =
+        document.getElementById('loginPassword') ||
+        document.getElementById('password');
+
     const errorMessage = document.getElementById('errorMessage');
     const loginBtn = document.getElementById('loginBtn');
 
-    if (!identifierInput || !passwordInput) return;
+    if (!identifierInput || !passwordInput) {
+        // form not on this page
+        return;
+    }
 
     errorMessage?.classList.add('hidden');
 
@@ -159,16 +172,15 @@ async function handleLogin(e) {
     }
 
     try {
-        loginBtn.disabled = true;
-        loginBtn.textContent = 'Signing in...';
+        if (loginBtn) {
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Signing in...';
+        }
 
         const res = await fetch(`${API_BASE_URL}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                identifier,
-                password
-            })
+            body: JSON.stringify({ identifier, password })
         });
 
         const data = await res.json().catch(() => ({}));
@@ -177,7 +189,6 @@ async function handleLogin(e) {
             throw new Error(data.error || 'Login failed');
         }
 
-        // Save auth
         setAuthToken(data.token);
         setCurrentUser(data.user);
 
@@ -186,12 +197,14 @@ async function handleLogin(e) {
         console.error('Login error:', err);
         showAuthMessage(errorMessage, err.message || 'Login failed.');
     } finally {
-        loginBtn.disabled = false;
-        loginBtn.textContent = 'Sign In';
+        if (loginBtn) {
+            loginBtn.disabled = false;
+            loginBtn.textContent = 'Sign In';
+        }
     }
 }
 
-// ----- INIT ON PAGE LOAD -----
+// ===== INIT =====
 document.addEventListener('DOMContentLoaded', () => {
     const signupForm = document.getElementById('signupForm');
     const loginForm = document.getElementById('loginForm');
@@ -199,12 +212,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (signupForm) {
         signupForm.addEventListener('submit', handleSignup);
     }
-
     if (loginForm) {
         loginForm.addEventListener('submit', handleLogin);
     }
 
-    // Hide/show header auth buttons on pages that include them
+    // Header auth/profile toggle
     const authButtons = document.getElementById('authButtons');
     const profileSection = document.getElementById('profileSection');
     const headerProfileImg = document.getElementById('headerProfileImg');
