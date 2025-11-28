@@ -1,4 +1,6 @@
 // Feed Management System
+const API_BASE_URL = 'http://localhost:3000/api';
+
 class FeedManager {
     constructor() {
         this.posts = [];
@@ -15,7 +17,7 @@ class FeedManager {
         this.updateUI();
     }
 
-    // Load initial posts
+    // Load initial posts - WORKS FOR BOTH LOGGED IN AND PUBLIC USERS
     async loadInitialPosts() {
         if (this.isLoading) return;
         
@@ -47,7 +49,7 @@ class FeedManager {
         }
     }
 
-    // Create new post
+    // Create new post - ONLY FOR LOGGED IN USERS
     async createPost(content) {
         const currentUser = getCurrentUser();
         
@@ -73,9 +75,9 @@ class FeedManager {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${getAuthToken()}`
                 },
                 body: JSON.stringify({
-                    userId: currentUser.id,
                     content: content.trim()
                 })
             });
@@ -160,6 +162,9 @@ class FeedManager {
         const username = user.username || 'unknown';
         const avatar = user.avatar_url || 'assets/icons/default-profile.png';
         const timestamp = this.formatTimestamp(post.created_at);
+        const likeCount = post.likes ? post.likes.length : 0;
+        const currentUser = getCurrentUser();
+        const isLiked = currentUser && post.likes ? post.likes.includes(currentUser.id) : false;
 
         postDiv.innerHTML = `
             <div class="post-header">
@@ -175,16 +180,24 @@ class FeedManager {
                 <p>${this.formatPostContent(post.content)}</p>
             </div>
             <div class="post-actions">
-                <button class="post-action like-btn" onclick="feedManager.handleLike('${post.id}')">
-                    ❤️ <span class="like-count">0</span>
+                <button class="post-action like-btn ${isLiked ? 'liked' : ''}" 
+                        onclick="feedManager.handleLike('${post.id}')"
+                        ${!isLoggedIn() ? 'disabled' : ''}>
+                    ${isLiked ? '❤️' : '🤍'} <span class="like-count">${likeCount}</span>
                 </button>
-                <button class="post-action comment-btn" onclick="feedManager.handleComment('${post.id}')">
-                    💬 <span class="comment-count">0</span>
+                <button class="post-action comment-btn" 
+                        onclick="feedManager.handleComment('${post.id}')"
+                        ${!isLoggedIn() ? 'disabled' : ''}>
+                    💬 <span class="comment-count">${post.comments ? post.comments.length : 0}</span>
                 </button>
-                <button class="post-action repost-btn" onclick="feedManager.handleRepost('${post.id}')">
-                    🔄
+                <button class="post-action repost-btn" 
+                        onclick="feedManager.handleRepost('${post.id}')"
+                        ${!isLoggedIn() ? 'disabled' : ''}>
+                    🔄 <span class="repost-count">${post.reposts ? post.reposts.length : 0}</span>
                 </button>
-                <button class="post-action save-btn" onclick="feedManager.handleSave('${post.id}')">
+                <button class="post-action save-btn" 
+                        onclick="feedManager.handleSave('${post.id}')"
+                        ${!isLoggedIn() ? 'disabled' : ''}>
                     🔖
                 </button>
             </div>
@@ -239,50 +252,60 @@ class FeedManager {
         }
 
         try {
-            const likeBtn = document.querySelector(`[data-post-id="${postId}"] .like-btn`);
-            const isLiked = likeBtn.classList.contains('liked');
-            
-            if (isLiked) {
-                await this.unlikePost(postId);
-            } else {
-                await this.likePost(postId);
+            const response = await fetch(`${API_BASE_URL}/posts/${postId}/like`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getAuthToken()}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to like post');
             }
+
+            const result = await response.json();
+            
+            // Update UI
+            const likeBtn = document.querySelector(`[data-post-id="${postId}"] .like-btn`);
+            const likeCount = document.querySelector(`[data-post-id="${postId}"] .like-count`);
+            
+            if (result.liked) {
+                likeBtn.classList.add('liked');
+                likeBtn.innerHTML = `❤️ <span class="like-count">${result.likes}</span>`;
+                this.showSuccess('Post liked!');
+            } else {
+                likeBtn.classList.remove('liked');
+                likeBtn.innerHTML = `🤍 <span class="like-count">${result.likes}</span>`;
+                this.showSuccess('Post unliked!');
+            }
+
         } catch (error) {
             console.error('Error handling like:', error);
             this.showError('Failed to like post');
         }
     }
 
-    async likePost(postId) {
-        // TODO: Implement API call
-        const likeBtn = document.querySelector(`[data-post-id="${postId}"] .like-btn`);
-        likeBtn.classList.add('liked');
-        likeBtn.innerHTML = '❤️ <span class="like-count">1</span>';
-        
-        this.showSuccess('Post liked!');
-    }
-
-    async unlikePost(postId) {
-        // TODO: Implement API call
-        const likeBtn = document.querySelector(`[data-post-id="${postId}"] .like-btn`);
-        likeBtn.classList.remove('liked');
-        likeBtn.innerHTML = '❤️ <span class="like-count">0</span>';
-        
-        this.showSuccess('Post unliked!');
-    }
-
     handleComment(postId) {
-        // TODO: Implement comment functionality
+        if (!isLoggedIn()) {
+            this.showError('Please log in to comment');
+            return;
+        }
         this.showMessage('Comment feature coming soon!');
     }
 
     handleRepost(postId) {
-        // TODO: Implement repost functionality
+        if (!isLoggedIn()) {
+            this.showError('Please log in to repost');
+            return;
+        }
         this.showMessage('Repost feature coming soon!');
     }
 
     handleSave(postId) {
-        // TODO: Implement save functionality
+        if (!isLoggedIn()) {
+            this.showError('Please log in to save posts');
+            return;
+        }
         this.showMessage('Save feature coming soon!');
     }
 
@@ -340,7 +363,7 @@ class FeedManager {
         if (!postInput || !postButton) return;
 
         const length = postInput.value.trim().length;
-        postButton.disabled = length === 0 || length > 280;
+        postButton.disabled = length === 0 || length > 280 || !isLoggedIn();
     }
 
     // Handle post creation
@@ -401,13 +424,14 @@ class FeedManager {
     showEmptyState() {
         const feedContainer = document.getElementById('feedContainer');
         if (feedContainer) {
+            const message = isLoggedIn() 
+                ? '<p>Be the first to post something!</p><button class="btn btn-primary mt-3" onclick="document.getElementById(\'postInput\').focus()">Create First Post</button>'
+                : '<p>No posts yet. Log in to create the first post!</p><button class="btn btn-primary mt-3" onclick="window.location.href=\'login.html\'">Log In</button>';
+            
             feedContainer.innerHTML = `
                 <div class="empty-state">
                     <h3>No posts yet</h3>
-                    <p>Be the first to post something!</p>
-                    <button class="btn btn-primary mt-3" onclick="document.getElementById('postInput').focus()">
-                        Create First Post
-                    </button>
+                    ${message}
                 </div>
             `;
         }
@@ -465,17 +489,45 @@ class FeedManager {
         const postCreation = document.getElementById('postCreation');
         const headerProfileImg = document.getElementById('headerProfileImg');
         const postUserAvatar = document.getElementById('postUserAvatar');
+        const postButton = document.getElementById('postButton');
 
+        // Show/hide post creation based on auth
         if (postCreation) {
-            postCreation.style.display = currentUser ? 'block' : 'none';
+            if (currentUser) {
+                postCreation.style.display = 'block';
+            } else {
+                postCreation.style.display = 'none';
+                // Show login prompt for non-logged-in users
+                const feedContainer = document.getElementById('feedContainer');
+                if (feedContainer && !feedContainer.querySelector('.login-prompt')) {
+                    const loginPrompt = document.createElement('div');
+                    loginPrompt.className = 'login-prompt';
+                    loginPrompt.innerHTML = `
+                        <div class="empty-state">
+                            <h3>Join the conversation</h3>
+                            <p>Log in to post and interact with others</p>
+                            <button class="btn btn-primary mt-3" onclick="window.location.href='login.html'">
+                                Log In
+                            </button>
+                        </div>
+                    `;
+                    feedContainer.appendChild(loginPrompt);
+                }
+            }
         }
 
+        // Update profile images
         if (headerProfileImg && currentUser?.avatar_url) {
             headerProfileImg.src = currentUser.avatar_url;
         }
 
         if (postUserAvatar && currentUser?.avatar_url) {
             postUserAvatar.src = currentUser.avatar_url;
+        }
+
+        // Update post button state
+        if (postButton) {
+            this.updatePostButton();
         }
     }
 }
