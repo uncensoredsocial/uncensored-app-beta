@@ -18,7 +18,7 @@ class ProfilePage {
         this.cacheDom();
         this.bindEvents();
 
-        // Try local user first so UI doesn't just say "Loading..." forever
+        // Try local user first so UI doesn't stay "Loading..."
         const localUser = window.getCurrentUser ? getCurrentUser() : null;
         if (localUser) {
             this.setUser(localUser);
@@ -30,6 +30,7 @@ class ProfilePage {
     }
 
     cacheDom() {
+        // Main profile fields
         this.displayNameEl = document.getElementById('profileDisplayName');
         this.usernameEl = document.getElementById('profileUsername');
         this.bioEl = document.getElementById('profileBio');
@@ -37,23 +38,29 @@ class ProfilePage {
         this.avatarEl = document.getElementById('profileAvatar');
         this.bannerEl = document.getElementById('profileBanner');
 
+        // Stats
         this.postsCountEl = document.getElementById('postsCount');
         this.followersCountEl = document.getElementById('followersCount');
         this.followingCountEl = document.getElementById('followingCount');
 
+        // Posts list
         this.postsContainer = document.getElementById('profilePosts');
 
+        // Buttons
         this.settingsButton = document.getElementById('settingsButton');
         this.editProfileBtn = document.getElementById('editProfileBtn');
 
-        // Modal
+        // Edit profile modal + fields
         this.editModal = document.getElementById('editProfileModal');
         this.editForm = document.getElementById('editProfileForm');
         this.editDisplayNameInput = document.getElementById('editDisplayName');
         this.editBioInput = document.getElementById('editBio');
         this.bioCharCounter = document.getElementById('bioCharCounter');
-        this.editAvatarUrlInput = document.getElementById('editAvatarUrl');
-        this.editBannerUrlInput = document.getElementById('editBannerUrl');
+
+        // NEW: file inputs for profile picture + banner
+        this.editProfileImageInput = document.getElementById('editProfileImage');
+        this.editBannerImageInput = document.getElementById('editBannerImage');
+
         this.editErrorEl = document.getElementById('editProfileError');
         this.editSuccessEl = document.getElementById('editProfileSuccess');
         this.closeEditBtn = document.getElementById('closeEditProfileBtn');
@@ -101,7 +108,7 @@ class ProfilePage {
             btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
         });
 
-        // Close modal if clicking backdrop
+        // Close modal when clicking backdrop
         if (this.editModal) {
             this.editModal.addEventListener('click', (e) => {
                 if (e.target === this.editModal) {
@@ -110,6 +117,8 @@ class ProfilePage {
             });
         }
     }
+
+    /* ================= API ================= */
 
     async fetchCurrentUser() {
         try {
@@ -126,7 +135,7 @@ class ProfilePage {
             const user = await res.json();
             this.setUser(user);
 
-            // sync local storage
+            // Sync local storage
             if (window.setCurrentUser) {
                 setCurrentUser(user);
             }
@@ -147,12 +156,15 @@ class ProfilePage {
             const res = await fetch(
                 `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(this.user.username)}/posts`
             );
-            if (!res.ok) throw new Error('Failed to load posts');
+
+            if (!res.ok) {
+                // This is the message you’re seeing:
+                throw new Error('Failed to load posts');
+            }
 
             const posts = await res.json();
             this.posts = posts || [];
 
-            // Update posts count based on actual posts
             if (this.postsCountEl) {
                 this.postsCountEl.textContent = this.posts.length.toString();
             }
@@ -177,6 +189,8 @@ class ProfilePage {
         }
     }
 
+    /* ================= PROFILE UI ================= */
+
     setUser(user) {
         this.user = user || this.user || {};
 
@@ -199,7 +213,6 @@ class ProfilePage {
                 this.bannerEl.style.backgroundImage = `url("${user.banner_url}")`;
                 this.bannerEl.classList.add('profile-banner-image');
             } else {
-                // keep gradient background
                 this.bannerEl.style.backgroundImage = '';
                 this.bannerEl.classList.remove('profile-banner-image');
             }
@@ -216,21 +229,54 @@ class ProfilePage {
         }
     }
 
-    /* ------------ Edit Profile Modal ------------ */
+    renderPosts() {
+        if (!this.postsContainer) return;
+        this.postsContainer.innerHTML = '';
+
+        this.posts.forEach((post) => {
+            const div = document.createElement('div');
+            div.className = 'post profile-post';
+
+            div.innerHTML = `
+                <div class="post-header">
+                    <img src="${this.user.avatar_url || 'assets/icons/default-profile.png'}"
+                         class="post-user-avatar">
+                    <div class="post-user-info">
+                        <div class="post-display-name">${this.user.display_name || this.user.username}</div>
+                        <div class="post-username">@${this.user.username}</div>
+                    </div>
+                </div>
+                <div class="post-content">${this.escape(post.content)}</div>
+                <div class="post-meta">
+                    <span class="post-date">
+                        ${new Date(post.created_at).toLocaleString()}
+                    </span>
+                </div>
+            `;
+
+            this.postsContainer.appendChild(div);
+        });
+    }
+
+    /* ============ EDIT PROFILE MODAL ============ */
 
     openEditModal() {
         if (!this.editModal || !this.user) return;
 
         this.editDisplayNameInput.value = this.user.display_name || '';
         this.editBioInput.value = this.user.bio || '';
-        this.editAvatarUrlInput.value = this.user.avatar_url || '';
-        this.editBannerUrlInput.value = this.user.banner_url || '';
 
-        // reset messages
-        this.editErrorEl.classList.add('hidden');
-        this.editSuccessEl.classList.add('hidden');
+        // Clear file inputs
+        if (this.editProfileImageInput) {
+            this.editProfileImageInput.value = '';
+        }
+        if (this.editBannerImageInput) {
+            this.editBannerImageInput.value = '';
+        }
 
-        // update char counter
+        if (this.editErrorEl) this.editErrorEl.classList.add('hidden');
+        if (this.editSuccessEl) this.editSuccessEl.classList.add('hidden');
+
         if (this.bioCharCounter) {
             const len = this.editBioInput.value.length;
             this.bioCharCounter.textContent = `${len}/160`;
@@ -250,13 +296,26 @@ class ProfilePage {
 
         const display_name = this.editDisplayNameInput.value.trim();
         const bio = this.editBioInput.value.trim();
-        const avatar_url = this.editAvatarUrlInput.value.trim();
-        const banner_url = this.editBannerUrlInput.value.trim();
 
-        this.editErrorEl.classList.add('hidden');
-        this.editSuccessEl.classList.add('hidden');
+        let avatar_url = this.user.avatar_url || null;
+        let banner_url = this.user.banner_url || null;
+
+        if (this.editErrorEl) this.editErrorEl.classList.add('hidden');
+        if (this.editSuccessEl) this.editSuccessEl.classList.add('hidden');
 
         try {
+            // If user picked a new profile picture, upload it
+            if (this.editProfileImageInput && this.editProfileImageInput.files[0]) {
+                const file = this.editProfileImageInput.files[0];
+                avatar_url = await this.uploadImage(file, 'avatar');
+            }
+
+            // If user picked a new banner image, upload it
+            if (this.editBannerImageInput && this.editBannerImageInput.files[0]) {
+                const file = this.editBannerImageInput.files[0];
+                banner_url = await this.uploadImage(file, 'banner');
+            }
+
             const res = await fetch(`${PROFILE_API_BASE_URL}/auth/me`, {
                 method: 'PUT',
                 headers: {
@@ -266,8 +325,8 @@ class ProfilePage {
                 body: JSON.stringify({
                     display_name,
                     bio,
-                    avatar_url: avatar_url || null,
-                    banner_url: banner_url || null
+                    avatar_url,
+                    banner_url
                 })
             });
 
@@ -277,35 +336,77 @@ class ProfilePage {
                 throw new Error(data.error || 'Failed to update profile');
             }
 
-            // update UI + local storage
+            // Update UI + local storage
             this.setUser(data);
             if (window.setCurrentUser) setCurrentUser(data);
 
-            this.editSuccessEl.textContent = 'Profile updated!';
-            this.editSuccessEl.classList.remove('hidden');
+            if (this.editSuccessEl) {
+                this.editSuccessEl.textContent = 'Profile updated!';
+                this.editSuccessEl.classList.remove('hidden');
+            }
 
             setTimeout(() => {
                 this.closeEditModal();
             }, 700);
         } catch (err) {
             console.error('handleEditSubmit error:', err);
-            this.editErrorEl.textContent = err.message || 'Failed to update profile';
-            this.editErrorEl.classList.remove('hidden');
+            if (this.editErrorEl) {
+                this.editErrorEl.textContent = err.message || 'Failed to update profile';
+                this.editErrorEl.classList.remove('hidden');
+            }
         }
     }
 
-    /* ------------ Tabs ------------ */
+    async uploadImage(file, kind) {
+        // kind = 'avatar' or 'banner'
+        const base64 = await this.fileToBase64(file);
+        const pureBase64 = base64.split(',')[1]; // remove "data:image/...;base64,"
+
+        const res = await fetch(`${PROFILE_API_BASE_URL}/profile/upload-image`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${getAuthToken()}`
+            },
+            body: JSON.stringify({
+                imageData: pureBase64,
+                kind
+            })
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.url) {
+            throw new Error(data.error || 'Failed to upload image');
+        }
+
+        return data.url; // public URL in Supabase bucket
+    }
+
+    fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = (err) => reject(err);
+            reader.readAsDataURL(file);
+        });
+    }
+
+    /* ============ TABS ============ */
 
     switchTab(tabName) {
         this.tabButtons.forEach((btn) => {
             btn.classList.toggle('active', btn.dataset.tab === tabName);
         });
 
-        this.postsTabPane.classList.toggle('active', tabName === 'posts');
-        this.likesTabPane.classList.toggle('active', tabName === 'likes');
+        if (this.postsTabPane) {
+            this.postsTabPane.classList.toggle('active', tabName === 'posts');
+        }
+        if (this.likesTabPane) {
+            this.likesTabPane.classList.toggle('active', tabName === 'likes');
+        }
     }
 
-    /* ------------ Helpers ------------ */
+    /* ============ HELPERS ============ */
 
     formatJoinDate(dateString) {
         if (!dateString) return 'Joined —';
@@ -317,7 +418,6 @@ class ProfilePage {
     }
 
     showTempMessage(message, type = 'info') {
-        // minimal toast
         const div = document.createElement('div');
         div.className = `status-message status-${type}`;
         div.textContent = message;
@@ -331,6 +431,17 @@ class ProfilePage {
         `;
         document.body.appendChild(div);
         setTimeout(() => div.remove(), 2500);
+    }
+
+    escape(str) {
+        if (!str) return '';
+        return String(str).replace(/[&<>"']/g, (m) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        })[m]);
     }
 }
 
