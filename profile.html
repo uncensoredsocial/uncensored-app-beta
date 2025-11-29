@@ -130,22 +130,21 @@
                     ></textarea>
                     <div id="bioCharCounter" class="profile-char-counter">0/160</div>
 
-                    <!-- Simple URL fields for now; real uploads can come later -->
-                    <label class="profile-form-label" for="editAvatarUrl">Avatar URL (optional)</label>
-                    <input
-                        type="url"
-                        id="editAvatarUrl"
-                        class="profile-input"
-                        placeholder="https://..."
-                    />
+                    <label class="profile-form-label" for="editProfileImage">Profile picture</label>
+<input
+    type="file"
+    id="editProfileImage"
+    class="profile-input"
+    accept="image/*"
+/>
 
-                    <label class="profile-form-label" for="editBannerUrl">Banner URL (optional)</label>
-                    <input
-                        type="url"
-                        id="editBannerUrl"
-                        class="profile-input"
-                        placeholder="https://..."
-                    />
+<label class="profile-form-label" for="editBannerImage">Banner image</label>
+<input
+    type="file"
+    id="editBannerImage"
+    class="profile-input"
+    accept="image/*"
+/>
 
                     <div class="profile-modal-actions">
                         <button type="button" class="btn btn-secondary" id="cancelEditProfileBtn">
