@@ -18,19 +18,18 @@ class ProfilePage {
         this.cacheDom();
         this.bindEvents();
 
-        // Try local user first so UI doesn't stay "Loading..."
+        // Use local user first for instant UI
         const localUser = window.getCurrentUser ? getCurrentUser() : null;
         if (localUser) {
             this.setUser(localUser);
         }
 
-        // Then refresh from backend
+        // Try to refresh from backend (if this fails, we just log, no scary banner)
         await this.fetchCurrentUser();
         await this.fetchUserPosts();
     }
 
     cacheDom() {
-        // Main profile fields
         this.displayNameEl = document.getElementById('profileDisplayName');
         this.usernameEl = document.getElementById('profileUsername');
         this.bioEl = document.getElementById('profileBio');
@@ -38,33 +37,28 @@ class ProfilePage {
         this.avatarEl = document.getElementById('profileAvatar');
         this.bannerEl = document.getElementById('profileBanner');
 
-        // Stats
         this.postsCountEl = document.getElementById('postsCount');
         this.followersCountEl = document.getElementById('followersCount');
         this.followingCountEl = document.getElementById('followingCount');
 
-        // Posts list
         this.postsContainer = document.getElementById('profilePosts');
 
-        // Buttons
         this.settingsButton = document.getElementById('settingsButton');
         this.editProfileBtn = document.getElementById('editProfileBtn');
 
-        // Edit profile modal + fields
+        // Modal
         this.editModal = document.getElementById('editProfileModal');
         this.editForm = document.getElementById('editProfileForm');
         this.editDisplayNameInput = document.getElementById('editDisplayName');
         this.editBioInput = document.getElementById('editBio');
         this.bioCharCounter = document.getElementById('bioCharCounter');
-
-        // NEW: file inputs for profile picture + banner
-        this.editProfileImageInput = document.getElementById('editProfileImage');
-        this.editBannerImageInput = document.getElementById('editBannerImage');
-
+        this.avatarFileInput = document.getElementById('editAvatarFile');
+        this.bannerFileInput = document.getElementById('editBannerFile');
         this.editErrorEl = document.getElementById('editProfileError');
         this.editSuccessEl = document.getElementById('editProfileSuccess');
         this.closeEditBtn = document.getElementById('closeEditProfileBtn');
         this.cancelEditBtn = document.getElementById('cancelEditProfileBtn');
+        this.saveProfileBtn = document.getElementById('saveProfileBtn');
 
         // Tabs
         this.tabButtons = document.querySelectorAll('.tab-btn');
@@ -108,7 +102,7 @@ class ProfilePage {
             btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
         });
 
-        // Close modal when clicking backdrop
+        // Close modal on backdrop click
         if (this.editModal) {
             this.editModal.addEventListener('click', (e) => {
                 if (e.target === this.editModal) {
@@ -118,7 +112,7 @@ class ProfilePage {
         }
     }
 
-    /* ================= API ================= */
+    /* ---------------- Fetch current user ---------------- */
 
     async fetchCurrentUser() {
         try {
@@ -129,21 +123,24 @@ class ProfilePage {
             });
 
             if (!res.ok) {
-                throw new Error('Failed to load profile');
+                // Don't scare the user; just log it
+                const msg = await res.text();
+                console.warn('auth/me failed:', res.status, msg);
+                return;
             }
 
             const user = await res.json();
             this.setUser(user);
 
-            // Sync local storage
             if (window.setCurrentUser) {
                 setCurrentUser(user);
             }
         } catch (err) {
-            console.error('fetchCurrentUser error:', err);
-            this.showTempMessage('Failed to load profile', 'error');
+            console.warn('fetchCurrentUser error:', err);
         }
     }
+
+    /* ---------------- Fetch user posts ---------------- */
 
     async fetchUserPosts() {
         if (!this.user || !this.user.username || !this.postsContainer) return;
@@ -156,11 +153,7 @@ class ProfilePage {
             const res = await fetch(
                 `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(this.user.username)}/posts`
             );
-
-            if (!res.ok) {
-                // This is the message you’re seeing:
-                throw new Error('Failed to load posts');
-            }
+            if (!res.ok) throw new Error('Failed to load posts');
 
             const posts = await res.json();
             this.posts = posts || [];
@@ -189,7 +182,31 @@ class ProfilePage {
         }
     }
 
-    /* ================= PROFILE UI ================= */
+    renderPosts() {
+        this.postsContainer.innerHTML = '';
+        this.posts.forEach((post) => {
+            const div = document.createElement('div');
+            div.className = 'profile-post-item';
+            const date = new Date(post.created_at);
+            const dateStr = date.toLocaleString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+            });
+
+            div.innerHTML = `
+                <div class="profile-post-header">
+                    <span class="profile-post-date">${dateStr}</span>
+                </div>
+                <div class="profile-post-content">${this.escapeHtml(post.content)}</div>
+            `;
+            this.postsContainer.appendChild(div);
+        });
+    }
+
+    /* ---------------- Set user into UI ---------------- */
 
     setUser(user) {
         this.user = user || this.user || {};
@@ -229,36 +246,7 @@ class ProfilePage {
         }
     }
 
-    renderPosts() {
-        if (!this.postsContainer) return;
-        this.postsContainer.innerHTML = '';
-
-        this.posts.forEach((post) => {
-            const div = document.createElement('div');
-            div.className = 'post profile-post';
-
-            div.innerHTML = `
-                <div class="post-header">
-                    <img src="${this.user.avatar_url || 'assets/icons/default-profile.png'}"
-                         class="post-user-avatar">
-                    <div class="post-user-info">
-                        <div class="post-display-name">${this.user.display_name || this.user.username}</div>
-                        <div class="post-username">@${this.user.username}</div>
-                    </div>
-                </div>
-                <div class="post-content">${this.escape(post.content)}</div>
-                <div class="post-meta">
-                    <span class="post-date">
-                        ${new Date(post.created_at).toLocaleString()}
-                    </span>
-                </div>
-            `;
-
-            this.postsContainer.appendChild(div);
-        });
-    }
-
-    /* ============ EDIT PROFILE MODAL ============ */
+    /* ---------------- Edit Profile Modal ---------------- */
 
     openEditModal() {
         if (!this.editModal || !this.user) return;
@@ -266,16 +254,13 @@ class ProfilePage {
         this.editDisplayNameInput.value = this.user.display_name || '';
         this.editBioInput.value = this.user.bio || '';
 
-        // Clear file inputs
-        if (this.editProfileImageInput) {
-            this.editProfileImageInput.value = '';
-        }
-        if (this.editBannerImageInput) {
-            this.editBannerImageInput.value = '';
-        }
+        // reset file inputs
+        if (this.avatarFileInput) this.avatarFileInput.value = '';
+        if (this.bannerFileInput) this.bannerFileInput.value = '';
 
-        if (this.editErrorEl) this.editErrorEl.classList.add('hidden');
-        if (this.editSuccessEl) this.editSuccessEl.classList.add('hidden');
+        // reset messages
+        this.editErrorEl.classList.add('hidden');
+        this.editSuccessEl.classList.add('hidden');
 
         if (this.bioCharCounter) {
             const len = this.editBioInput.value.length;
@@ -297,23 +282,26 @@ class ProfilePage {
         const display_name = this.editDisplayNameInput.value.trim();
         const bio = this.editBioInput.value.trim();
 
-        let avatar_url = this.user.avatar_url || null;
-        let banner_url = this.user.banner_url || null;
+        this.editErrorEl.classList.add('hidden');
+        this.editSuccessEl.classList.add('hidden');
 
-        if (this.editErrorEl) this.editErrorEl.classList.add('hidden');
-        if (this.editSuccessEl) this.editSuccessEl.classList.add('hidden');
+        if (this.saveProfileBtn) {
+            this.saveProfileBtn.disabled = true;
+            this.saveProfileBtn.textContent = 'Saving...';
+        }
 
         try {
-            // If user picked a new profile picture, upload it
-            if (this.editProfileImageInput && this.editProfileImageInput.files[0]) {
-                const file = this.editProfileImageInput.files[0];
-                avatar_url = await this.uploadImage(file, 'avatar');
+            let avatar_url = this.user.avatar_url || null;
+            let banner_url = this.user.banner_url || null;
+
+            // Upload profile picture if selected
+            if (this.avatarFileInput && this.avatarFileInput.files[0]) {
+                avatar_url = await this.uploadImageFile(this.avatarFileInput.files[0], 'avatar');
             }
 
-            // If user picked a new banner image, upload it
-            if (this.editBannerImageInput && this.editBannerImageInput.files[0]) {
-                const file = this.editBannerImageInput.files[0];
-                banner_url = await this.uploadImage(file, 'banner');
+            // Upload banner if selected
+            if (this.bannerFileInput && this.bannerFileInput.files[0]) {
+                banner_url = await this.uploadImageFile(this.bannerFileInput.files[0], 'banner');
             }
 
             const res = await fetch(`${PROFILE_API_BASE_URL}/auth/me`, {
@@ -336,31 +324,32 @@ class ProfilePage {
                 throw new Error(data.error || 'Failed to update profile');
             }
 
-            // Update UI + local storage
             this.setUser(data);
             if (window.setCurrentUser) setCurrentUser(data);
 
-            if (this.editSuccessEl) {
-                this.editSuccessEl.textContent = 'Profile updated!';
-                this.editSuccessEl.classList.remove('hidden');
-            }
+            this.editSuccessEl.textContent = 'Profile updated!';
+            this.editSuccessEl.classList.remove('hidden');
 
             setTimeout(() => {
                 this.closeEditModal();
             }, 700);
         } catch (err) {
             console.error('handleEditSubmit error:', err);
-            if (this.editErrorEl) {
-                this.editErrorEl.textContent = err.message || 'Failed to update profile';
-                this.editErrorEl.classList.remove('hidden');
+            this.editErrorEl.textContent = err.message || 'Failed to update profile';
+            this.editErrorEl.classList.remove('hidden');
+        } finally {
+            if (this.saveProfileBtn) {
+                this.saveProfileBtn.disabled = false;
+                this.saveProfileBtn.textContent = 'Save';
             }
         }
     }
 
-    async uploadImage(file, kind) {
-        // kind = 'avatar' or 'banner'
-        const base64 = await this.fileToBase64(file);
-        const pureBase64 = base64.split(',')[1]; // remove "data:image/...;base64,"
+    /* ---------------- Upload helper ---------------- */
+
+    async uploadImageFile(file, kind) {
+        // kind: 'avatar' | 'banner'
+        const base64 = await this.readFileAsBase64(file);
 
         const res = await fetch(`${PROFILE_API_BASE_URL}/profile/upload-image`, {
             method: 'POST',
@@ -369,44 +358,47 @@ class ProfilePage {
                 Authorization: `Bearer ${getAuthToken()}`
             },
             body: JSON.stringify({
-                imageData: pureBase64,
+                imageData: base64,
                 kind
             })
         });
 
         const data = await res.json().catch(() => ({}));
+
         if (!res.ok || !data.url) {
-            throw new Error(data.error || 'Failed to upload image');
+            throw new Error(data.error || `Failed to upload ${kind} image`);
         }
 
-        return data.url; // public URL in Supabase bucket
+        return data.url;
     }
 
-    fileToBase64(file) {
+    readFileAsBase64(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = (err) => reject(err);
+            reader.onload = () => {
+                // reader.result is "data:<mime>;base64,<...>"
+                const result = reader.result || '';
+                const commaIndex = result.indexOf(',');
+                if (commaIndex === -1) return resolve(result);
+                resolve(result.slice(commaIndex + 1));
+            };
+            reader.onerror = () => reject(reader.error || new Error('File read error'));
             reader.readAsDataURL(file);
         });
     }
 
-    /* ============ TABS ============ */
+    /* ---------------- Tabs ---------------- */
 
     switchTab(tabName) {
         this.tabButtons.forEach((btn) => {
             btn.classList.toggle('active', btn.dataset.tab === tabName);
         });
 
-        if (this.postsTabPane) {
-            this.postsTabPane.classList.toggle('active', tabName === 'posts');
-        }
-        if (this.likesTabPane) {
-            this.likesTabPane.classList.toggle('active', tabName === 'likes');
-        }
+        this.postsTabPane.classList.toggle('active', tabName === 'posts');
+        this.likesTabPane.classList.toggle('active', tabName === 'likes');
     }
 
-    /* ============ HELPERS ============ */
+    /* ---------------- Helpers ---------------- */
 
     formatJoinDate(dateString) {
         if (!dateString) return 'Joined —';
@@ -417,33 +409,20 @@ class ProfilePage {
         return `Joined ${date.toLocaleDateString(undefined, opts)}`;
     }
 
-    showTempMessage(message, type = 'info') {
-        const div = document.createElement('div');
-        div.className = `status-message status-${type}`;
-        div.textContent = message;
-        div.style.cssText = `
-            position: fixed;
-            top: 16px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 9999;
-            max-width: 90%;
-        `;
-        document.body.appendChild(div);
-        setTimeout(() => div.remove(), 2500);
-    }
-
-    escape(str) {
-        if (!str) return '';
-        return String(str).replace(/[&<>"']/g, (m) => ({
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#039;'
-        })[m]);
+    escapeHtml(str = '') {
+        return str.replace(/[&<>"']/g, (m) => {
+            return {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            }[m];
+        });
     }
 }
+
+/* ---------------- Init ---------------- */
 
 document.addEventListener('DOMContentLoaded', () => {
     if (document.body.classList.contains('profile-page-body')) {
