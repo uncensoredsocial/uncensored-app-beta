@@ -12,7 +12,7 @@ const { createClient } = require('@supabase/supabase-js');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// --- Supabase setup ---
+// ---------- Supabase setup ----------
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
@@ -22,23 +22,31 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-// --- Middleware ---
-app.use(express.json());
+// bucket name for profile / banner images
+const USER_MEDIA_BUCKET = 'user-media';
+
+// admin emails (hard-coded + env)
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'ssssss@gmail.com')
+  .split(',')
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
+// ---------- Middleware ----------
 app.use(
   cors({
     origin: [
-      'https://spepdb.github.io', // your GitHub Pages frontend
-      'https://uncensored-app-beta-production.up.railway.app' // backend origin / health
+      'https://spepdb.github.io',
+      'https://uncensored-app-beta-production.up.railway.app'
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
   })
 );
 
-// ======================================================
-//                    AUTH HELPERS
-// ======================================================
+// allow bigger JSON bodies for base64 images
+app.use(express.json({ limit: '10mb' }));
 
+// ---------- Auth helpers ----------
 function signToken(user) {
   const payload = { id: user.id, username: user.username, email: user.email };
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -62,51 +70,25 @@ function authMiddleware(req, res, next) {
   }
 }
 
-// Admin / moderator check
-async function adminMiddleware(req, res, next) {
-  try {
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('id, is_admin, is_moderator')
-      .eq('id', req.user.id)
-      .single();
-
-    if (error || !user) {
-      return res.status(403).json({ error: 'Not authorized' });
-    }
-
-    if (!user.is_admin && !user.is_moderator) {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    req.admin = user;
-    next();
-  } catch (err) {
-    console.error('adminMiddleware error:', err);
-    return res.status(500).json({ error: 'Admin check failed' });
+function requireAdmin(req, res, next) {
+  if (!req.user || !req.user.email) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
+  const email = String(req.user.email).toLowerCase();
+  if (!ADMIN_EMAILS.includes(email)) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
 }
 
-// Profile stats helper
+// Utility: stats for a user
 async function getUserStats(userId) {
-  const [
-    { count: postsCount },
-    { count: followersCount },
-    { count: followingCount }
-  ] = await Promise.all([
-    supabase
-      .from('posts')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId),
-    supabase
-      .from('follows')
-      .select('*', { count: 'exact', head: true })
-      .eq('followed_id', userId),
-    supabase
-      .from('follows')
-      .select('*', { count: 'exact', head: true })
-      .eq('follower_id', userId)
-  ]);
+  const [{ count: postsCount }, { count: followersCount }, { count: followingCount }] =
+    await Promise.all([
+      supabase.from('posts').select('*', { count: 'exact', head: true }).eq('user_id', userId),
+      supabase.from('follows').select('*', { count: 'exact', head: true }).eq('followed_id', userId),
+      supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', userId)
+    ]);
 
   return {
     posts_count: postsCount || 0,
@@ -116,14 +98,12 @@ async function getUserStats(userId) {
 }
 
 // ======================================================
-//                    HEALTH CHECK
+//                        HEALTH
 // ======================================================
 
 app.get('/api/health', async (req, res) => {
   try {
-    const { count } = await supabase
-      .from('users')
-      .select('*', { count: 'exact', head: true });
+    const { count } = await supabase.from('users').select('*', { count: 'exact', head: true });
 
     res.json({
       status: 'OK',
@@ -137,7 +117,7 @@ app.get('/api/health', async (req, res) => {
 });
 
 // ======================================================
-//                    AUTH ROUTES
+//                        AUTH
 // ======================================================
 
 // Signup
@@ -149,7 +129,6 @@ app.post('/api/auth/signup', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Check if username/email already exists
     const { data: existing, error: checkError } = await supabase
       .from('users')
       .select('id')
@@ -178,9 +157,7 @@ app.post('/api/auth/signup', async (req, res) => {
       banner_url: null,
       bio: '',
       created_at: now,
-      last_login_at: now,
-      is_admin: false,
-      is_moderator: false
+      last_login_at: now
     };
 
     const { data: inserted, error: insertError } = await supabase
@@ -217,34 +194,32 @@ app.post('/api/auth/signup', async (req, res) => {
   }
 });
 
-// Login (identifier = email OR username)
+// Login
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { identifier, password } = req.body;
+    const { identifier, password } = req.body; // email or username
 
     if (!identifier || !password) {
       return res.status(400).json({ error: 'Missing email/username or password' });
     }
 
     const isEmail = identifier.includes('@');
-    const baseQuery = supabase.from('users').select('*').limit(1);
-
+    const query = supabase.from('users').select('*').limit(1);
     const { data, error: userError } = isEmail
-      ? await baseQuery.eq('email', identifier)
-      : await baseQuery.eq('username', identifier);
+      ? await query.eq('email', identifier)
+      : await query.eq('username', identifier);
 
     if (userError || !data || data.length === 0) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
     const user = data[0];
-
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
-    // Update last_login_at
+    // update last login
     await supabase
       .from('users')
       .update({ last_login_at: new Date().toISOString() })
@@ -273,12 +248,12 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Get current user
+// Current user
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
   try {
     const { data: user, error } = await supabase
       .from('users')
-      .select('id,username,email,display_name,avatar_url,banner_url,bio,created_at,is_admin,is_moderator')
+      .select('id,username,email,display_name,avatar_url,banner_url,bio,created_at')
       .eq('id', req.user.id)
       .single();
 
@@ -287,18 +262,14 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
     }
 
     const stats = await getUserStats(user.id);
-
-    res.json({
-      ...user,
-      ...stats
-    });
+    res.json({ ...user, ...stats });
   } catch (err) {
     console.error('/auth/me error:', err);
     res.status(500).json({ error: 'Failed to load user' });
   }
 });
 
-// Update current user's profile
+// Update current user profile
 app.put('/api/auth/me', authMiddleware, async (req, res) => {
   try {
     const { display_name, bio, avatar_url, banner_url } = req.body;
@@ -313,7 +284,7 @@ app.put('/api/auth/me', authMiddleware, async (req, res) => {
       .from('users')
       .update(updates)
       .eq('id', req.user.id)
-      .select('id,username,email,display_name,avatar_url,banner_url,bio,created_at,is_admin,is_moderator')
+      .select('id,username,email,display_name,avatar_url,banner_url,bio,created_at')
       .single();
 
     if (error) {
@@ -322,11 +293,7 @@ app.put('/api/auth/me', authMiddleware, async (req, res) => {
     }
 
     const stats = await getUserStats(updated.id);
-
-    res.json({
-      ...updated,
-      ...stats
-    });
+    res.json({ ...updated, ...stats });
   } catch (err) {
     console.error('PUT /auth/me error:', err);
     res.status(500).json({ error: 'Profile update failed' });
@@ -334,15 +301,60 @@ app.put('/api/auth/me', authMiddleware, async (req, res) => {
 });
 
 // ======================================================
-//                      POSTS
+//                  IMAGE UPLOAD (PROFILE/BANNER)
 // ======================================================
 
-// Get global feed
+app.post('/api/profile/upload-image', authMiddleware, async (req, res) => {
+  try {
+    const { imageData, kind } = req.body; // base64 string (no data: prefix), kind: 'avatar' | 'banner'
+
+    if (!imageData || !kind || !['avatar', 'banner'].includes(kind)) {
+      return res.status(400).json({ error: 'Missing image data or kind' });
+    }
+
+    const buffer = Buffer.from(imageData, 'base64');
+    const folder = kind === 'avatar' ? 'avatars' : 'banners';
+    const fileName = `${folder}/${req.user.id}-${Date.now()}.jpg`;
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from(USER_MEDIA_BUCKET)
+      .upload(fileName, buffer, {
+        contentType: 'image/jpeg',
+        upsert: true
+      });
+
+    if (uploadError) {
+      console.error('Supabase upload error:', uploadError);
+      return res.status(500).json({ error: 'Failed to upload image' });
+    }
+
+    const { data: publicData } = supabase.storage
+      .from(USER_MEDIA_BUCKET)
+      .getPublicUrl(fileName);
+
+    const publicUrl = publicData && publicData.publicUrl;
+    if (!publicUrl) {
+      return res.status(500).json({ error: 'Could not get public URL' });
+    }
+
+    res.status(201).json({ url: publicUrl });
+  } catch (err) {
+    console.error('POST /profile/upload-image error:', err);
+    res.status(500).json({ error: 'Image upload failed' });
+  }
+});
+
+// ======================================================
+//                        POSTS
+// ======================================================
+
+// Global feed
 app.get('/api/posts', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('posts')
-      .select(`
+      .select(
+        `
         id,
         content,
         created_at,
@@ -352,7 +364,8 @@ app.get('/api/posts', async (req, res) => {
           display_name,
           avatar_url
         )
-      `)
+      `
+      )
       .order('created_at', { ascending: false })
       .limit(50);
 
@@ -368,7 +381,7 @@ app.get('/api/posts', async (req, res) => {
   }
 });
 
-// Create new post
+// Create post
 app.post('/api/posts', authMiddleware, async (req, res) => {
   try {
     const { content } = req.body;
@@ -387,11 +400,7 @@ app.post('/api/posts', authMiddleware, async (req, res) => {
       created_at: new Date().toISOString()
     };
 
-    const { data: inserted, error } = await supabase
-      .from('posts')
-      .insert(post)
-      .select('*')
-      .single();
+    const { data: inserted, error } = await supabase.from('posts').insert(post).select('*').single();
 
     if (error) {
       console.error('Create post error:', error);
@@ -404,17 +413,14 @@ app.post('/api/posts', authMiddleware, async (req, res) => {
       .eq('id', req.user.id)
       .single();
 
-    res.status(201).json({
-      ...inserted,
-      user
-    });
+    res.status(201).json({ ...inserted, user });
   } catch (err) {
     console.error('POST /posts error:', err);
     res.status(500).json({ error: 'Failed to create post' });
   }
 });
 
-// Like / Unlike post
+// Like / unlike
 app.post('/api/posts/:id/like', authMiddleware, async (req, res) => {
   try {
     const postId = req.params.id;
@@ -435,27 +441,18 @@ app.post('/api/posts/:id/like', authMiddleware, async (req, res) => {
     let liked;
 
     if (existing) {
-      // Unlike
-      const { error: delError } = await supabase
-        .from('post_likes')
-        .delete()
-        .eq('id', existing.id);
-
+      const { error: delError } = await supabase.from('post_likes').delete().eq('id', existing.id);
       if (delError) {
         console.error('Unlike error:', delError);
         return res.status(500).json({ error: 'Failed to unlike post' });
       }
       liked = false;
     } else {
-      // Like
-      const { error: insError } = await supabase
-        .from('post_likes')
-        .insert({
-          id: uuidv4(),
-          post_id: postId,
-          user_id: userId
-        });
-
+      const { error: insError } = await supabase.from('post_likes').insert({
+        id: uuidv4(),
+        post_id: postId,
+        user_id: userId
+      });
       if (insError) {
         console.error('Like error:', insError);
         return res.status(500).json({ error: 'Failed to like post' });
@@ -468,10 +465,7 @@ app.post('/api/posts/:id/like', authMiddleware, async (req, res) => {
       .select('*', { count: 'exact', head: true })
       .eq('post_id', postId);
 
-    res.json({
-      liked,
-      likes: count || 0
-    });
+    res.json({ liked, likes: count || 0 });
   } catch (err) {
     console.error('POST /posts/:id/like error:', err);
     res.status(500).json({ error: 'Failed to like post' });
@@ -479,10 +473,10 @@ app.post('/api/posts/:id/like', authMiddleware, async (req, res) => {
 });
 
 // ======================================================
-//                   PROFILE / USERS
+//                     PROFILE / FOLLOWS
 // ======================================================
 
-// Get user by username (for visiting other profiles)
+// Get user by username
 app.get('/api/users/:username', async (req, res) => {
   try {
     const { username } = req.params;
@@ -505,7 +499,7 @@ app.get('/api/users/:username', async (req, res) => {
   }
 });
 
-// Get posts for a given username (profile page)
+// Posts for a user
 app.get('/api/users/:username/posts', async (req, res) => {
   try {
     const { username } = req.params;
@@ -538,7 +532,7 @@ app.get('/api/users/:username/posts', async (req, res) => {
   }
 });
 
-// Follow / unfollow by username
+// Follow / unfollow
 app.post('/api/users/:username/follow', authMiddleware, async (req, res) => {
   try {
     const { username } = req.params;
@@ -573,25 +567,18 @@ app.post('/api/users/:username/follow', authMiddleware, async (req, res) => {
     let following;
 
     if (existing) {
-      const { error: delError } = await supabase
-        .from('follows')
-        .delete()
-        .eq('id', existing.id);
-
+      const { error: delError } = await supabase.from('follows').delete().eq('id', existing.id);
       if (delError) {
         console.error('Unfollow error:', delError);
         return res.status(500).json({ error: 'Failed to unfollow' });
       }
       following = false;
     } else {
-      const { error: insError } = await supabase
-        .from('follows')
-        .insert({
-          id: uuidv4(),
-          follower_id: currentUserId,
-          followed_id: target.id
-        });
-
+      const { error: insError } = await supabase.from('follows').insert({
+        id: uuidv4(),
+        follower_id: currentUserId,
+        followed_id: target.id
+      });
       if (insError) {
         console.error('Follow error:', insError);
         return res.status(500).json({ error: 'Failed to follow' });
@@ -600,11 +587,7 @@ app.post('/api/users/:username/follow', authMiddleware, async (req, res) => {
     }
 
     const stats = await getUserStats(target.id);
-
-    res.json({
-      following,
-      ...stats
-    });
+    res.json({ following, ...stats });
   } catch (err) {
     console.error('POST /users/:username/follow error:', err);
     res.status(500).json({ error: 'Failed to update follow status' });
@@ -612,10 +595,9 @@ app.post('/api/users/:username/follow', authMiddleware, async (req, res) => {
 });
 
 // ======================================================
-//                        SEARCH
+//                         SEARCH
 // ======================================================
 
-// Search users + posts + hashtags
 app.get('/api/search', async (req, res) => {
   try {
     const q = (req.query.q || '').trim();
@@ -637,7 +619,8 @@ app.get('/api/search', async (req, res) => {
         .limit(10),
       supabase
         .from('posts')
-        .select(`
+        .select(
+          `
           id,
           content,
           created_at,
@@ -647,15 +630,12 @@ app.get('/api/search', async (req, res) => {
             display_name,
             avatar_url
           )
-        `)
+        `
+        )
         .ilike('content', pattern)
         .order('created_at', { ascending: false })
         .limit(20),
-      supabase
-        .from('hashtags')
-        .select('id,tag')
-        .ilike('tag', pattern)
-        .limit(10)
+      supabase.from('hashtags').select('id,tag').ilike('tag', pattern).limit(10)
     ]);
 
     if (usersError || postsError || tagsError) {
@@ -674,7 +654,7 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
-// Save search query to history
+// search history: save
 app.post('/api/search/history', authMiddleware, async (req, res) => {
   try {
     const { query } = req.body;
@@ -702,7 +682,7 @@ app.post('/api/search/history', authMiddleware, async (req, res) => {
   }
 });
 
-// Get current user's recent search history
+// search history: get
 app.get('/api/search/history', authMiddleware, async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -725,61 +705,53 @@ app.get('/api/search/history', authMiddleware, async (req, res) => {
 });
 
 // ======================================================
-//                     ADMIN ROUTES
+//                        ADMIN
 // ======================================================
 
-// Simple stats overview
-app.get('/api/admin/stats', authMiddleware, adminMiddleware, async (req, res) => {
+// basic stats
+app.get('/api/admin/stats', authMiddleware, requireAdmin, async (req, res) => {
   try {
-    const now = new Date();
-    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    const now = new Date().toISOString();
 
     const [
-      { count: totalUsers },
-      { count: totalPosts },
-      { count: totalLikes },
-      { count: totalFollows },
-      { count: signupsLast24h },
-      { count: activeLast24h }
+      { count: userCount },
+      { count: postCount },
+      { count: likeCount },
+      { count: followCount },
+      { count: hashtagCount },
+      { count: searchCount }
     ] = await Promise.all([
       supabase.from('users').select('*', { count: 'exact', head: true }),
       supabase.from('posts').select('*', { count: 'exact', head: true }),
       supabase.from('post_likes').select('*', { count: 'exact', head: true }),
       supabase.from('follows').select('*', { count: 'exact', head: true }),
-      supabase
-        .from('users')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', yesterday),
-      supabase
-        .from('users')
-        .select('*', { count: 'exact', head: true })
-        .gte('last_login_at', yesterday)
+      supabase.from('hashtags').select('*', { count: 'exact', head: true }),
+      supabase.from('search_history').select('*', { count: 'exact', head: true })
     ]);
 
     res.json({
-      total_users: totalUsers || 0,
-      total_posts: totalPosts || 0,
-      total_likes: totalLikes || 0,
-      total_follows: totalFollows || 0,
-      signups_last_24h: signupsLast24h || 0,
-      active_users_last_24h: activeLast24h || 0
+      timestamp: now,
+      users: userCount || 0,
+      posts: postCount || 0,
+      likes: likeCount || 0,
+      follows: followCount || 0,
+      hashtags: hashtagCount || 0,
+      searches: searchCount || 0
     });
   } catch (err) {
     console.error('GET /admin/stats error:', err);
-    res.status(500).json({ error: 'Failed to load admin stats' });
+    res.status(500).json({ error: 'Failed to load stats' });
   }
 });
 
-// List latest users (for admin dashboard)
-app.get('/api/admin/users', authMiddleware, adminMiddleware, async (req, res) => {
+// list users (simple)
+app.get('/api/admin/users', authMiddleware, requireAdmin, async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit || '50', 10), 200);
-
     const { data, error } = await supabase
       .from('users')
-      .select('id,username,email,display_name,created_at,last_login_at,is_admin,is_moderator')
+      .select('id,username,email,display_name,created_at,last_login_at')
       .order('created_at', { ascending: false })
-      .limit(limit);
+      .limit(100);
 
     if (error) {
       console.error('GET /admin/users error:', error);
@@ -793,26 +765,25 @@ app.get('/api/admin/users', authMiddleware, adminMiddleware, async (req, res) =>
   }
 });
 
-// List latest posts with author (for moderation)
-app.get('/api/admin/posts', authMiddleware, adminMiddleware, async (req, res) => {
+// list posts (simple)
+app.get('/api/admin/posts', authMiddleware, requireAdmin, async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit || '100', 10), 200);
-
     const { data, error } = await supabase
       .from('posts')
-      .select(`
+      .select(
+        `
         id,
         content,
         created_at,
         user:users (
           id,
           username,
-          display_name,
-          email
+          display_name
         )
-      `)
+      `
+      )
       .order('created_at', { ascending: false })
-      .limit(limit);
+      .limit(200);
 
     if (error) {
       console.error('GET /admin/posts error:', error);
@@ -826,22 +797,17 @@ app.get('/api/admin/posts', authMiddleware, adminMiddleware, async (req, res) =>
   }
 });
 
-// HARD DELETE a post (no hiding)
-app.delete('/api/admin/posts/:id', authMiddleware, adminMiddleware, async (req, res) => {
+// hard delete a post
+app.delete('/api/admin/posts/:id', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const postId = req.params.id;
 
-    // Delete likes first (if any)
+    // delete likes for that post
     await supabase.from('post_likes').delete().eq('post_id', postId);
 
-    // Delete the post itself
-    const { error } = await supabase
-      .from('posts')
-      .delete()
-      .eq('id', postId);
-
+    const { error } = await supabase.from('posts').delete().eq('id', postId);
     if (error) {
-      console.error('Delete post error:', error);
+      console.error('DELETE /admin/posts/:id error:', error);
       return res.status(500).json({ error: 'Failed to delete post' });
     }
 
@@ -852,10 +818,32 @@ app.delete('/api/admin/posts/:id', authMiddleware, adminMiddleware, async (req, 
   }
 });
 
-// (You can later add hard-delete for users, reports, etc. here)
+// hard delete a user (and related data)
+app.delete('/api/admin/users/:id', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    // delete in reasonable order
+    await supabase.from('post_likes').delete().eq('user_id', userId);
+    await supabase.from('follows').delete().or(`follower_id.eq.${userId},followed_id.eq.${userId}`);
+    await supabase.from('search_history').delete().eq('user_id', userId);
+    await supabase.from('posts').delete().eq('user_id', userId);
+
+    const { error } = await supabase.from('users').delete().eq('id', userId);
+    if (error) {
+      console.error('DELETE /admin/users/:id error:', error);
+      return res.status(500).json({ error: 'Failed to delete user' });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /admin/users/:id error:', err);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
 
 // ======================================================
-//                     START SERVER
+//                      START SERVER
 // ======================================================
 
 app.listen(PORT, () => {
