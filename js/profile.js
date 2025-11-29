@@ -18,7 +18,7 @@ class ProfilePage {
         this.cacheDom();
         this.bindEvents();
 
-        // Try local user first so UI doesn't just say "Loading..." forever
+        // Use local user first for instant UI
         const localUser = window.getCurrentUser ? getCurrentUser() : null;
         if (localUser) {
             this.setUser(localUser);
@@ -46,14 +46,14 @@ class ProfilePage {
         this.settingsButton = document.getElementById('settingsButton');
         this.editProfileBtn = document.getElementById('editProfileBtn');
 
-        // Modal
+        // Modal elements
         this.editModal = document.getElementById('editProfileModal');
         this.editForm = document.getElementById('editProfileForm');
         this.editDisplayNameInput = document.getElementById('editDisplayName');
         this.editBioInput = document.getElementById('editBio');
         this.bioCharCounter = document.getElementById('bioCharCounter');
-        this.editAvatarUrlInput = document.getElementById('editAvatarUrl');
-        this.editBannerUrlInput = document.getElementById('editBannerUrl');
+        this.profileImageInput = document.getElementById('editProfileImage');
+        this.bannerImageInput = document.getElementById('editBannerImage');
         this.editErrorEl = document.getElementById('editProfileError');
         this.editSuccessEl = document.getElementById('editProfileSuccess');
         this.closeEditBtn = document.getElementById('closeEditProfileBtn');
@@ -126,7 +126,6 @@ class ProfilePage {
             const user = await res.json();
             this.setUser(user);
 
-            // sync local storage
             if (window.setCurrentUser) {
                 setCurrentUser(user);
             }
@@ -152,7 +151,6 @@ class ProfilePage {
             const posts = await res.json();
             this.posts = posts || [];
 
-            // Update posts count based on actual posts
             if (this.postsCountEl) {
                 this.postsCountEl.textContent = this.posts.length.toString();
             }
@@ -199,7 +197,6 @@ class ProfilePage {
                 this.bannerEl.style.backgroundImage = `url("${user.banner_url}")`;
                 this.bannerEl.classList.add('profile-banner-image');
             } else {
-                // keep gradient background
                 this.bannerEl.style.backgroundImage = '';
                 this.bannerEl.classList.remove('profile-banner-image');
             }
@@ -216,25 +213,25 @@ class ProfilePage {
         }
     }
 
-    /* ------------ Edit Profile Modal ------------ */
+    /* ---------- Edit Profile Modal ---------- */
 
     openEditModal() {
         if (!this.editModal || !this.user) return;
 
         this.editDisplayNameInput.value = this.user.display_name || '';
         this.editBioInput.value = this.user.bio || '';
-        this.editAvatarUrlInput.value = this.user.avatar_url || '';
-        this.editBannerUrlInput.value = this.user.banner_url || '';
 
-        // reset messages
         this.editErrorEl.classList.add('hidden');
         this.editSuccessEl.classList.add('hidden');
 
-        // update char counter
         if (this.bioCharCounter) {
             const len = this.editBioInput.value.length;
             this.bioCharCounter.textContent = `${len}/160`;
         }
+
+        // clear file inputs
+        if (this.profileImageInput) this.profileImageInput.value = '';
+        if (this.bannerImageInput) this.bannerImageInput.value = '';
 
         this.editModal.classList.add('open');
     }
@@ -250,13 +247,27 @@ class ProfilePage {
 
         const display_name = this.editDisplayNameInput.value.trim();
         const bio = this.editBioInput.value.trim();
-        const avatar_url = this.editAvatarUrlInput.value.trim();
-        const banner_url = this.editBannerUrlInput.value.trim();
+
+        let avatarUrl = this.user.avatar_url || null;
+        let bannerUrl = this.user.banner_url || null;
 
         this.editErrorEl.classList.add('hidden');
         this.editSuccessEl.classList.add('hidden');
 
         try {
+            // If new profile picture selected, upload it first
+            if (this.profileImageInput && this.profileImageInput.files[0]) {
+                const base64 = await this.readFileAsBase64(this.profileImageInput.files[0]);
+                avatarUrl = await this.uploadImage(base64, 'avatar');
+            }
+
+            // If new banner selected, upload it
+            if (this.bannerImageInput && this.bannerImageInput.files[0]) {
+                const base64 = await this.readFileAsBase64(this.bannerImageInput.files[0]);
+                bannerUrl = await this.uploadImage(base64, 'banner');
+            }
+
+            // Now update profile record (display name, bio, URLs)
             const res = await fetch(`${PROFILE_API_BASE_URL}/auth/me`, {
                 method: 'PUT',
                 headers: {
@@ -266,8 +277,8 @@ class ProfilePage {
                 body: JSON.stringify({
                     display_name,
                     bio,
-                    avatar_url: avatar_url || null,
-                    banner_url: banner_url || null
+                    avatar_url: avatarUrl,
+                    banner_url: bannerUrl
                 })
             });
 
@@ -277,7 +288,6 @@ class ProfilePage {
                 throw new Error(data.error || 'Failed to update profile');
             }
 
-            // update UI + local storage
             this.setUser(data);
             if (window.setCurrentUser) setCurrentUser(data);
 
@@ -294,7 +304,44 @@ class ProfilePage {
         }
     }
 
-    /* ------------ Tabs ------------ */
+    // Read a File object as base64 (without the data: prefix)
+    readFileAsBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const result = reader.result || '';
+                const base64 = String(result).split(',')[1]; // remove data:...;base64,
+                resolve(base64);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Upload image to backend which will put it in Supabase storage
+    async uploadImage(base64Data, kind) {
+        const res = await fetch(`${PROFILE_API_BASE_URL}/profile/upload-image`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${getAuthToken()}`
+            },
+            body: JSON.stringify({
+                imageData: base64Data,
+                kind // 'avatar' or 'banner'
+            })
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+            throw new Error(data.error || 'Failed to upload image');
+        }
+
+        return data.url;
+    }
+
+    /* ---------- Tabs ---------- */
 
     switchTab(tabName) {
         this.tabButtons.forEach((btn) => {
@@ -305,7 +352,45 @@ class ProfilePage {
         this.likesTabPane.classList.toggle('active', tabName === 'likes');
     }
 
-    /* ------------ Helpers ------------ */
+    /* ---------- Helpers ---------- */
+
+    renderPosts() {
+        this.postsContainer.innerHTML = '';
+
+        this.posts.forEach((post) => {
+            const div = document.createElement('div');
+            div.className = 'post';
+
+            const user = post.user || {
+                display_name: this.user.display_name,
+                username: this.user.username,
+                avatar_url: this.user.avatar_url
+            };
+
+            div.innerHTML = `
+                <div class="post-header">
+                    <img src="${user.avatar_url || 'assets/icons/default-profile.png'}" class="post-user-avatar">
+                    <div class="post-user-info">
+                        <div class="post-display-name">${user.display_name || 'User'}</div>
+                        <div class="post-username">@${user.username || 'username'}</div>
+                    </div>
+                </div>
+                <div class="post-content">${this.escape(post.content || '')}</div>
+            `;
+
+            this.postsContainer.appendChild(div);
+        });
+    }
+
+    escape(str) {
+        return String(str).replace(/[&<>"']/g, (m) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        })[m]);
+    }
 
     formatJoinDate(dateString) {
         if (!dateString) return 'Joined —';
@@ -317,7 +402,6 @@ class ProfilePage {
     }
 
     showTempMessage(message, type = 'info') {
-        // minimal toast
         const div = document.createElement('div');
         div.className = `status-message status-${type}`;
         div.textContent = message;
