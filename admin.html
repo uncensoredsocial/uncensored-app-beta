@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Uncensored Social</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/icons.css">
+    <link rel="stylesheet" href="css/admin-styles.css">
+</head>
+<body class="admin-page">
+    <!-- Admin Header -->
+    <header class="admin-header">
+        <div class="admin-header-left">
+            <h1 class="admin-logo">Uncensored<span>Social</span></h1>
+            <span class="admin-tag">Admin Dashboard</span>
+        </div>
+        <div class="admin-header-right">
+            <button class="btn btn-secondary btn-sm" onclick="window.location.href='index.html'">
+                ← Back to Site
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Layout -->
+    <main class="admin-main">
+        <section class="admin-section">
+            <!-- Summary Stats -->
+            <div class="admin-section-header">
+                <h2>Overview</h2>
+                <span class="admin-subtitle" id="lastUpdated">Last updated: —</span>
+            </div>
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Users</div>
+                    <div class="stat-value" id="statTotalUsers">—</div>
+                    <div class="stat-footnote">All-time registered accounts</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Active Users (24h)</div>
+                    <div class="stat-value" id="statActive24h">—</div>
+                    <div class="stat-footnote">Logged in in the last 24 hours</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">New Signups (24h)</div>
+                    <div class="stat-value" id="statSignups24h">—</div>
+                    <div class="stat-footnote">Accounts created in the last 24 hours</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Posts</div>
+                    <div class="stat-value" id="statTotalPosts">—</div>
+                    <div class="stat-footnote">Public posts in the system</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Likes</div>
+                    <div class="stat-value" id="statTotalLikes">—</div>
+                    <div class="stat-footnote">All-time likes on posts</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Follow Relationships</div>
+                    <div class="stat-value" id="statTotalFollows">—</div>
+                    <div class="stat-footnote">Total following connections</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Two-column layout: Users + Posts -->
+        <section class="admin-grid-2">
+            <!-- Recent Users -->
+            <div class="admin-panel">
+                <div class="admin-section-header">
+                    <h2>Recent Users</h2>
+                    <button class="btn btn-ghost btn-sm" id="refreshUsersBtn">Refresh</button>
+                </div>
+                <div class="admin-table-wrapper">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Email</th>
+                                <th>Joined</th>
+                                <th>Last Active</th>
+                                <th>Role</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <tr>
+                                <td colspan="5" class="admin-table-empty">
+                                    Loading users...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Recent Posts / Moderation -->
+            <div class="admin-panel">
+                <div class="admin-section-header">
+                    <h2>Recent Posts</h2>
+                    <button class="btn btn-ghost btn-sm" id="refreshPostsBtn">Refresh</button>
+                </div>
+                <div class="admin-table-wrapper">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Author</th>
+                                <th>Content</th>
+                                <th>Posted</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="postsTableBody">
+                            <tr>
+                                <td colspan="4" class="admin-table-empty">
+                                    Loading posts...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="admin-note">
+                    Deleting a post here is a <strong>hard delete</strong>. It is permanently removed from the database.
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <!-- Toast / status messages -->
+    <div id="adminToastContainer" class="admin-toast-container"></div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>
