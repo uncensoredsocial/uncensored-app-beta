@@ -1,173 +1,152 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Profile - Uncensored Social</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile</title>
 
-  <!-- Styles -->
-  <link rel="stylesheet" href="css/styles.css" />
-  <link rel="stylesheet" href="css/profile-styles.css" />
-  <link rel="stylesheet" href="css/icons.css" />
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/profile-styles.css">
+    <link rel="stylesheet" href="css/icons.css">
 </head>
-<body id="profilePage">
-  <!-- Header -->
-  <header class="header">
-    <div class="header-left">
-      <a href="index.html" class="btn btn-ghost btn-icon" title="Home">
-        <span class="icon icon-home"></span>
-      </a>
-    </div>
 
-    <h1 class="logo">Profile</h1>
+<body>
 
-    <div class="header-actions">
-      <button class="btn btn-ghost btn-icon" id="settingsButton" title="Settings">
+<!-- HEADER -->
+<header class="header">
+    <h1 class="logo center">Profile</h1>
+
+    <!-- SETTINGS ICON -->
+    <button class="btn btn-ghost btn-icon settings-btn" onclick="window.location='settings.html'">
         <span class="icon icon-settings"></span>
-      </button>
+    </button>
+</header>
+
+<!-- PROFILE BANNER -->
+<div class="profile-banner">
+    <img id="profileBanner" src="assets/default-banner.jpg" alt="Banner">
+</div>
+
+<!-- PROFILE MAIN SECTION -->
+<section class="profile-section">
+
+    <!-- Avatar + Edit Button -->
+    <div class="profile-top-row">
+        <img id="profileAvatar" class="profile-avatar" src="assets/icons/default-profile.png">
+
+        <button id="editProfileBtn" class="btn btn-primary small-btn">Edit Profile</button>
     </div>
-  </header>
 
-  <!-- MAIN CONTENT -->
-  <main class="main-content">
-    <section class="profile-section">
-      <!-- Profile Header -->
-      <div class="profile-header">
-        <div class="profile-avatar">
-          <img
-            src="assets/icons/default-profile.png"
-            alt="Profile picture"
-            id="profileAvatar"
-          />
+    <!-- Name + Username -->
+    <h2 id="profileName">Loading...</h2>
+    <p class="username" id="profileUsername">@username</p>
+
+    <!-- Bio -->
+    <p id="profileBio" class="bio-text">Loading bio...</p>
+
+    <!-- Joined -->
+    <p id="profileJoined" class="joined-text">Joined —</p>
+
+    <!-- Stats Row -->
+    <div class="profile-stats-row">
+        <div>
+            <strong id="profilePostsCount">0</strong>
+            <span>Posts</span>
+        </div>
+        <div>
+            <strong id="profileFollowersCount">0</strong>
+            <span>Followers</span>
+        </div>
+        <div>
+            <strong id="profileFollowingCount">0</strong>
+            <span>Following</span>
+        </div>
+    </div>
+
+</section>
+
+<!-- TABS -->
+<div class="profile-tabs">
+    <button class="tab-btn active" data-tab="posts">Posts</button>
+    <button class="tab-btn" data-tab="likes">Likes</button>
+</div>
+
+<!-- TAB CONTENT -->
+<div class="tab-content">
+
+    <!-- POSTS TAB -->
+    <div id="postsTab" class="profile-tab-pane active">
+        <div class="loading-indicator" id="loadingPosts">
+            <div class="loading-spinner"></div>
+            <p>Loading posts...</p>
         </div>
 
-        <div class="profile-info">
-          <h2 id="profileName" class="profile-name">Loading...</h2>
-          <p id="profileUsername" class="profile-username">@username</p>
-          <p id="profileBio" class="profile-bio">Loading bio...</p>
-          <p id="profileJoined" class="profile-joined">Joined —</p>
-        </div>
+        <div id="profilePostsList"></div>
 
-        <div class="profile-actions">
-          <button id="editProfileBtn" class="btn btn-primary">Edit Profile</button>
+        <div id="profilePostsEmpty" class="empty-state" style="display:none;">
+            <p>No posts yet</p>
         </div>
-      </div>
+    </div>
 
-      <!-- Stats Row -->
-      <div class="profile-stats">
-        <div class="stat">
-          <span id="profilePostsCount">0</span>
-          <label>Posts</label>
-        </div>
-        <div class="stat">
-          <span id="profileFollowersCount">0</span>
-          <label>Followers</label>
-        </div>
-        <div class="stat">
-          <span id="profileFollowingCount">0</span>
-          <label>Following</label>
-        </div>
-      </div>
+    <!-- LIKES TAB -->
+    <div id="likesTab" class="profile-tab-pane">
+        <div id="profileLikesList"></div>
 
-      <!-- Tabs -->
-      <div class="profile-tabs">
-        <button class="tab-btn active" data-tab="posts">Posts</button>
-        <button class="tab-btn" data-tab="likes">Likes</button>
-      </div>
-
-      <div class="tab-content">
-        <div class="profile-tab-pane active" data-tab-pane="posts">
-          <div id="profilePostsList" class="posts-container">
-            <div class="loading-indicator">
-              <div class="loading-spinner"></div>
-              <span>Loading posts...</span>
-            </div>
-          </div>
-          <div id="profilePostsEmpty" class="empty-state" style="display: none;">
-            <h3>No posts yet</h3>
-            <p>Share your first post on the home feed.</p>
-            <button class="btn btn-primary" onclick="window.location.href='index.html'">
-              Go to Home
-            </button>
-          </div>
+        <div class="empty-state">
+            <p>No liked posts yet</p>
         </div>
+    </div>
 
-        <div class="profile-tab-pane" data-tab-pane="likes">
-          <div id="profileLikesList" class="posts-container">
-            <div class="empty-state" id="profileLikesEmpty">
-              <h3>No liked posts yet</h3>
-              <p>Posts you like will show up here in the future.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  </main>
+</div>
 
-  <!-- BOTTOM NAVIGATION -->
-  <nav class="bottom-nav" id="bottomNav">
+<!-- BOTTOM NAV (SAME AS HOME PAGE) -->
+<nav class="bottom-nav">
     <a href="index.html" class="nav-item">
-      <span class="icon icon-home"></span>
-      <span class="nav-label">Home</span>
+        <span class="icon icon-home"></span>
+        Home
     </a>
     <a href="search.html" class="nav-item">
-      <span class="icon icon-search"></span>
-      <span class="nav-label">Search</span>
+        <span class="icon icon-search"></span>
+        Search
     </a>
     <a href="notifications.html" class="nav-item">
-      <span class="icon icon-notifications"></span>
-      <span class="nav-label">Alerts</span>
+        <span class="icon icon-notifications"></span>
+        Alerts
     </a>
     <a href="dms.html" class="nav-item">
-      <span class="icon icon-messages"></span>
-      <span class="nav-label">Messages</span>
+        <span class="icon icon-messages"></span>
+        Messages
     </a>
-  </nav>
+</nav>
 
-  <!-- EDIT PROFILE POPUP (Modal) -->
-  <div class="modal" id="editProfileModal">
+<!-- EDIT PROFILE MODAL -->
+<div id="editProfileModal" class="modal">
     <div class="modal-content">
-      <div class="modal-header">
+
         <h3>Edit Profile</h3>
-        <button class="close-modal" id="closeEditModal">&times;</button>
-      </div>
 
-      <div class="modal-body">
-        <div class="form-group">
-          <label for="editDisplayName">Display Name</label>
-          <input type="text" id="editDisplayName" maxlength="50" placeholder="Your name" />
+        <label>Display Name</label>
+        <input id="editDisplayName" type="text">
+
+        <label>Bio</label>
+        <textarea id="editBio" maxlength="160"></textarea>
+
+        <label>Profile Picture URL</label>
+        <input id="editAvatarUrl" type="text" placeholder="https://...">
+
+        <label>Banner URL</label>
+        <input id="editBannerUrl" type="text" placeholder="https://...">
+
+        <div class="modal-buttons">
+            <button id="closeEditModal" class="btn btn-secondary">Cancel</button>
+            <button id="saveProfileBtn" class="btn btn-primary">Save</button>
         </div>
 
-        <div class="form-group">
-          <label for="editBio">Bio</label>
-          <textarea
-            id="editBio"
-            rows="3"
-            maxlength="160"
-            placeholder="Tell people about yourself"
-          ></textarea>
-          <div class="char-counter" id="bioCharCounter">0/160</div>
-        </div>
-
-        <div class="form-group">
-          <label for="editAvatarUrl">Profile Picture URL</label>
-          <input
-            type="url"
-            id="editAvatarUrl"
-            placeholder="https://example.com/avatar.jpg"
-          />
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn btn-secondary" id="cancelEditBtn">Cancel</button>
-        <button class="btn btn-primary" id="saveProfileBtn">Save</button>
-      </div>
     </div>
-  </div>
+</div>
 
-  <!-- Scripts -->
-  <script src="js/auth.js"></script>
-  <script src="js/profile.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/profile.js"></script>
+
 </body>
 </html>
