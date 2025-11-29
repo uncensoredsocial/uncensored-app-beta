@@ -44,30 +44,30 @@ class FeedManager {
             });
         }
 
-        // NEW: delegated click handlers for like/comment/share
+        // Delegated handlers for like / comment / share
         if (this.feedContainer) {
             this.feedContainer.addEventListener("click", (e) => {
-                const likeBtn = e.target.closest(".like-btn");
-                const commentBtn = e.target.closest(".comment-btn");
-                const shareBtn = e.target.closest(".share-btn");
+                const likeBtn = e.target.closest && e.target.closest(".like-btn");
+                const commentBtn = e.target.closest && e.target.closest(".comment-btn");
+                const shareBtn = e.target.closest && e.target.closest(".share-btn");
 
                 if (likeBtn) {
                     const postEl = likeBtn.closest(".post");
-                    const postId = postEl?.dataset.postId;
+                    const postId = postEl && postEl.dataset.postId;
                     if (postId) this.toggleLike(postId, likeBtn);
                     return;
                 }
 
                 if (commentBtn) {
                     const postEl = commentBtn.closest(".post");
-                    const postId = postEl?.dataset.postId;
+                    const postId = postEl && postEl.dataset.postId;
                     if (postId) this.openPostComments(postId);
                     return;
                 }
 
                 if (shareBtn) {
                     const postEl = shareBtn.closest(".post");
-                    const postId = postEl?.dataset.postId;
+                    const postId = postEl && postEl.dataset.postId;
                     if (postId) this.sharePost(postId);
                     return;
                 }
@@ -75,12 +75,11 @@ class FeedManager {
         }
     }
 
-    /* ----------------------- AUTH / UI ----------------------- */
+    /* -------------------- AUTH / UI -------------------- */
 
     updateAuthUI() {
         const loggedIn = typeof isLoggedIn === "function" ? isLoggedIn() : false;
 
-        // Show or hide post creation
         if (this.postCreation) {
             this.postCreation.style.display = loggedIn ? "block" : "none";
         }
@@ -91,8 +90,8 @@ class FeedManager {
     updateCharCounter() {
         if (!this.charCounter || !this.postInput) return;
 
-        const length = this.postInput.value.length;
-        this.charCounter.textContent = `${length}/280`;
+        var length = this.postInput.value.length;
+        this.charCounter.textContent = length + "/280";
 
         this.charCounter.classList.remove("warning", "error");
         if (length > 280) this.charCounter.classList.add("error");
@@ -121,41 +120,32 @@ class FeedManager {
         }
     }
 
-    /* ----------------------- LOAD POSTS ----------------------- */
+    /* -------------------- LOAD POSTS -------------------- */
 
     async loadPosts() {
         if (!this.feedContainer || this.isLoading) return;
 
         this.isLoading = true;
-        this.feedContainer.innerHTML = `
-            <div class="loading-indicator">Loading posts...</div>
-        `;
+        this.feedContainer.innerHTML =
+            '<div class="loading-indicator">Loading posts...</div>';
 
         try {
-            const res = await fetch(`${API_BASE_URL}/posts`);
+            const res = await fetch(API_BASE_URL + "/posts");
             if (!res.ok) throw new Error("Failed to load posts");
 
             this.posts = await res.json();
 
             if (!this.posts || this.posts.length === 0) {
-                this.feedContainer.innerHTML = `
-                    <div class="empty-state">
-                        <h3>No posts yet</h3>
-                        <p>Be the first to post something!</p>
-                    </div>
-                `;
+                this.feedContainer.innerHTML =
+                    '<div class="empty-state"><h3>No posts yet</h3><p>Be the first to post something!</p></div>';
                 return;
             }
 
             this.renderPosts();
         } catch (err) {
-            console.error(err);
-            this.feedContainer.innerHTML = `
-                <div class="empty-state">
-                    <h3>Error loading posts</h3>
-                    <p>Please try again later.</p>
-                </div>
-            `;
+            console.error("loadPosts error:", err);
+            this.feedContainer.innerHTML =
+                '<div class="empty-state"><h3>Error loading posts</h3><p>Please try again later.</p></div>';
         } finally {
             this.isLoading = false;
         }
@@ -163,12 +153,12 @@ class FeedManager {
 
     renderPosts() {
         this.feedContainer.innerHTML = "";
-        this.posts.forEach((post) => {
-            this.feedContainer.appendChild(this.createPostElement(post));
-        });
+        for (let i = 0; i < this.posts.length; i++) {
+            this.feedContainer.appendChild(this.createPostElement(this.posts[i]));
+        }
     }
 
-    /* ----------------------- CREATE POST ----------------------- */
+    /* -------------------- CREATE POST -------------------- */
 
     async handleCreatePost() {
         if (!this.postInput) return;
@@ -185,39 +175,41 @@ class FeedManager {
         this.setPostButtonLoading(true);
 
         try {
-            const res = await fetch(`${API_BASE_URL}/posts`, {
+            const res = await fetch(API_BASE_URL + "/posts", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${getAuthToken()}`
+                    Authorization: "Bearer " + getAuthToken()
                 },
                 body: JSON.stringify({ content: text })
             });
 
             if (!res.ok) {
-                const error = await res.json().catch(() => ({}));
+                const error = await res.json().catch(function () { return {}; });
                 alert(error.error || "Error creating post");
                 return;
             }
 
             const newPost = await res.json();
 
-            // prepend new post
             this.posts.unshift(newPost);
-            this.feedContainer.prepend(this.createPostElement(newPost));
+            this.feedContainer.insertBefore(
+                this.createPostElement(newPost),
+                this.feedContainer.firstChild
+            );
 
             this.postInput.value = "";
             this.updateCharCounter();
             this.updatePostButtonState();
         } catch (err) {
-            console.error(err);
+            console.error("handleCreatePost error:", err);
             alert("Error creating post");
         } finally {
             this.setPostButtonLoading(false);
         }
     }
 
-    /* ----------------------- LIKE / COMMENT / SHARE ----------------------- */
+    /* ------------- LIKE / COMMENT / SHARE ------------- */
 
     async toggleLike(postId, buttonEl) {
         const loggedIn = typeof isLoggedIn === "function" ? isLoggedIn() : false;
@@ -229,26 +221,28 @@ class FeedManager {
         try {
             buttonEl.disabled = true;
 
-            const res = await fetch(`${API_BASE_URL}/posts/${postId}/like`, {
+            const res = await fetch(API_BASE_URL + "/posts/" + postId + "/like", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${getAuthToken()}`
+                    Authorization: "Bearer " + getAuthToken()
                 }
             });
 
-            const data = await res.json().catch(() => ({}));
+            const data = await res.json().catch(function () { return {}; });
             if (!res.ok) {
                 console.error("Like error:", data);
                 return;
             }
 
-            // update UI
             const countSpan = buttonEl.querySelector(".post-action-count");
             if (countSpan) {
-                countSpan.textContent = data.likes ?? 0;
+                countSpan.textContent =
+                    typeof data.likes === "number" ? data.likes : 0;
             }
-            buttonEl.classList.toggle("liked", !!data.liked);
+
+            if (data.liked) buttonEl.classList.add("liked");
+            else buttonEl.classList.remove("liked");
         } catch (err) {
             console.error("toggleLike error:", err);
         } finally {
@@ -257,21 +251,22 @@ class FeedManager {
     }
 
     openPostComments(postId) {
-        // For now, send them to a post detail page (you can build post.html later)
-        window.location.href = `post.html?id=${encodeURIComponent(postId)}`;
+        // You can build post.html later to show full thread
+        window.location.href = "post.html?id=" + encodeURIComponent(postId);
     }
 
     async sharePost(postId) {
-        const url = `${window.location.origin}/post.html?id=${encodeURIComponent(
-            postId
-        )}`;
+        const url =
+            window.location.origin +
+            "/post.html?id=" +
+            encodeURIComponent(postId);
 
         try {
             if (navigator.share) {
                 await navigator.share({
                     title: "UncensoredSocial",
                     text: "Check out this post",
-                    url
+                    url: url
                 });
             } else if (navigator.clipboard) {
                 await navigator.clipboard.writeText(url);
@@ -284,7 +279,7 @@ class FeedManager {
         }
     }
 
-    /* ----------------------- POST ELEMENT ----------------------- */
+    /* -------------------- POST ELEMENT -------------------- */
 
     createPostElement(post) {
         const div = document.createElement("div");
@@ -297,87 +292,103 @@ class FeedManager {
         const currentUser =
             typeof getCurrentUser === "function" ? getCurrentUser() : null;
 
-        const likeCount = Array.isArray(post.post_likes)
-            ? post.post_likes.length
-            : post.likes || 0;
+        let likeCount = 0;
+        if (Array.isArray(post.post_likes)) likeCount = post.post_likes.length;
+        else if (typeof post.likes === "number") likeCount = post.likes;
 
-        const commentCount = Array.isArray(post.comments)
-            ? post.comments.length
-            : post.comment_count || 0;
+        let commentCount = 0;
+        if (Array.isArray(post.comments)) commentCount = post.comments.length;
+        else if (typeof post.comment_count === "number")
+            commentCount = post.comment_count;
 
-        const likedByCurrentUser =
-            currentUser &&
-            Array.isArray(post.post_likes) &&
-            post.post_likes.some((l) => l.user_id === currentUser.id);
+        let likedByCurrentUser = false;
+        if (currentUser && Array.isArray(post.post_likes)) {
+            for (let i = 0; i < post.post_likes.length; i++) {
+                if (post.post_likes[i].user_id === currentUser.id) {
+                    likedByCurrentUser = true;
+                    break;
+                }
+            }
+        }
 
-        const created = post.created_at ? new Date(post.created_at) : null;
-        const timestamp = created
-            ? created.toLocaleString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit"
-              })
-            : "";
+        let timestamp = "";
+        if (post.created_at) {
+            const created = new Date(post.created_at);
+            if (!isNaN(created.getTime())) {
+                timestamp = created.toLocaleString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit"
+                });
+            }
+        }
 
-        div.innerHTML = `
-            <div class="post-header">
-                <img src="${avatar}" class="post-user-avatar" alt="Avatar">
-                <div class="post-user-info">
-                    <div class="post-display-name">${this.escape(
-                        user.display_name || "Unknown"
-                    )}</div>
-                    <div class="post-username">@${this.escape(
-                        user.username || "user"
-                    )}</div>
-                </div>
-            </div>
-
-            <div class="post-content">
-                ${this.escape(post.content || "")}
-            </div>
-
-            <div class="post-footer">
-                <span class="post-timestamp">${timestamp}</span>
-                <div class="post-actions">
-                    <button class="post-action-btn like-btn ${
-                        likedByCurrentUser ? "liked" : ""
-                    }" type="button" aria-label="Like">
-                        <span class="post-action-icon">♥</span>
-                        <span class="post-action-count">${likeCount}</span>
-                    </button>
-                    <button class="post-action-btn comment-btn" type="button" aria-label="Comment">
-                        <span class="post-action-icon">💬</span>
-                        <span class="post-action-count">${commentCount}</span>
-                    </button>
-                    <button class="post-action-btn share-btn" type="button" aria-label="Share">
-                        <span class="post-action-icon">⤴</span>
-                    </button>
-                </div>
-            </div>
-        `;
+        div.innerHTML =
+            '<div class="post-header">' +
+            '<img src="' +
+            avatar +
+            '" class="post-user-avatar" alt="Avatar">' +
+            '<div class="post-user-info">' +
+            '<div class="post-display-name">' +
+            this.escape(user.display_name || "Unknown") +
+            "</div>" +
+            '<div class="post-username">@' +
+            this.escape(user.username || "user") +
+            "</div>" +
+            "</div>" +
+            "</div>" +
+            '<div class="post-content">' +
+            this.escape(post.content || "") +
+            "</div>" +
+            '<div class="post-footer">' +
+            '<span class="post-timestamp">' +
+            timestamp +
+            "</span>" +
+            '<div class="post-actions">' +
+            '<button class="post-action-btn like-btn' +
+            (likedByCurrentUser ? " liked" : "") +
+            '" type="button" aria-label="Like">' +
+            '<span class="post-action-icon">♥</span>' +
+            '<span class="post-action-count">' +
+            likeCount +
+            "</span>" +
+            "</button>" +
+            '<button class="post-action-btn comment-btn" type="button" aria-label="Comment">' +
+            '<span class="post-action-icon">💬</span>' +
+            '<span class="post-action-count">' +
+            commentCount +
+            "</span>" +
+            "</button>" +
+            '<button class="post-action-btn share-btn" type="button" aria-label="Share">' +
+            '<span class="post-action-icon">⤴</span>' +
+            "</button>" +
+            "</div>" +
+            "</div>";
 
         return div;
     }
 
-    /* ----------------------- UTILITIES ----------------------- */
+    /* -------------------- UTILITIES -------------------- */
 
     escape(str) {
-        return String(str).replace(/[&<>"']/g, (m) => ({
-            "&": "&amp;",
-            "<": "&lt;",
-            ">": "&gt;",
-            '"': "&quot;",
-            "'": "&#039;"
-        })[m]);
+        return String(str).replace(/[&<>"']/g, function (m) {
+            return {
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#039;"
+            }[m];
+        });
     }
 }
 
-/* ----------------------- INIT FEED ----------------------- */
+/* -------------------- INIT FEED -------------------- */
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", function () {
     if (document.getElementById("feedContainer")) {
         window.feedManager = new FeedManager();
-        feedManager.init();
+        window.feedManager.init();
     }
 });
