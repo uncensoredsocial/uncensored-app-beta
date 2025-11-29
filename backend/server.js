@@ -12,7 +12,10 @@ const { createClient } = require('@supabase/supabase-js');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ---------- Supabase setup ----------
+// ======================================================
+//                     SUPABASE SETUP
+// ======================================================
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
@@ -22,33 +25,43 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-// bucket name for profile / banner images
+// Bucket for profile + banner images
 const USER_MEDIA_BUCKET = 'user-media';
 
-// admin emails (hard-coded + env)
+// Admin emails (hard-coded plus optional env override)
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'ssssss@gmail.com')
   .split(',')
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
 
-// ---------- Middleware ----------
+// ======================================================
+//                      MIDDLEWARE
+// ======================================================
+
 app.use(
   cors({
     origin: [
-      'https://spepdb.github.io',
-      'https://uncensored-app-beta-production.up.railway.app'
+      'https://spepdb.github.io', // frontend
+      'https://uncensored-app-beta-production.up.railway.app' // backend (for tests / tools)
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
   })
 );
 
-// allow bigger JSON bodies for base64 images
+// allow larger JSON bodies for base64 images
 app.use(express.json({ limit: '10mb' }));
 
-// ---------- Auth helpers ----------
+// ======================================================
+//                    AUTH HELPERS
+// ======================================================
+
 function signToken(user) {
-  const payload = { id: user.id, username: user.username, email: user.email };
+  const payload = {
+    id: user.id,
+    username: user.username,
+    email: user.email
+  };
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
 }
 
@@ -81,14 +94,26 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// Utility: stats for a user
+// Utility: stats for a single user
 async function getUserStats(userId) {
-  const [{ count: postsCount }, { count: followersCount }, { count: followingCount }] =
-    await Promise.all([
-      supabase.from('posts').select('*', { count: 'exact', head: true }).eq('user_id', userId),
-      supabase.from('follows').select('*', { count: 'exact', head: true }).eq('followed_id', userId),
-      supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', userId)
-    ]);
+  const [
+    { count: postsCount },
+    { count: followersCount },
+    { count: followingCount }
+  ] = await Promise.all([
+    supabase
+      .from('posts')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId),
+    supabase
+      .from('follows')
+      .select('*', { count: 'exact', head: true })
+      .eq('followed_id', userId),
+    supabase
+      .from('follows')
+      .select('*', { count: 'exact', head: true })
+      .eq('follower_id', userId)
+  ]);
 
   return {
     posts_count: postsCount || 0,
@@ -103,7 +128,9 @@ async function getUserStats(userId) {
 
 app.get('/api/health', async (req, res) => {
   try {
-    const { count } = await supabase.from('users').select('*', { count: 'exact', head: true });
+    const { count } = await supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true });
 
     res.json({
       status: 'OK',
@@ -117,7 +144,7 @@ app.get('/api/health', async (req, res) => {
 });
 
 // ======================================================
-//                        AUTH
+//                         AUTH
 // ======================================================
 
 // Signup
@@ -129,6 +156,7 @@ app.post('/api/auth/signup', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    // Check if username or email already exists
     const { data: existing, error: checkError } = await supabase
       .from('users')
       .select('id')
@@ -141,7 +169,9 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 
     if (existing && existing.length > 0) {
-      return res.status(400).json({ error: 'Username or email already in use' });
+      return res
+        .status(400)
+        .json({ error: 'Username or email already in use' });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -194,17 +224,20 @@ app.post('/api/auth/signup', async (req, res) => {
   }
 });
 
-// Login
+// Login (email or username)
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { identifier, password } = req.body; // email or username
+    const { identifier, password } = req.body;
 
     if (!identifier || !password) {
-      return res.status(400).json({ error: 'Missing email/username or password' });
+      return res
+        .status(400)
+        .json({ error: 'Missing email/username or password' });
     }
 
     const isEmail = identifier.includes('@');
     const query = supabase.from('users').select('*').limit(1);
+
     const { data, error: userError } = isEmail
       ? await query.eq('email', identifier)
       : await query.eq('username', identifier);
@@ -214,12 +247,13 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const user = data[0];
+
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
-    // update last login
+    // update last_login_at
     await supabase
       .from('users')
       .update({ last_login_at: new Date().toISOString() })
@@ -248,12 +282,14 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Current user
+// Get current user (for profile / app)
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
   try {
     const { data: user, error } = await supabase
       .from('users')
-      .select('id,username,email,display_name,avatar_url,banner_url,bio,created_at')
+      .select(
+        'id,username,email,display_name,avatar_url,banner_url,bio,created_at'
+      )
       .eq('id', req.user.id)
       .single();
 
@@ -262,29 +298,43 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
     }
 
     const stats = await getUserStats(user.id);
-    res.json({ ...user, ...stats });
+
+    res.json({
+      ...user,
+      ...stats
+    });
   } catch (err) {
     console.error('/auth/me error:', err);
     res.status(500).json({ error: 'Failed to load user' });
   }
 });
 
-// Update current user profile
+// Update current user's profile
 app.put('/api/auth/me', authMiddleware, async (req, res) => {
   try {
     const { display_name, bio, avatar_url, banner_url } = req.body;
 
     const updates = {};
-    if (typeof display_name === 'string') updates.display_name = display_name.trim();
-    if (typeof bio === 'string') updates.bio = bio.trim();
-    if (typeof avatar_url === 'string') updates.avatar_url = avatar_url.trim() || null;
-    if (typeof banner_url === 'string') updates.banner_url = banner_url.trim() || null;
+    if (typeof display_name === 'string') {
+      updates.display_name = display_name.trim();
+    }
+    if (typeof bio === 'string') {
+      updates.bio = bio.trim();
+    }
+    if (typeof avatar_url === 'string') {
+      updates.avatar_url = avatar_url.trim() || null;
+    }
+    if (typeof banner_url === 'string') {
+      updates.banner_url = banner_url.trim() || null;
+    }
 
     const { data: updated, error } = await supabase
       .from('users')
       .update(updates)
       .eq('id', req.user.id)
-      .select('id,username,email,display_name,avatar_url,banner_url,bio,created_at')
+      .select(
+        'id,username,email,display_name,avatar_url,banner_url,bio,created_at'
+      )
       .single();
 
     if (error) {
@@ -293,7 +343,11 @@ app.put('/api/auth/me', authMiddleware, async (req, res) => {
     }
 
     const stats = await getUserStats(updated.id);
-    res.json({ ...updated, ...stats });
+
+    res.json({
+      ...updated,
+      ...stats
+    });
   } catch (err) {
     console.error('PUT /auth/me error:', err);
     res.status(500).json({ error: 'Profile update failed' });
@@ -301,15 +355,17 @@ app.put('/api/auth/me', authMiddleware, async (req, res) => {
 });
 
 // ======================================================
-//                  IMAGE UPLOAD (PROFILE/BANNER)
+//                 PROFILE / BANNER IMAGE UPLOAD
 // ======================================================
 
 app.post('/api/profile/upload-image', authMiddleware, async (req, res) => {
   try {
-    const { imageData, kind } = req.body; // base64 string (no data: prefix), kind: 'avatar' | 'banner'
+    const { imageData, kind } = req.body; // base64 string (no "data:" prefix), kind: 'avatar' | 'banner'
 
     if (!imageData || !kind || !['avatar', 'banner'].includes(kind)) {
-      return res.status(400).json({ error: 'Missing image data or kind' });
+      return res
+        .status(400)
+        .json({ error: 'Missing image data or invalid kind' });
     }
 
     const buffer = Buffer.from(imageData, 'base64');
@@ -345,7 +401,7 @@ app.post('/api/profile/upload-image', authMiddleware, async (req, res) => {
 });
 
 // ======================================================
-//                        POSTS
+//                          POSTS
 // ======================================================
 
 // Global feed
@@ -363,7 +419,9 @@ app.get('/api/posts', async (req, res) => {
           username,
           display_name,
           avatar_url
-        )
+        ),
+        post_likes ( user_id ),
+        comments ( id )
       `
       )
       .order('created_at', { ascending: false })
@@ -381,7 +439,7 @@ app.get('/api/posts', async (req, res) => {
   }
 });
 
-// Create post
+// Create new post
 app.post('/api/posts', authMiddleware, async (req, res) => {
   try {
     const { content } = req.body;
@@ -390,7 +448,9 @@ app.post('/api/posts', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Post content is required' });
     }
     if (content.length > 280) {
-      return res.status(400).json({ error: 'Post must be 280 characters or less' });
+      return res
+        .status(400)
+        .json({ error: 'Post must be 280 characters or less' });
     }
 
     const post = {
@@ -400,7 +460,11 @@ app.post('/api/posts', authMiddleware, async (req, res) => {
       created_at: new Date().toISOString()
     };
 
-    const { data: inserted, error } = await supabase.from('posts').insert(post).select('*').single();
+    const { data: inserted, error } = await supabase
+      .from('posts')
+      .insert(post)
+      .select('*')
+      .single();
 
     if (error) {
       console.error('Create post error:', error);
@@ -413,14 +477,63 @@ app.post('/api/posts', authMiddleware, async (req, res) => {
       .eq('id', req.user.id)
       .single();
 
-    res.status(201).json({ ...inserted, user });
+    res.status(201).json({
+      ...inserted,
+      user
+    });
   } catch (err) {
     console.error('POST /posts error:', err);
     res.status(500).json({ error: 'Failed to create post' });
   }
 });
 
-// Like / unlike
+// Single post with user + likes + comments
+app.get('/api/posts/:id', async (req, res) => {
+  try {
+    const postId = req.params.id;
+
+    const { data, error } = await supabase
+      .from('posts')
+      .select(
+        `
+        id,
+        content,
+        created_at,
+        user:users (
+          id,
+          username,
+          display_name,
+          avatar_url
+        ),
+        post_likes ( user_id ),
+        comments (
+          id,
+          content,
+          created_at,
+          user:users (
+            id,
+            username,
+            display_name,
+            avatar_url
+          )
+        )
+      `
+      )
+      .eq('id', postId)
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    res.json(data);
+  } catch (err) {
+    console.error('GET /posts/:id error:', err);
+    res.status(500).json({ error: 'Failed to load post' });
+  }
+});
+
+// Like / unlike a post
 app.post('/api/posts/:id/like', authMiddleware, async (req, res) => {
   try {
     const postId = req.params.id;
@@ -441,7 +554,11 @@ app.post('/api/posts/:id/like', authMiddleware, async (req, res) => {
     let liked;
 
     if (existing) {
-      const { error: delError } = await supabase.from('post_likes').delete().eq('id', existing.id);
+      const { error: delError } = await supabase
+        .from('post_likes')
+        .delete()
+        .eq('id', existing.id);
+
       if (delError) {
         console.error('Unlike error:', delError);
         return res.status(500).json({ error: 'Failed to unlike post' });
@@ -453,6 +570,7 @@ app.post('/api/posts/:id/like', authMiddleware, async (req, res) => {
         post_id: postId,
         user_id: userId
       });
+
       if (insError) {
         console.error('Like error:', insError);
         return res.status(500).json({ error: 'Failed to like post' });
@@ -465,15 +583,140 @@ app.post('/api/posts/:id/like', authMiddleware, async (req, res) => {
       .select('*', { count: 'exact', head: true })
       .eq('post_id', postId);
 
-    res.json({ liked, likes: count || 0 });
+    res.json({
+      liked,
+      likes: count || 0
+    });
   } catch (err) {
     console.error('POST /posts/:id/like error:', err);
     res.status(500).json({ error: 'Failed to like post' });
   }
 });
 
+// Create a comment on a post
+app.post('/api/posts/:id/comments', authMiddleware, async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const { content } = req.body;
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: 'Comment content is required' });
+    }
+
+    const newComment = {
+      id: uuidv4(),
+      post_id: postId,
+      user_id: req.user.id,
+      content: content.trim(),
+      created_at: new Date().toISOString()
+    };
+
+    const { data: inserted, error } = await supabase
+      .from('comments')
+      .insert(newComment)
+      .select(
+        `
+        id,
+        content,
+        created_at,
+        user:users (
+          id,
+          username,
+          display_name,
+          avatar_url
+        )
+      `
+      )
+      .single();
+
+    if (error) {
+      console.error('Create comment error:', error);
+      return res.status(500).json({ error: 'Failed to create comment' });
+    }
+
+    res.status(201).json(inserted);
+  } catch (err) {
+    console.error('POST /posts/:id/comments error:', err);
+    res.status(500).json({ error: 'Failed to create comment' });
+  }
+});
+
+// Get all comments for a post
+app.get('/api/posts/:id/comments', async (req, res) => {
+  try {
+    const postId = req.params.id;
+
+    const { data, error } = await supabase
+      .from('comments')
+      .select(
+        `
+        id,
+        content,
+        created_at,
+        user:users (
+          id,
+          username,
+          display_name,
+          avatar_url
+        )
+      `
+      )
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Get comments error:', error);
+      return res.status(500).json({ error: 'Failed to load comments' });
+    }
+
+    res.json(data || []);
+  } catch (err) {
+    console.error('GET /posts/:id/comments error:', err);
+    res.status(500).json({ error: 'Failed to load comments' });
+  }
+});
+
+// Save / unsave (bookmark) a post
+app.post('/api/posts/:id/save', authMiddleware, async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const userId = req.user.id;
+
+    const { data: existing, error: checkError } = await supabase
+      .from('saved_posts')
+      .select('id')
+      .eq('post_id', postId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (checkError) {
+      console.error('Save check error:', checkError);
+      return res.status(500).json({ error: 'Failed to update save status' });
+    }
+
+    let saved;
+
+    if (existing) {
+      await supabase.from('saved_posts').delete().eq('id', existing.id);
+      saved = false;
+    } else {
+      await supabase.from('saved_posts').insert({
+        id: uuidv4(),
+        post_id: postId,
+        user_id: userId
+      });
+      saved = true;
+    }
+
+    res.json({ saved });
+  } catch (err) {
+    console.error('POST /posts/:id/save error:', err);
+    res.status(500).json({ error: 'Failed to update save status' });
+  }
+});
+
 // ======================================================
-//                     PROFILE / FOLLOWS
+//                   PROFILE / FOLLOWS
 // ======================================================
 
 // Get user by username
@@ -483,7 +726,9 @@ app.get('/api/users/:username', async (req, res) => {
 
     const { data: user, error } = await supabase
       .from('users')
-      .select('id,username,display_name,avatar_url,banner_url,bio,created_at')
+      .select(
+        'id,username,display_name,avatar_url,banner_url,bio,created_at'
+      )
       .eq('username', username)
       .single();
 
@@ -499,7 +744,7 @@ app.get('/api/users/:username', async (req, res) => {
   }
 });
 
-// Posts for a user
+// Get posts for a given username
 app.get('/api/users/:username/posts', async (req, res) => {
   try {
     const { username } = req.params;
@@ -532,7 +777,7 @@ app.get('/api/users/:username/posts', async (req, res) => {
   }
 });
 
-// Follow / unfollow
+// Follow / unfollow user
 app.post('/api/users/:username/follow', authMiddleware, async (req, res) => {
   try {
     const { username } = req.params;
@@ -567,7 +812,11 @@ app.post('/api/users/:username/follow', authMiddleware, async (req, res) => {
     let following;
 
     if (existing) {
-      const { error: delError } = await supabase.from('follows').delete().eq('id', existing.id);
+      const { error: delError } = await supabase
+        .from('follows')
+        .delete()
+        .eq('id', existing.id);
+
       if (delError) {
         console.error('Unfollow error:', delError);
         return res.status(500).json({ error: 'Failed to unfollow' });
@@ -579,6 +828,7 @@ app.post('/api/users/:username/follow', authMiddleware, async (req, res) => {
         follower_id: currentUserId,
         followed_id: target.id
       });
+
       if (insError) {
         console.error('Follow error:', insError);
         return res.status(500).json({ error: 'Failed to follow' });
@@ -587,7 +837,11 @@ app.post('/api/users/:username/follow', authMiddleware, async (req, res) => {
     }
 
     const stats = await getUserStats(target.id);
-    res.json({ following, ...stats });
+
+    res.json({
+      following,
+      ...stats
+    });
   } catch (err) {
     console.error('POST /users/:username/follow error:', err);
     res.status(500).json({ error: 'Failed to update follow status' });
@@ -595,9 +849,10 @@ app.post('/api/users/:username/follow', authMiddleware, async (req, res) => {
 });
 
 // ======================================================
-//                         SEARCH
+//                          SEARCH
 // ======================================================
 
+// Search users + posts + hashtags
 app.get('/api/search', async (req, res) => {
   try {
     const q = (req.query.q || '').trim();
@@ -635,11 +890,19 @@ app.get('/api/search', async (req, res) => {
         .ilike('content', pattern)
         .order('created_at', { ascending: false })
         .limit(20),
-      supabase.from('hashtags').select('id,tag').ilike('tag', pattern).limit(10)
+      supabase
+        .from('hashtags')
+        .select('id,tag')
+        .ilike('tag', pattern)
+        .limit(10)
     ]);
 
     if (usersError || postsError || tagsError) {
-      console.error('Search errors:', { usersError, postsError, tagsError });
+      console.error('Search errors:', {
+        usersError,
+        postsError,
+        tagsError
+      });
       return res.status(500).json({ error: 'Search failed' });
     }
 
@@ -654,7 +917,7 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
-// search history: save
+// Save search query to history
 app.post('/api/search/history', authMiddleware, async (req, res) => {
   try {
     const { query } = req.body;
@@ -682,7 +945,7 @@ app.post('/api/search/history', authMiddleware, async (req, res) => {
   }
 });
 
-// search history: get
+// Get current user's search history
 app.get('/api/search/history', authMiddleware, async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -705,10 +968,10 @@ app.get('/api/search/history', authMiddleware, async (req, res) => {
 });
 
 // ======================================================
-//                        ADMIN
+//                          ADMIN
 // ======================================================
 
-// basic stats
+// Basic stats for admin dashboard
 app.get('/api/admin/stats', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const now = new Date().toISOString();
@@ -719,14 +982,20 @@ app.get('/api/admin/stats', authMiddleware, requireAdmin, async (req, res) => {
       { count: likeCount },
       { count: followCount },
       { count: hashtagCount },
-      { count: searchCount }
+      { count: searchCount },
+      { count: commentCount },
+      { count: savedCount }
     ] = await Promise.all([
       supabase.from('users').select('*', { count: 'exact', head: true }),
       supabase.from('posts').select('*', { count: 'exact', head: true }),
       supabase.from('post_likes').select('*', { count: 'exact', head: true }),
       supabase.from('follows').select('*', { count: 'exact', head: true }),
       supabase.from('hashtags').select('*', { count: 'exact', head: true }),
-      supabase.from('search_history').select('*', { count: 'exact', head: true })
+      supabase
+        .from('search_history')
+        .select('*', { count: 'exact', head: true }),
+      supabase.from('comments').select('*', { count: 'exact', head: true }),
+      supabase.from('saved_posts').select('*', { count: 'exact', head: true })
     ]);
 
     res.json({
@@ -736,7 +1005,9 @@ app.get('/api/admin/stats', authMiddleware, requireAdmin, async (req, res) => {
       likes: likeCount || 0,
       follows: followCount || 0,
       hashtags: hashtagCount || 0,
-      searches: searchCount || 0
+      searches: searchCount || 0,
+      comments: commentCount || 0,
+      saved_posts: savedCount || 0
     });
   } catch (err) {
     console.error('GET /admin/stats error:', err);
@@ -744,7 +1015,7 @@ app.get('/api/admin/stats', authMiddleware, requireAdmin, async (req, res) => {
   }
 });
 
-// list users (simple)
+// List users (simple)
 app.get('/api/admin/users', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -765,7 +1036,7 @@ app.get('/api/admin/users', authMiddleware, requireAdmin, async (req, res) => {
   }
 });
 
-// list posts (simple)
+// List posts (simple)
 app.get('/api/admin/posts', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -797,50 +1068,67 @@ app.get('/api/admin/posts', authMiddleware, requireAdmin, async (req, res) => {
   }
 });
 
-// hard delete a post
-app.delete('/api/admin/posts/:id', authMiddleware, requireAdmin, async (req, res) => {
-  try {
-    const postId = req.params.id;
+// Hard delete a post (and related data)
+app.delete(
+  '/api/admin/posts/:id',
+  authMiddleware,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const postId = req.params.id;
 
-    // delete likes for that post
-    await supabase.from('post_likes').delete().eq('post_id', postId);
+      await supabase.from('post_likes').delete().eq('post_id', postId);
+      await supabase.from('comments').delete().eq('post_id', postId);
+      await supabase.from('saved_posts').delete().eq('post_id', postId);
 
-    const { error } = await supabase.from('posts').delete().eq('id', postId);
-    if (error) {
-      console.error('DELETE /admin/posts/:id error:', error);
-      return res.status(500).json({ error: 'Failed to delete post' });
+      const { error } = await supabase.from('posts').delete().eq('id', postId);
+      if (error) {
+        console.error('DELETE /admin/posts/:id error:', error);
+        return res.status(500).json({ error: 'Failed to delete post' });
+      }
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error('DELETE /admin/posts/:id error:', err);
+      res.status(500).json({ error: 'Failed to delete post' });
     }
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error('DELETE /admin/posts/:id error:', err);
-    res.status(500).json({ error: 'Failed to delete post' });
   }
-});
+);
 
-// hard delete a user (and related data)
-app.delete('/api/admin/users/:id', authMiddleware, requireAdmin, async (req, res) => {
-  try {
-    const userId = req.params.id;
+// Hard delete a user (and related data)
+app.delete(
+  '/api/admin/users/:id',
+  authMiddleware,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const userId = req.params.id;
 
-    // delete in reasonable order
-    await supabase.from('post_likes').delete().eq('user_id', userId);
-    await supabase.from('follows').delete().or(`follower_id.eq.${userId},followed_id.eq.${userId}`);
-    await supabase.from('search_history').delete().eq('user_id', userId);
-    await supabase.from('posts').delete().eq('user_id', userId);
+      await supabase.from('post_likes').delete().eq('user_id', userId);
+      await supabase.from('follows').delete()
+        .or(`follower_id.eq.${userId},followed_id.eq.${userId}`);
+      await supabase.from('search_history').delete().eq('user_id', userId);
+      await supabase.from('comments').delete().eq('user_id', userId);
+      await supabase.from('saved_posts').delete().eq('user_id', userId);
+      await supabase.from('posts').delete().eq('user_id', userId);
 
-    const { error } = await supabase.from('users').delete().eq('id', userId);
-    if (error) {
-      console.error('DELETE /admin/users/:id error:', error);
-      return res.status(500).json({ error: 'Failed to delete user' });
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', userId);
+
+      if (error) {
+        console.error('DELETE /admin/users/:id error:', error);
+        return res.status(500).json({ error: 'Failed to delete user' });
+      }
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error('DELETE /admin/users/:id error:', err);
+      res.status(500).json({ error: 'Failed to delete user' });
     }
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error('DELETE /admin/users/:id error:', err);
-    res.status(500).json({ error: 'Failed to delete user' });
   }
-});
+);
 
 // ======================================================
 //                      START SERVER
