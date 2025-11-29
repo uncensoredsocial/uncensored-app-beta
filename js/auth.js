@@ -126,6 +126,7 @@ async function handleSignup(e) {
         showAuthMessage(successMessage, 'Account created! Redirecting...', 'success');
 
         setTimeout(() => {
+            // New users are normal users by default -> go to home feed
             window.location.href = 'index.html';
         }, 800);
     } catch (err) {
@@ -189,10 +190,19 @@ async function handleLogin(e) {
             throw new Error(data.error || 'Login failed');
         }
 
-        setAuthToken(data.token);
-        setCurrentUser(data.user);
+        const { token, user } = data;
 
-        window.location.href = 'index.html';
+        setAuthToken(token);
+        setCurrentUser(user);
+
+        // Redirect based on admin status
+        if (user && user.is_admin === true) {
+            // Admin -> dashboard
+            window.location.href = 'admin.html';
+        } else {
+            // Normal user -> main home feed
+            window.location.href = 'index.html';
+        }
     } catch (err) {
         console.error('Login error:', err);
         showAuthMessage(errorMessage, err.message || 'Login failed.');
@@ -216,7 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loginForm.addEventListener('submit', handleLogin);
     }
 
-    // Header auth/profile toggle
+    // Header auth/profile toggle (only on pages that have these)
     const authButtons = document.getElementById('authButtons');
     const profileSection = document.getElementById('profileSection');
     const headerProfileImg = document.getElementById('headerProfileImg');
