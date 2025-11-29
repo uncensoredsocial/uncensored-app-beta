@@ -8,143 +8,254 @@
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/profile-styles.css">
     <link rel="stylesheet" href="css/icons.css">
+
+    <style>
+        /* Restore OLD layout styling */
+
+        body {
+            background: #000;
+            color: white;
+            font-family: system-ui, sans-serif;
+        }
+
+        header.header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: #000;
+            padding: 15px;
+            border-bottom: 1px solid #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        header .settings-icon {
+            position: absolute;
+            right: 15px;
+            font-size: 22px;
+        }
+
+        .profile-banner {
+            width: 100%;
+            height: 150px;
+            background: linear-gradient(45deg, #111, #222);
+        }
+
+        .profile-avatar-container {
+            margin-top: -45px;
+            padding-left: 12px;
+        }
+
+        .profile-avatar {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            border: 4px solid black;
+            background: #111;
+        }
+
+        .edit-profile-btn {
+            float: right;
+            margin-right: 15px;
+            margin-top: -30px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid #444;
+            background: #222;
+            color: white;
+            font-size: 14px;
+        }
+
+        .profile-name {
+            margin: 10px 12px 0 12px;
+            font-size: 22px;
+            font-weight: bold;
+        }
+
+        .profile-username {
+            margin-left: 12px;
+            opacity: 0.7;
+        }
+
+        .profile-bio {
+            margin: 10px 12px;
+            font-size: 15px;
+            opacity: 0.9;
+        }
+
+        .joined-text {
+            margin-left: 12px;
+            margin-top: 5px;
+            font-size: 14px;
+            opacity: 0.6;
+        }
+
+        .stats-row {
+            display: flex;
+            gap: 20px;
+            margin: 12px;
+        }
+
+        .stats-row div {
+            font-size: 14px;
+        }
+
+        .stats-row strong {
+            font-size: 15px;
+            margin-right: 3px;
+        }
+
+        /* Tabs */
+        .profile-tabs {
+            display: flex;
+            border-bottom: 1px solid #222;
+            margin-top: 10px;
+        }
+
+        .profile-tabs button {
+            flex: 1;
+            padding: 15px 0;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 16px;
+        }
+
+        .profile-tabs .active {
+            border-bottom: 3px solid #1d9bf0;
+        }
+
+        /* Posts content */
+        #profilePostsList,
+        #profileLikesList {
+            padding: 15px;
+        }
+
+        .loading-indicator {
+            text-align: center;
+            margin: 25px 0;
+            opacity: 0.6;
+        }
+
+        /* Bottom nav restore */
+        nav.bottom-nav {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background: #000;
+            border-top: 1px solid #222;
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+        }
+
+        nav.bottom-nav a {
+            color: white;
+            text-decoration: none;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        nav.bottom-nav .icon {
+            display: block;
+            font-size: 20px;
+            margin-bottom: 3px;
+        }
+    </style>
 </head>
 
 <body>
 
 <!-- HEADER -->
 <header class="header">
-    <h1 class="logo center">Profile</h1>
+    <h2>Profile</h2>
 
-    <!-- SETTINGS ICON -->
-    <button class="btn btn-ghost btn-icon settings-btn" onclick="window.location='settings.html'">
+    <a href="settings.html" class="settings-icon">
         <span class="icon icon-settings"></span>
-    </button>
+    </a>
 </header>
 
-<!-- PROFILE BANNER -->
-<div class="profile-banner">
-    <img id="profileBanner" src="assets/default-banner.jpg" alt="Banner">
+<!-- BANNER -->
+<div class="profile-banner" id="profileBanner"></div>
+
+<!-- AVATAR + EDIT BUTTON -->
+<div class="profile-avatar-container">
+    <img id="profileAvatar" class="profile-avatar" src="assets/icons/default-profile.png" alt="User Avatar">
 </div>
 
-<!-- PROFILE MAIN SECTION -->
-<section class="profile-section">
+<button id="editProfileBtn" class="edit-profile-btn">Edit Profile</button>
 
-    <!-- Avatar + Edit Button -->
-    <div class="profile-top-row">
-        <img id="profileAvatar" class="profile-avatar" src="assets/icons/default-profile.png">
+<!-- NAME -->
+<h2 id="profileName" class="profile-name">Loading...</h2>
+<p id="profileUsername" class="profile-username">@username</p>
 
-        <button id="editProfileBtn" class="btn btn-primary small-btn">Edit Profile</button>
+<!-- BIO -->
+<p id="profileBio" class="profile-bio">Loading bio...</p>
+
+<!-- JOINED TEXT -->
+<p id="profileJoined" class="joined-text">Joined —</p>
+
+<!-- STATS -->
+<div class="stats-row">
+    <div>
+        <strong id="profilePostsCount">0</strong> Posts
     </div>
-
-    <!-- Name + Username -->
-    <h2 id="profileName">Loading...</h2>
-    <p class="username" id="profileUsername">@username</p>
-
-    <!-- Bio -->
-    <p id="profileBio" class="bio-text">Loading bio...</p>
-
-    <!-- Joined -->
-    <p id="profileJoined" class="joined-text">Joined —</p>
-
-    <!-- Stats Row -->
-    <div class="profile-stats-row">
-        <div>
-            <strong id="profilePostsCount">0</strong>
-            <span>Posts</span>
-        </div>
-        <div>
-            <strong id="profileFollowersCount">0</strong>
-            <span>Followers</span>
-        </div>
-        <div>
-            <strong id="profileFollowingCount">0</strong>
-            <span>Following</span>
-        </div>
+    <div>
+        <strong id="profileFollowersCount">0</strong> Followers
     </div>
-
-</section>
+    <div>
+        <strong id="profileFollowingCount">0</strong> Following
+    </div>
+</div>
 
 <!-- TABS -->
 <div class="profile-tabs">
-    <button class="tab-btn active" data-tab="posts">Posts</button>
-    <button class="tab-btn" data-tab="likes">Likes</button>
+    <button class="tab active" data-tab="postsTab">Posts</button>
+    <button class="tab" data-tab="likesTab">Likes</button>
 </div>
 
-<!-- TAB CONTENT -->
-<div class="tab-content">
-
-    <!-- POSTS TAB -->
-    <div id="postsTab" class="profile-tab-pane active">
-        <div class="loading-indicator" id="loadingPosts">
-            <div class="loading-spinner"></div>
-            <p>Loading posts...</p>
-        </div>
-
-        <div id="profilePostsList"></div>
-
-        <div id="profilePostsEmpty" class="empty-state" style="display:none;">
-            <p>No posts yet</p>
-        </div>
+<!-- POSTS TAB -->
+<div id="postsTab" class="profile-tab-pane active">
+    <div class="loading-indicator" id="loadingPosts">
+        <p>Loading posts...</p>
     </div>
 
-    <!-- LIKES TAB -->
-    <div id="likesTab" class="profile-tab-pane">
-        <div id="profileLikesList"></div>
-
-        <div class="empty-state">
-            <p>No liked posts yet</p>
-        </div>
-    </div>
-
+    <div id="profilePostsList"></div>
 </div>
 
-<!-- BOTTOM NAV (SAME AS HOME PAGE) -->
+<!-- LIKES TAB -->
+<div id="likesTab" class="profile-tab-pane" style="display:none;">
+    <div class="loading-indicator">
+        <p>Loading liked posts...</p>
+    </div>
+
+    <div id="profileLikesList"></div>
+
+    <p style="text-align:center; margin-top:20px; opacity:0.6;">No liked posts yet</p>
+</div>
+
+<!-- BOTTOM NAV -->
 <nav class="bottom-nav">
-    <a href="index.html" class="nav-item">
+    <a href="index.html">
         <span class="icon icon-home"></span>
         Home
     </a>
-    <a href="search.html" class="nav-item">
+    <a href="search.html">
         <span class="icon icon-search"></span>
         Search
     </a>
-    <a href="notifications.html" class="nav-item">
+    <a href="notifications.html">
         <span class="icon icon-notifications"></span>
         Alerts
     </a>
-    <a href="dms.html" class="nav-item">
+    <a href="dms.html">
         <span class="icon icon-messages"></span>
         Messages
     </a>
 </nav>
 
-<!-- EDIT PROFILE MODAL -->
-<div id="editProfileModal" class="modal">
-    <div class="modal-content">
-
-        <h3>Edit Profile</h3>
-
-        <label>Display Name</label>
-        <input id="editDisplayName" type="text">
-
-        <label>Bio</label>
-        <textarea id="editBio" maxlength="160"></textarea>
-
-        <label>Profile Picture URL</label>
-        <input id="editAvatarUrl" type="text" placeholder="https://...">
-
-        <label>Banner URL</label>
-        <input id="editBannerUrl" type="text" placeholder="https://...">
-
-        <div class="modal-buttons">
-            <button id="closeEditModal" class="btn btn-secondary">Cancel</button>
-            <button id="saveProfileBtn" class="btn btn-primary">Save</button>
-        </div>
-
-    </div>
-</div>
-
+<!-- SCRIPTS -->
 <script src="js/auth.js"></script>
 <script src="js/profile.js"></script>
 
