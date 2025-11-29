@@ -2,48 +2,36 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Your Profile - UncensoredSocial</title>
-
-  <!-- Global styles -->
+  <title>Profile - UncensoredSocial</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="css/styles.css" />
-  <!-- Profile specific styles -->
   <link rel="stylesheet" href="css/profile-styles.css" />
 </head>
-<body class="app-body">
+<body class="profile-page">
 
-  <div class="page profile-page">
+  <!-- Top bar: centered title, settings on the right -->
+  <header class="profile-topbar">
+    <h1 class="profile-topbar-title">Profile</h1>
+    <button id="settingsButton" class="profile-settings-btn" aria-label="Settings">
+      ⚙️
+    </button>
+  </header>
 
-    <!-- Top bar JUST for this page -->
-    <header class="profile-topbar">
-      <h1 class="profile-topbar-title">Profile</h1>
-      <button
-        id="settingsButton"
-        class="profile-settings-btn"
-        aria-label="Open settings"
-      >
-        ⚙️
-      </button>
-    </header>
-
-    <!-- Profile header (banner + avatar + basic info) -->
+  <!-- Profile header (banner + avatar + basic info) -->
+  <main>
     <section class="profile-header">
       <div class="profile-banner">
-        <img
-          id="profileBanner"
-          src=""
-          alt="Profile banner"
-          class="profile-banner-img"
-        />
+        <!-- If no banner_url, this img gets the .hidden class -->
+        <img id="profileBanner" class="profile-banner-img hidden" alt="Profile banner" />
       </div>
 
       <div class="profile-header-main">
         <div class="profile-avatar-wrapper">
           <img
             id="profileAvatar"
+            class="profile-avatar"
             src="assets/icons/default-profile.png"
             alt="Profile avatar"
-            class="profile-avatar"
           />
         </div>
 
@@ -55,10 +43,10 @@
       </div>
 
       <div class="profile-header-info">
-        <h2 id="profileDisplayName" class="profile-display-name">Loading…</h2>
+        <h2 id="profileDisplayName" class="profile-display-name">Loading...</h2>
         <p id="profileUsername" class="profile-username">@username</p>
 
-        <p id="profileBio" class="profile-bio">Bio will appear here.</p>
+        <p id="profileBio" class="profile-bio">Loading bio…</p>
 
         <div class="profile-meta">
           <span id="joinDate">Joined —</span>
@@ -82,61 +70,66 @@
     </section>
 
     <!-- Tabs -->
-    <nav class="profile-tabs">
+    <nav class="profile-tabs" aria-label="Profile content tabs">
       <button class="tab-btn active" data-tab="posts">Posts</button>
       <button class="tab-btn" data-tab="likes">Likes</button>
     </nav>
 
-    <!-- Tab content -->
-    <main class="tab-content">
-      <section id="postsTab" class="tab-pane active">
+    <!-- Tab panes -->
+    <section class="tab-content">
+      <!-- Posts tab -->
+      <div id="postsTab" class="tab-pane active">
         <div id="profilePosts" class="posts-container">
           <div class="loading-indicator">Loading posts…</div>
         </div>
-      </section>
+      </div>
 
-      <section id="likesTab" class="tab-pane">
+      <!-- Likes tab (placeholder for now) -->
+      <div id="likesTab" class="tab-pane">
         <div class="empty-state">
           <h3>Likes coming soon</h3>
-          <p>We’ll show posts you’ve liked here.</p>
+          <p>We’ll show your liked posts here later.</p>
         </div>
-      </section>
-    </main>
+      </div>
+    </section>
+  </main>
 
-  </div>
-
-  <!-- Edit Profile Modal -->
-  <div id="editProfileModal" class="modal">
-    <div class="modal-content">
+  <!-- Edit Profile Modal (popup, stays on same page) -->
+  <div class="modal" id="editProfileModal" aria-hidden="true">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="editProfileTitle">
       <div class="modal-header">
-        <h3>Edit Profile</h3>
+        <h3 id="editProfileTitle">Edit profile</h3>
         <button id="closeEditModal" class="close-modal" aria-label="Close">
-          ×
+          &times;
         </button>
       </div>
+
       <div class="modal-body">
-        <form id="editProfileForm" novalidate>
+        <form id="editProfileForm">
+          <!-- Display name -->
           <div class="input-group">
             <label for="editDisplayName">Display name</label>
             <input
               type="text"
               id="editDisplayName"
               maxlength="50"
-              placeholder="How people see you"
+              placeholder="How people will see you"
             />
           </div>
 
+          <!-- Bio -->
           <div class="input-group">
             <label for="editBio">Bio</label>
             <textarea
               id="editBio"
               rows="3"
               maxlength="160"
-              placeholder="Tell people about yourself"
+              placeholder="Tell people who you are"
             ></textarea>
             <div id="bioCharCounter" class="char-counter">0/160</div>
           </div>
 
+          <!-- Avatar URL (for now; you can swap this to a real upload later) -->
           <div class="input-group">
             <label for="editAvatarUrl">Profile picture URL</label>
             <input
@@ -144,30 +137,50 @@
               id="editAvatarUrl"
               placeholder="https://example.com/avatar.png"
             />
-            <small class="helper-text">
-              Host your image somewhere (Imgur, etc.) and paste the link.
-            </small>
+            <span class="helper-text">
+              For now, paste a direct image URL. Later you can add real uploads.
+            </span>
           </div>
 
+          <!-- Banner URL -->
           <div class="input-group">
             <label for="editBannerUrl">Banner image URL</label>
             <input
               type="url"
               id="editBannerUrl"
-              placeholder="https://example.com/banner.png"
+              placeholder="https://example.com/banner.jpg"
             />
           </div>
         </form>
       </div>
+
       <div class="modal-footer">
-        <button id="cancelEditBtn" class="btn btn-outline">Cancel</button>
+        <button id="cancelEditBtn" class="btn btn-outline-light">Cancel</button>
         <button id="saveProfileBtn" class="btn btn-primary">Save</button>
       </div>
     </div>
   </div>
 
-  <!-- scripts -->
-  <script src="js/app.js"></script>
+  <!-- Bottom navigation (same idea as other pages) -->
+  <nav class="bottom-nav" aria-label="Main navigation">
+    <a href="index.html" class="bottom-nav-item">
+      <span class="bottom-nav-icon">🏠</span>
+      <span class="bottom-nav-label">Home</span>
+    </a>
+    <a href="search.html" class="bottom-nav-item">
+      <span class="bottom-nav-icon">🔍</span>
+      <span class="bottom-nav-label">Search</span>
+    </a>
+    <a href="notifications.html" class="bottom-nav-item">
+      <span class="bottom-nav-icon">🔔</span>
+      <span class="bottom-nav-label">Alerts</span>
+    </a>
+    <a href="dms.html" class="bottom-nav-item">
+      <span class="bottom-nav-icon">✉️</span>
+      <span class="bottom-nav-label">Messages</span>
+    </a>
+  </nav>
+
   <script src="js/profile.js"></script>
 </body>
 </html>
