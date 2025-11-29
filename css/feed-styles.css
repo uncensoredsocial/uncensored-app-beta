@@ -389,3 +389,66 @@
 .post-action-btn.saved {
     color: #1d9bf0; /* Twitter blue for 'active' */
 }
+
+/* --- Post footer + actions (likes / comments / share) --- */
+
+.post-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: var(--space-2);
+    font-size: 0.8rem;
+    color: #9ca3af;
+}
+
+.post-timestamp {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.post-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.post-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: none;
+    background: transparent;
+    color: #9ca3af;
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 4px 6px;
+    border-radius: 999px;
+    transition: background-color 0.15s ease, color 0.15s ease, transform 0.05s ease;
+}
+
+.post-action-btn:hover {
+    background-color: rgba(55, 65, 81, 0.25);
+    color: #e5e7eb;
+}
+
+.post-action-btn:active {
+    transform: scale(0.96);
+}
+
+.post-action-icon {
+    font-size: 0.9rem;
+    line-height: 1;
+}
+
+.post-action-count {
+    font-size: 0.8rem;
+}
+
+/* liked state */
+.post-action-btn.liked {
+    color: #3b82f6; /* highlight color for liked */
+}
+
+.post-action-btn.liked .post-action-icon {
+    transform: translateY(0);
+}
