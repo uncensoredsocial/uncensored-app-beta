@@ -69,16 +69,16 @@ class ProfilePage {
   // ----- events -----
   bindEvents() {
     // Tabs
-    var tabButtons = document.querySelectorAll('.tab-btn');
-    for (var i = 0; i < tabButtons.length; i++) {
-      tabButtons[i].addEventListener('click', (e) => {
-        var tab = e.currentTarget.getAttribute('data-tab');
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    tabButtons.forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const tab = e.currentTarget.getAttribute('data-tab');
         this.switchTab(tab);
       });
-    }
+    });
 
     // Settings button → settings.html
-    var settingsButton = document.getElementById('settingsButton');
+    const settingsButton = document.getElementById('settingsButton');
     if (settingsButton) {
       settingsButton.addEventListener('click', () => {
         window.location.href = 'settings.html';
@@ -86,19 +86,19 @@ class ProfilePage {
     }
 
     // Edit profile open
-    var editBtn = document.getElementById('editProfileButton');
+    const editBtn = document.getElementById('editProfileButton');
     if (editBtn) {
       editBtn.addEventListener('click', () => this.openEditModal());
     }
 
     // Close modal (X)
-    var closeModalBtn = document.getElementById('closeEditModal');
+    const closeModalBtn = document.getElementById('closeEditModal');
     if (closeModalBtn) {
       closeModalBtn.addEventListener('click', () => this.closeEditModal());
     }
 
     // Cancel button
-    var cancelBtn = document.getElementById('cancelEditBtn');
+    const cancelBtn = document.getElementById('cancelEditBtn');
     if (cancelBtn) {
       cancelBtn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -107,7 +107,7 @@ class ProfilePage {
     }
 
     // Save profile
-    var saveBtn = document.getElementById('saveProfileBtn');
+    const saveBtn = document.getElementById('saveProfileBtn');
     if (saveBtn) {
       saveBtn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -191,16 +191,14 @@ class ProfilePage {
       this.joinDateEl.textContent = this.formatJoinDate(u.created_at);
     }
 
-    if (this.postsCountEl)
-      this.postsCountEl.textContent = u.posts_count || 0;
+    if (this.postsCountEl) this.postsCountEl.textContent = u.posts_count || 0;
     if (this.followersCountEl)
       this.followersCountEl.textContent = u.followers_count || 0;
     if (this.followingCountEl)
       this.followingCountEl.textContent = u.following_count || 0;
 
     if (this.avatarEl) {
-      this.avatarEl.src =
-        u.avatar_url || 'assets/icons/default-profile.png';
+      this.avatarEl.src = u.avatar_url || 'assets/icons/default-profile.png';
     }
 
     if (this.bannerEl) {
@@ -241,9 +239,7 @@ class ProfilePage {
       }
 
       let html = '';
-      for (let i = 0; i < posts.length; i++) {
-        html += this.renderPostHtml(posts[i]);
-      }
+      posts.forEach((post) => (html += this.renderPostHtml(post)));
       this.postsContainer.innerHTML = html;
     } catch (err) {
       console.error(err);
@@ -259,37 +255,28 @@ class ProfilePage {
     const content = this.formatPostContent(post.content || '');
     const time = this.formatTimestamp(post.created_at);
 
-    return (
-      '<article class="profile-post" data-post-id="' +
-      post.id +
-      '">' +
-      '<div class="post-content"><p>' +
-      content +
-      '</p></div>' +
-      '<div class="post-stats">' +
-      '<span class="post-time">' +
-      time +
-      '</span>' +
-      '</div>' +
-      '</article>'
-    );
+    return `
+      <article class="profile-post" data-post-id="${post.id}">
+        <div class="post-content">
+          <p>${content}</p>
+        </div>
+        <div class="post-stats">
+          <span class="post-time">${time}</span>
+        </div>
+      </article>`;
   }
 
   // ----- tabs -----
   switchTab(tabName) {
     this.currentTab = tabName;
 
-    var tabButtons = document.querySelectorAll('.tab-btn');
-    for (var i = 0; i < tabButtons.length; i++) {
-      var btn = tabButtons[i];
-      btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
-    }
+    document.querySelectorAll('.tab-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.tab === tabName);
+    });
 
-    var panes = document.querySelectorAll('.tab-pane');
-    for (var j = 0; j < panes.length; j++) {
-      var pane = panes[j];
-      pane.classList.toggle('active', pane.id === tabName + 'Tab');
-    }
+    document.querySelectorAll('.tab-pane').forEach((pane) => {
+      pane.classList.toggle('active', pane.id === `${tabName}Tab`);
+    });
 
     if (tabName === 'posts' && this.currentProfile) {
       this.loadProfilePosts(this.currentProfile.username);
@@ -300,8 +287,7 @@ class ProfilePage {
   openEditModal() {
     if (!this.currentProfile || !this.editModal) return;
 
-    this.editDisplayNameInput.value =
-      this.currentProfile.display_name || '';
+    this.editDisplayNameInput.value = this.currentProfile.display_name || '';
     this.editBioInput.value = this.currentProfile.bio || '';
     this.editAvatarUrlInput.value = this.currentProfile.avatar_url || '';
     this.editBannerUrlInput.value = this.currentProfile.banner_url || '';
@@ -317,8 +303,8 @@ class ProfilePage {
   updateBioCharCounter() {
     if (!this.editBioInput || !this.bioCharCounter) return;
 
-    var length = this.editBioInput.value.length;
-    this.bioCharCounter.textContent = length + '/160';
+    const length = this.editBioInput.value.length;
+    this.bioCharCounter.textContent = `${length}/160`;
 
     this.bioCharCounter.classList.remove('warning', 'error');
     if (length > 160) this.bioCharCounter.classList.add('error');
@@ -378,13 +364,10 @@ class ProfilePage {
   formatJoinDate(dateString) {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return 'Joined —';
-    return (
-      'Joined ' +
-      date.toLocaleDateString('en-US', {
-        month: 'long',
-        year: 'numeric',
-      })
-    );
+    return `Joined ${date.toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric',
+    })}`;
   }
 
   formatTimestamp(timestamp) {
@@ -398,9 +381,9 @@ class ProfilePage {
     const diffDays = Math.floor(diffMs / 86400000);
 
     if (diffMins < 1) return 'just now';
-    if (diffMins < 60) return diffMins + 'm';
-    if (diffHours < 24) return diffHours + 'h';
-    if (diffDays < 7) return diffDays + 'd';
+    if (diffMins < 60) return `${diffMins}m`;
+    if (diffHours < 24) return `${diffHours}h`;
+    if (diffDays < 7) return `${diffDays}d`;
 
     return postDate.toLocaleDateString();
   }
@@ -422,14 +405,12 @@ class ProfilePage {
   }
 
   // ----- messages -----
-  showMessage(message, type) {
-    type = type || 'info';
-
+  showMessage(message, type = 'info') {
     const existing = document.querySelector('.status-message');
     if (existing) existing.remove();
 
     const div = document.createElement('div');
-    div.className = 'status-message status-' + type;
+    div.className = `status-message status-${type}`;
     div.textContent = message;
     div.style.position = 'fixed';
     div.style.top = '20px';
@@ -439,13 +420,13 @@ class ProfilePage {
     div.style.maxWidth = '90%';
 
     document.body.appendChild(div);
-    setTimeout(function () {
+    setTimeout(() => {
       if (div.parentNode) div.parentNode.removeChild(div);
     }, 3000);
   }
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', () => {
   const page = new ProfilePage();
   page.init();
 });
