@@ -1,297 +1,259 @@
 // js/profile.js
 
-const API_BASE_URL = 'https://uncensored-app-beta-production.up.railway.app/api';
+// === CONFIG ===
+const API_BASE_URL =
+  window.API_BASE_URL || 'https://uncensored-app-beta-production.up.railway.app/api';
+
+// --- small helpers so this works even if auth.js is simple ---
+
+function getAuthToken() {
+  if (window.auth && typeof window.auth.getToken === 'function') {
+    return window.auth.getToken();
+  }
+  return localStorage.getItem('authToken');
+}
+
+function getCurrentUser() {
+  if (window.auth && typeof window.auth.getCurrentUser === 'function') {
+    return window.auth.getCurrentUser();
+  }
+  const raw = localStorage.getItem('currentUser');
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function setSession(user, token) {
+  // keep auth.js happy if it exists
+  if (window.auth && typeof window.auth.setSession === 'function') {
+    window.auth.setSession(user, token);
+  } else {
+    if (user) {
+      localStorage.setItem('currentUser', JSON.stringify(user));
+    }
+    if (token) {
+      localStorage.setItem('authToken', token);
+    }
+  }
+}
+
+function requireAuth() {
+  const token = getAuthToken();
+  if (!token) {
+    window.location.href = 'signup.html';
+    return null;
+  }
+  return token;
+}
+
+// === PROFILE PAGE LOGIC ===
 
 class ProfilePage {
   constructor() {
-    this.currentProfile = null;
+    this.user = null;
     this.currentTab = 'posts';
+    this.init();
   }
 
   async init() {
-    // If not logged in → signup
-    if (!this.isLoggedIn()) {
-      window.location.href = 'signup.html';
-      return;
-    }
+    const token = requireAuth();
+    if (!token) return;
 
-    this.cacheDom();
-    this.bindEvents();
-    await this.loadCurrentUserProfile();
+    this.cacheElements();
+    this.attachEvents();
+
+    await this.loadProfileFromApi(token);
+    await this.loadPosts();
   }
 
-  // ----- auth helpers -----
-  isLoggedIn() {
-    const token = this.getAuthToken();
-    return !!token;
-  }
-
-  getAuthToken() {
-    return localStorage.getItem('authToken');
-  }
-
-  getCurrentUserFromStorage() {
-    const raw = localStorage.getItem('currentUser');
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }
-
-  setCurrentUserInStorage(user) {
-    localStorage.setItem('currentUser', JSON.stringify(user));
-  }
-
-  // ----- DOM cache -----
-  cacheDom() {
-    this.displayNameEl = document.getElementById('profileDisplayName');
+  cacheElements() {
+    this.nameEl = document.getElementById('profileName');
     this.usernameEl = document.getElementById('profileUsername');
     this.bioEl = document.getElementById('profileBio');
-    this.joinDateEl = document.getElementById('joinDate');
-    this.postsCountEl = document.getElementById('postsCount');
-    this.followersCountEl = document.getElementById('followersCount');
-    this.followingCountEl = document.getElementById('followingCount');
+    this.joinedEl = document.getElementById('profileJoined');
+    this.postsCountEl = document.getElementById('profilePostsCount');
+    this.followersCountEl = document.getElementById('profileFollowersCount');
+    this.followingCountEl = document.getElementById('profileFollowingCount');
     this.avatarEl = document.getElementById('profileAvatar');
-    this.bannerEl = document.getElementById('profileBanner');
-    this.postsContainer = document.getElementById('profilePosts');
+
+    this.postsListEl = document.getElementById('profilePostsList');
+    this.likesListEl = document.getElementById('profileLikesList');
+    this.postsEmptyEl = document.getElementById('profilePostsEmpty');
+    this.likesEmptyEl = document.getElementById('profileLikesEmpty');
 
     // modal
     this.editModal = document.getElementById('editProfileModal');
     this.editDisplayNameInput = document.getElementById('editDisplayName');
     this.editBioInput = document.getElementById('editBio');
-    this.editAvatarUrlInput = document.getElementById('editAvatarUrl');
-    this.editBannerUrlInput = document.getElementById('editBannerUrl');
+    this.editAvatarInput = document.getElementById('editAvatarUrl');
     this.bioCharCounter = document.getElementById('bioCharCounter');
   }
 
-  // ----- events -----
-  bindEvents() {
-    // Tabs
-    const tabButtons = document.querySelectorAll('.tab-btn');
-    tabButtons.forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        const tab = e.currentTarget.getAttribute('data-tab');
-        this.switchTab(tab);
-      });
-    });
-
-    // Settings button → settings.html
-    const settingsButton = document.getElementById('settingsButton');
-    if (settingsButton) {
-      settingsButton.addEventListener('click', () => {
-        window.location.href = 'settings.html';
-      });
-    }
-
-    // Edit profile open
-    const editBtn = document.getElementById('editProfileButton');
+  attachEvents() {
+    // Edit profile button
+    const editBtn = document.getElementById('editProfileBtn');
     if (editBtn) {
       editBtn.addEventListener('click', () => this.openEditModal());
     }
 
-    // Close modal (X)
-    const closeModalBtn = document.getElementById('closeEditModal');
-    if (closeModalBtn) {
-      closeModalBtn.addEventListener('click', () => this.closeEditModal());
-    }
-
-    // Cancel button
-    const cancelBtn = document.getElementById('cancelEditBtn');
-    if (cancelBtn) {
-      cancelBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.closeEditModal();
+    // Settings gear
+    const settingsBtn = document.getElementById('settingsButton');
+    if (settingsBtn) {
+      settingsBtn.addEventListener('click', () => {
+        window.location.href = 'settings.html';
       });
     }
 
-    // Save profile
-    const saveBtn = document.getElementById('saveProfileBtn');
-    if (saveBtn) {
-      saveBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.saveProfile();
-      });
+    // Tabs
+    document.querySelectorAll('[data-tab]').forEach((btn) => {
+      btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
+    });
+
+    // Modal buttons
+    document.getElementById('closeEditModal')?.addEventListener('click', () =>
+      this.closeEditModal()
+    );
+    document.getElementById('cancelEditBtn')?.addEventListener('click', () =>
+      this.closeEditModal()
+    );
+    document.getElementById('saveProfileBtn')?.addEventListener('click', () =>
+      this.saveProfile()
+    );
+
+    // Bio char counter
+    if (this.editBioInput && this.bioCharCounter) {
+      this.editBioInput.addEventListener('input', () => this.updateBioCounter());
     }
 
-    // Bio counter
-    if (this.editBioInput) {
-      this.editBioInput.addEventListener('input', () =>
-        this.updateBioCharCounter()
-      );
-    }
-
-    // Close modal when clicking background
+    // Close modal when clicking backdrop
     if (this.editModal) {
       this.editModal.addEventListener('click', (e) => {
-        if (e.target === this.editModal) {
-          this.closeEditModal();
-        }
+        if (e.target === this.editModal) this.closeEditModal();
       });
     }
   }
 
-  // ----- load profile from backend -----
-  async loadCurrentUserProfile() {
+  async loadProfileFromApi(token) {
     try {
-      const token = this.getAuthToken();
       const res = await fetch(`${API_BASE_URL}/auth/me`, {
         headers: {
-          Authorization: `Bearer ${token}`,
-        },
+          Authorization: `Bearer ${token}`
+        }
       });
 
+      if (res.status === 401) {
+        // token invalid → force re-login
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('currentUser');
+        window.location.href = 'signup.html';
+        return;
+      }
+
       if (!res.ok) {
-        if (res.status === 401) {
-          // token invalid → send to signup
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('currentUser');
-          window.location.href = 'signup.html';
-          return;
-        }
         throw new Error('Failed to load profile');
       }
 
       const user = await res.json();
-      this.currentProfile = user;
-
-      // store simplified user for rest of the app
-      this.setCurrentUserInStorage({
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        display_name: user.display_name,
-        avatar_url: user.avatar_url,
-        banner_url: user.banner_url,
-        bio: user.bio,
-        created_at: user.created_at,
-        posts_count: user.posts_count,
-        followers_count: user.followers_count,
-        following_count: user.following_count,
-      });
+      this.user = user;
+      // refresh local session
+      setSession(user, token);
 
       this.renderProfile();
-      await this.loadProfilePosts(user.username);
     } catch (err) {
-      console.error(err);
-      this.showMessage('Failed to load profile', 'error');
+      console.error('Profile load error:', err);
+      this.showToast('Failed to load profile', 'error');
     }
   }
 
   renderProfile() {
-    if (!this.currentProfile) return;
-    const u = this.currentProfile;
+    if (!this.user) return;
 
-    if (this.displayNameEl) this.displayNameEl.textContent = u.display_name;
-    if (this.usernameEl) this.usernameEl.textContent = '@' + u.username;
+    const u = this.user;
+
+    if (this.nameEl) this.nameEl.textContent = u.display_name || u.username || 'User';
+    if (this.usernameEl) this.usernameEl.textContent = '@' + (u.username || 'username');
     if (this.bioEl) this.bioEl.textContent = u.bio || 'No bio yet.';
+    if (this.joinedEl) this.joinedEl.textContent = this.formatJoined(u.created_at);
 
-    if (this.joinDateEl) {
-      this.joinDateEl.textContent = this.formatJoinDate(u.created_at);
-    }
-
-    if (this.postsCountEl) this.postsCountEl.textContent = u.posts_count || 0;
-    if (this.followersCountEl)
-      this.followersCountEl.textContent = u.followers_count || 0;
-    if (this.followingCountEl)
-      this.followingCountEl.textContent = u.following_count || 0;
+    if (this.postsCountEl) this.postsCountEl.textContent = u.posts_count ?? 0;
+    if (this.followersCountEl) this.followersCountEl.textContent = u.followers_count ?? 0;
+    if (this.followingCountEl) this.followingCountEl.textContent = u.following_count ?? 0;
 
     if (this.avatarEl) {
       this.avatarEl.src = u.avatar_url || 'assets/icons/default-profile.png';
     }
-
-    if (this.bannerEl) {
-      if (u.banner_url) {
-        this.bannerEl.src = u.banner_url;
-        this.bannerEl.classList.remove('hidden');
-      } else {
-        this.bannerEl.src = '';
-        this.bannerEl.classList.add('hidden');
-      }
-    }
-
-    document.title = `${u.display_name} (@${u.username}) - UncensoredSocial`;
   }
 
-  async loadProfilePosts(username) {
-    if (!this.postsContainer) return;
+  async loadPosts() {
+    if (!this.user || !this.postsListEl) return;
 
-    this.postsContainer.innerHTML =
-      '<div class="loading-indicator">Loading posts…</div>';
-
+    // basic implementation: your backend has /api/users/:username/posts
     try {
+      this.postsListEl.innerHTML = '<div class="loading-indicator">Loading posts...</div>';
+      this.postsEmptyEl.style.display = 'none';
+
       const res = await fetch(
-        `${API_BASE_URL}/users/${encodeURIComponent(username)}/posts`
+        `${API_BASE_URL}/users/${encodeURIComponent(this.user.username)}/posts`
       );
-
-      if (!res.ok) throw new Error('Failed to load posts');
-
+      if (!res.ok) {
+        throw new Error('Failed to load posts');
+      }
       const posts = await res.json();
 
       if (!posts || posts.length === 0) {
-        this.postsContainer.innerHTML = `
-          <div class="empty-state">
-            <h3>No posts yet</h3>
-            <p>Share something on the home feed to see it here.</p>
-          </div>`;
+        this.postsListEl.innerHTML = '';
+        this.postsEmptyEl.style.display = 'block';
         return;
       }
 
-      let html = '';
-      posts.forEach((post) => (html += this.renderPostHtml(post)));
-      this.postsContainer.innerHTML = html;
+      this.postsListEl.innerHTML = posts
+        .map(
+          (p) => `
+        <article class="profile-post">
+          <div class="profile-post-content">
+            ${this.formatPostContent(p.content)}
+          </div>
+          <div class="profile-post-meta">
+            <span>${this.formatTimestamp(p.created_at)}</span>
+          </div>
+        </article>
+      `
+        )
+        .join('');
     } catch (err) {
-      console.error(err);
-      this.postsContainer.innerHTML = `
-        <div class="empty-state">
-          <h3>Couldn’t load posts</h3>
-          <p>Please try again in a moment.</p>
-        </div>`;
+      console.error('Profile posts error:', err);
+      this.postsListEl.innerHTML = '';
+      this.postsEmptyEl.style.display = 'block';
+      this.showToast('Failed to load posts', 'error');
     }
   }
 
-  renderPostHtml(post) {
-    const content = this.formatPostContent(post.content || '');
-    const time = this.formatTimestamp(post.created_at);
+  // ---- Tabs ----
+  switchTab(tab) {
+    this.currentTab = tab;
 
-    return `
-      <article class="profile-post" data-post-id="${post.id}">
-        <div class="post-content">
-          <p>${content}</p>
-        </div>
-        <div class="post-stats">
-          <span class="post-time">${time}</span>
-        </div>
-      </article>`;
-  }
-
-  // ----- tabs -----
-  switchTab(tabName) {
-    this.currentTab = tabName;
-
-    document.querySelectorAll('.tab-btn').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.tab === tabName);
+    document.querySelectorAll('[data-tab]').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    document.querySelectorAll('.profile-tab-pane').forEach((pane) => {
+      pane.classList.toggle('active', pane.dataset.tabPane === tab);
     });
 
-    document.querySelectorAll('.tab-pane').forEach((pane) => {
-      pane.classList.toggle('active', pane.id === `${tabName}Tab`);
-    });
-
-    if (tabName === 'posts' && this.currentProfile) {
-      this.loadProfilePosts(this.currentProfile.username);
-    }
+    // you can later add loading for likes here
   }
 
-  // ----- edit profile -----
+  // ---- Edit Profile Modal ----
+
   openEditModal() {
-    if (!this.currentProfile || !this.editModal) return;
+    if (!this.user || !this.editModal) return;
 
-    this.editDisplayNameInput.value = this.currentProfile.display_name || '';
-    this.editBioInput.value = this.currentProfile.bio || '';
-    this.editAvatarUrlInput.value = this.currentProfile.avatar_url || '';
-    this.editBannerUrlInput.value = this.currentProfile.banner_url || '';
-    this.updateBioCharCounter();
+    this.editDisplayNameInput.value = this.user.display_name || '';
+    this.editBioInput.value = this.user.bio || '';
+    this.editAvatarInput.value = this.user.avatar_url || '';
+    this.updateBioCounter();
 
     this.editModal.classList.add('open');
   }
@@ -300,79 +262,83 @@ class ProfilePage {
     if (this.editModal) this.editModal.classList.remove('open');
   }
 
-  updateBioCharCounter() {
+  updateBioCounter() {
     if (!this.editBioInput || !this.bioCharCounter) return;
-
-    const length = this.editBioInput.value.length;
-    this.bioCharCounter.textContent = `${length}/160`;
-
-    this.bioCharCounter.classList.remove('warning', 'error');
-    if (length > 160) this.bioCharCounter.classList.add('error');
-    else if (length > 140) this.bioCharCounter.classList.add('warning');
+    const len = this.editBioInput.value.length;
+    this.bioCharCounter.textContent = `${len}/160`;
+    this.bioCharCounter.classList.toggle('warning', len > 140 && len <= 160);
+    this.bioCharCounter.classList.toggle('error', len > 160);
   }
 
   async saveProfile() {
-    if (!this.currentProfile) return;
+    if (!this.user) return;
+    const token = getAuthToken();
+    if (!token) {
+      window.location.href = 'signup.html';
+      return;
+    }
 
-    const updates = {
-      display_name: this.editDisplayNameInput.value.trim(),
-      bio: this.editBioInput.value.trim(),
-      avatar_url: this.editAvatarUrlInput.value.trim(),
-      banner_url: this.editBannerUrlInput.value.trim(),
-    };
+    const display_name = this.editDisplayNameInput.value.trim();
+    const bio = this.editBioInput.value.trim();
+    const avatar_url = this.editAvatarInput.value.trim();
+
+    if (bio.length > 160) {
+      this.showToast('Bio must be 160 characters or less', 'error');
+      return;
+    }
 
     try {
-      const token = this.getAuthToken();
+      const saveBtn = document.getElementById('saveProfileBtn');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+      }
+
       const res = await fetch(`${API_BASE_URL}/auth/me`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(updates),
+        body: JSON.stringify({ display_name, bio, avatar_url })
       });
 
-      if (!res.ok) throw new Error('Failed to update profile');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to update profile');
+      }
 
       const updated = await res.json();
-      this.currentProfile = updated;
-
-      this.setCurrentUserInStorage({
-        id: updated.id,
-        username: updated.username,
-        email: updated.email,
-        display_name: updated.display_name,
-        avatar_url: updated.avatar_url,
-        banner_url: updated.banner_url,
-        bio: updated.bio,
-        created_at: updated.created_at,
-        posts_count: updated.posts_count,
-        followers_count: updated.followers_count,
-        following_count: updated.following_count,
-      });
-
+      this.user = updated;
+      setSession(updated, token);
       this.renderProfile();
       this.closeEditModal();
-      this.showMessage('Profile updated', 'success');
+      this.showToast('Profile updated', 'success');
     } catch (err) {
-      console.error(err);
-      this.showMessage('Failed to update profile', 'error');
+      console.error('Save profile error:', err);
+      this.showToast(err.message || 'Failed to update profile', 'error');
+    } finally {
+      const saveBtn = document.getElementById('saveProfileBtn');
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
+      }
     }
   }
 
-  // ----- formatting helpers -----
-  formatJoinDate(dateString) {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return 'Joined —';
-    return `Joined ${date.toLocaleDateString('en-US', {
+  // ---- Utility formatting ----
+
+  formatJoined(dateStr) {
+    if (!dateStr) return 'Joined —';
+    const d = new Date(dateStr);
+    return `Joined ${d.toLocaleDateString('en-US', {
       month: 'long',
-      year: 'numeric',
+      year: 'numeric'
     })}`;
   }
 
   formatTimestamp(timestamp) {
     if (!timestamp) return 'just now';
-
     const postDate = new Date(timestamp);
     const now = new Date();
     const diffMs = now - postDate;
@@ -384,49 +350,52 @@ class ProfilePage {
     if (diffMins < 60) return `${diffMins}m`;
     if (diffHours < 24) return `${diffHours}h`;
     if (diffDays < 7) return `${diffDays}d`;
-
     return postDate.toLocaleDateString();
   }
 
   formatPostContent(content) {
-    let text = content
+    if (!content) return '';
+    let safe = content
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
 
-    text = text.replace(
+    safe = safe.replace(
       /(https?:\/\/[^\s]+)/g,
       '<a href="$1" target="_blank" rel="noopener">$1</a>'
     );
-    text = text.replace(/#(\w+)/g, '<span class="hashtag">#$1</span>');
-    text = text.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+    safe = safe.replace(/#(\w+)/g, '<span class="hashtag">#$1</span>');
+    safe = safe.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
 
-    return text;
+    return safe;
   }
 
-  // ----- messages -----
-  showMessage(message, type = 'info') {
+  showToast(message, type = 'info') {
     const existing = document.querySelector('.status-message');
     if (existing) existing.remove();
 
     const div = document.createElement('div');
     div.className = `status-message status-${type}`;
     div.textContent = message;
-    div.style.position = 'fixed';
-    div.style.top = '20px';
-    div.style.left = '50%';
-    div.style.transform = 'translateX(-50%)';
-    div.style.zIndex = '10000';
-    div.style.maxWidth = '90%';
-
+    div.style.cssText = `
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10000;
+      max-width: 90%;
+    `;
     document.body.appendChild(div);
+
     setTimeout(() => {
       if (div.parentNode) div.parentNode.removeChild(div);
     }, 3000);
   }
 }
 
+// init
 document.addEventListener('DOMContentLoaded', () => {
-  const page = new ProfilePage();
-  page.init();
+  if (document.getElementById('profilePage')) {
+    new ProfilePage();
+  }
 });
