@@ -110,9 +110,9 @@
                 <h2>Edit Profile</h2>
                 <button class="profile-modal-close" id="closeEditProfileBtn" aria-label="Close">✕</button>
             </div>
+
             <div class="profile-modal-body">
                 <form id="editProfileForm">
-                    <!-- Display name -->
                     <label class="profile-form-label" for="editDisplayName">Display name</label>
                     <input
                         type="text"
@@ -121,7 +121,6 @@
                         maxlength="50"
                     />
 
-                    <!-- Bio -->
                     <label class="profile-form-label" for="editBio">Bio</label>
                     <textarea
                         id="editBio"
@@ -131,25 +130,23 @@
                     ></textarea>
                     <div id="bioCharCounter" class="profile-char-counter">0/160</div>
 
-                    <!-- Profile picture upload -->
-                    <label class="profile-form-label" for="editProfileImage">Profile picture</label>
+                    <!-- NEW: file inputs instead of URL text boxes -->
+                    <label class="profile-form-label" for="editAvatarFile">Profile picture</label>
                     <input
                         type="file"
-                        id="editProfileImage"
-                        class="profile-input"
+                        id="editAvatarFile"
                         accept="image/*"
+                        class="profile-input-file"
                     />
 
-                    <!-- Banner image upload -->
-                    <label class="profile-form-label" for="editBannerImage">Banner image</label>
+                    <label class="profile-form-label" for="editBannerFile">Banner image</label>
                     <input
                         type="file"
-                        id="editBannerImage"
-                        class="profile-input"
+                        id="editBannerFile"
                         accept="image/*"
+                        class="profile-input-file"
                     />
 
-                    <!-- Actions -->
                     <div class="profile-modal-actions">
                         <button type="button" class="btn btn-secondary" id="cancelEditProfileBtn">
                             Cancel
@@ -159,7 +156,6 @@
                         </button>
                     </div>
 
-                    <!-- Status messages -->
                     <p id="editProfileError" class="profile-error-message hidden"></p>
                     <p id="editProfileSuccess" class="profile-success-message hidden"></p>
                 </form>
