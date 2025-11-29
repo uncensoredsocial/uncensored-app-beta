@@ -10,6 +10,7 @@ class FeedManager {
   constructor() {
     this.posts = [];
     this.isLoading = false;
+    this.currentTab = 'recent'; // 'recent' | 'popular'
   }
 
   async init() {
@@ -28,6 +29,13 @@ class FeedManager {
     this.charCounter = document.getElementById('charCounter');
     this.postCreation = document.getElementById('postCreation');
     this.guestMessage = document.getElementById('guestMessage');
+
+    // NEW: composer avatars
+    this.postUserAvatar = document.getElementById('postUserAvatar');
+    this.postUserAvatarSmall = document.getElementById('postUserAvatarSmall');
+
+    // NEW: feed tabs
+    this.feedTabButtons = document.querySelectorAll('.feed-tab-btn');
   }
 
   /* ----------------------- EVENTS ----------------------- */
@@ -55,6 +63,16 @@ class FeedManager {
         this.handleCreatePost();
       });
     }
+
+    // NEW: Recent / Popular tabs
+    if (this.feedTabButtons && this.feedTabButtons.length) {
+      this.feedTabButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const tab = btn.dataset.tab || 'recent';
+          this.switchTab(tab);
+        });
+      });
+    }
   }
 
   /* ----------------------- AUTH / UI ----------------------- */
@@ -78,6 +96,22 @@ class FeedManager {
     // Optional: show / hide "Join the Conversation"
     if (this.guestMessage) {
       this.guestMessage.style.display = loggedIn ? 'none' : 'block';
+    }
+
+    // NEW: update composer avatars from current user
+    if (loggedIn && typeof getCurrentUser === 'function') {
+      const user = getCurrentUser();
+      const avatarUrl =
+        user && user.avatar_url
+          ? user.avatar_url
+          : 'assets/icons/default-profile.png';
+
+      if (this.postUserAvatar) {
+        this.postUserAvatar.src = avatarUrl;
+      }
+      if (this.postUserAvatarSmall) {
+        this.postUserAvatarSmall.src = avatarUrl;
+      }
     }
 
     this.updatePostButtonState();
@@ -167,12 +201,65 @@ class FeedManager {
     this.isLoading = false;
   }
 
+  /* ----------------------- TABS / FILTERING ----------------------- */
+
+  switchTab(tab) {
+    if (tab !== 'recent' && tab !== 'popular') {
+      tab = 'recent';
+    }
+    this.currentTab = tab;
+
+    if (this.feedTabButtons && this.feedTabButtons.length) {
+      this.feedTabButtons.forEach((btn) => {
+        const btnTab = btn.dataset.tab || 'recent';
+        btn.classList.toggle('active', btnTab === this.currentTab);
+      });
+    }
+
+    this.renderPosts();
+  }
+
+  getPostsForCurrentTab() {
+    // Recent: just return in API order (newest first)
+    if (this.currentTab === 'recent') {
+      return this.posts.slice();
+    }
+
+    // Popular: sort by like count, then newest first
+    const arr = this.posts.slice();
+
+    arr.sort((a, b) => {
+      const aLikes =
+        typeof a.likes === 'number'
+          ? a.likes
+          : Array.isArray(a.likes)
+          ? a.likes.length
+          : a.like_count ?? 0;
+      const bLikes =
+        typeof b.likes === 'number'
+          ? b.likes
+          : Array.isArray(b.likes)
+          ? b.likes.length
+          : b.like_count ?? 0;
+
+      if (bLikes !== aLikes) return bLikes - aLikes;
+
+      const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return bTime - aTime;
+    });
+
+    return arr;
+  }
+
   renderPosts() {
     if (!this.feedContainer) return;
 
+    const postsToRender = this.getPostsForCurrentTab();
+
     this.feedContainer.innerHTML = '';
 
-    this.posts.forEach((post) => {
+    postsToRender.forEach((post) => {
       this.feedContainer.appendChild(this.createPostElement(post));
     });
   }
@@ -215,15 +302,15 @@ class FeedManager {
 
       // Prepend new post locally
       this.posts.unshift(newPost);
-      if (this.feedContainer) {
-        const el = this.createPostElement(newPost);
-        this.feedContainer.prepend(el);
-      }
 
+      // Clear composer
       this.postInput.value = '';
       this.updateCharCounter();
       this.updatePostButtonState();
       this.showToast('Posted!', 'success');
+
+      // Re-render according to current tab (so Popular updates too)
+      this.renderPosts();
     } catch (err) {
       console.error('handleCreatePost error:', err);
       this.showToast(err.message || 'Error creating post', 'error');
@@ -245,15 +332,14 @@ class FeedManager {
     const displayName = user.display_name || user.username || 'Unknown';
     const username = user.username || 'user';
     const createdAt = post.created_at ? new Date(post.created_at) : null;
-    const timeLabel = createdAt
-      ? createdAt.toLocaleString()
-      : '';
+    const timeLabel = createdAt ? createdAt.toLocaleString() : '';
 
-    const likeCount = typeof post.likes === 'number'
-      ? post.likes
-      : Array.isArray(post.likes)
-      ? post.likes.length
-      : 0;
+    const likeCount =
+      typeof post.likes === 'number'
+        ? post.likes
+        : Array.isArray(post.likes)
+        ? post.likes.length
+        : post.like_count ?? 0;
 
     const commentsCount = post.comments_count || 0;
 
@@ -301,7 +387,7 @@ class FeedManager {
           </button>
         </div>
       </footer>
-    `;
+    */
 
     // Wire up buttons
     const likeBtn = div.querySelector('.post-like-btn');
