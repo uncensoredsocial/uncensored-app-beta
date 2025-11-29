@@ -452,3 +452,11 @@
 .post-action-btn.liked .post-action-icon {
     transform: translateY(0);
 }
+/* --- Make entire post clickable when used for post detail pages --- */
+.post-clickable {
+    cursor: pointer;
+}
+
+.post-clickable:hover {
+    background: var(--hover-color);
+}
