@@ -10,11 +10,10 @@
     <link rel="stylesheet" href="css/icons.css" />
 </head>
 <body class="profile-page-body">
-    <!-- Top bar (simple) -->
+    <!-- Top bar -->
     <header class="profile-header-bar">
         <h1 class="profile-header-title">Profile</h1>
         <button class="profile-header-settings" id="settingsButton" aria-label="Settings">
-            <!-- you can swap this for your icon font class -->
             ⚙️
         </button>
     </header>
@@ -113,6 +112,7 @@
             </div>
             <div class="profile-modal-body">
                 <form id="editProfileForm">
+                    <!-- Display name -->
                     <label class="profile-form-label" for="editDisplayName">Display name</label>
                     <input
                         type="text"
@@ -121,6 +121,7 @@
                         maxlength="50"
                     />
 
+                    <!-- Bio -->
                     <label class="profile-form-label" for="editBio">Bio</label>
                     <textarea
                         id="editBio"
@@ -130,23 +131,25 @@
                     ></textarea>
                     <div id="bioCharCounter" class="profile-char-counter">0/160</div>
 
-                    <!-- Simple URL fields for now; real uploads can come later -->
-                    <label class="profile-form-label" for="editAvatarUrl">Avatar URL (optional)</label>
+                    <!-- Profile picture upload -->
+                    <label class="profile-form-label" for="editProfileImage">Profile picture</label>
                     <input
-                        type="url"
-                        id="editAvatarUrl"
+                        type="file"
+                        id="editProfileImage"
                         class="profile-input"
-                        placeholder="https://..."
+                        accept="image/*"
                     />
 
-                    <label class="profile-form-label" for="editBannerUrl">Banner URL (optional)</label>
+                    <!-- Banner image upload -->
+                    <label class="profile-form-label" for="editBannerImage">Banner image</label>
                     <input
-                        type="url"
-                        id="editBannerUrl"
+                        type="file"
+                        id="editBannerImage"
                         class="profile-input"
-                        placeholder="https://..."
+                        accept="image/*"
                     />
 
+                    <!-- Actions -->
                     <div class="profile-modal-actions">
                         <button type="button" class="btn btn-secondary" id="cancelEditProfileBtn">
                             Cancel
@@ -156,6 +159,7 @@
                         </button>
                     </div>
 
+                    <!-- Status messages -->
                     <p id="editProfileError" class="profile-error-message hidden"></p>
                     <p id="editProfileSuccess" class="profile-success-message hidden"></p>
                 </form>
