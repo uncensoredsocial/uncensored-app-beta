@@ -344,3 +344,48 @@
         justify-content: space-between;
     }
 }
+
+/* --- Post Action Buttons (Like, Comment, Save, Share) --- */
+
+.post-actions {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-top: 8px;
+    font-size: 14px;
+}
+
+.post-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    color: #8899a6; /* soft gray */
+    border: none;
+    background: transparent;
+    padding: 4px 0;
+    font: inherit;
+}
+
+.post-action-btn .icon {
+    font-size: 18px;
+}
+
+/* Temporary emoji-style icons (you can swap with real SVG later) */
+.icon-like::before {
+    content: "♥";
+}
+.icon-comment::before {
+    content: "💬";
+}
+.icon-save::before {
+    content: "🔖";
+}
+.icon-share::before {
+    content: "⤴";
+}
+
+.post-action-btn.liked,
+.post-action-btn.saved {
+    color: #1d9bf0; /* Twitter blue for 'active' */
+}
