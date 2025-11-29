@@ -24,7 +24,7 @@ class ProfilePage {
             this.setUser(localUser);
         }
 
-        // Try to refresh from backend (if this fails, we just log, no scary banner)
+        // Try to refresh from backend
         await this.fetchCurrentUser();
         await this.fetchUserPosts();
     }
@@ -123,7 +123,6 @@ class ProfilePage {
             });
 
             if (!res.ok) {
-                // Don't scare the user; just log it
                 const msg = await res.text();
                 console.warn('auth/me failed:', res.status, msg);
                 return;
@@ -182,26 +181,58 @@ class ProfilePage {
         }
     }
 
+    /* ---------------- RENDER POSTS (feed-style) ---------------- */
+
     renderPosts() {
+        if (!this.postsContainer) return;
         this.postsContainer.innerHTML = '';
+
+        const user = this.user || {};
+        const avatar = user.avatar_url || 'assets/icons/default-profile.png';
+        const displayName = user.display_name || user.username || 'User';
+        const username = user.username || 'username';
+
         this.posts.forEach((post) => {
             const div = document.createElement('div');
-            div.className = 'profile-post-item';
-            const date = new Date(post.created_at);
-            const dateStr = date.toLocaleString(undefined, {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit'
-            });
+            div.className = 'post';
+            div.dataset.postId = post.id;
+
+            // optional timestamp formatting
+            let timeStr = '';
+            if (post.created_at) {
+                const d = new Date(post.created_at);
+                if (!Number.isNaN(d.getTime())) {
+                    timeStr = d.toLocaleString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit'
+                    });
+                }
+            }
 
             div.innerHTML = `
-                <div class="profile-post-header">
-                    <span class="profile-post-date">${dateStr}</span>
+                <div class="post-header">
+                    <img src="${avatar}" class="post-user-avatar" alt="${this.escapeHtml(displayName)}">
+                    <div class="post-user-info">
+                        <div class="post-display-name">${this.escapeHtml(displayName)}</div>
+                        <div class="post-username">@${this.escapeHtml(username)}</div>
+                        ${timeStr ? `<div class="post-meta">${this.escapeHtml(timeStr)}</div>` : ''}
+                    </div>
                 </div>
-                <div class="profile-post-content">${this.escapeHtml(post.content)}</div>
+
+                <div class="post-content">
+                    ${this.escapeHtml(post.content || '')}
+                </div>
+
+                <div class="post-actions">
+                    <!-- These match the feed markup; you can later wire them to like/comment APIs -->
+                    <span>❤️ 0</span>
+                    <span>💬 0</span>
+                </div>
             `;
+
             this.postsContainer.appendChild(div);
         });
     }
@@ -254,11 +285,9 @@ class ProfilePage {
         this.editDisplayNameInput.value = this.user.display_name || '';
         this.editBioInput.value = this.user.bio || '';
 
-        // reset file inputs
         if (this.avatarFileInput) this.avatarFileInput.value = '';
         if (this.bannerFileInput) this.bannerFileInput.value = '';
 
-        // reset messages
         this.editErrorEl.classList.add('hidden');
         this.editSuccessEl.classList.add('hidden');
 
@@ -294,12 +323,10 @@ class ProfilePage {
             let avatar_url = this.user.avatar_url || null;
             let banner_url = this.user.banner_url || null;
 
-            // Upload profile picture if selected
             if (this.avatarFileInput && this.avatarFileInput.files[0]) {
                 avatar_url = await this.uploadImageFile(this.avatarFileInput.files[0], 'avatar');
             }
 
-            // Upload banner if selected
             if (this.bannerFileInput && this.bannerFileInput.files[0]) {
                 banner_url = await this.uploadImageFile(this.bannerFileInput.files[0], 'banner');
             }
@@ -345,10 +372,7 @@ class ProfilePage {
         }
     }
 
-    /* ---------------- Upload helper ---------------- */
-
     async uploadImageFile(file, kind) {
-        // kind: 'avatar' | 'banner'
         const base64 = await this.readFileAsBase64(file);
 
         const res = await fetch(`${PROFILE_API_BASE_URL}/profile/upload-image`, {
@@ -376,7 +400,6 @@ class ProfilePage {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => {
-                // reader.result is "data:<mime>;base64,<...>"
                 const result = reader.result || '';
                 const commaIndex = result.indexOf(',');
                 if (commaIndex === -1) return resolve(result);
@@ -387,8 +410,6 @@ class ProfilePage {
         });
     }
 
-    /* ---------------- Tabs ---------------- */
-
     switchTab(tabName) {
         this.tabButtons.forEach((btn) => {
             btn.classList.toggle('active', btn.dataset.tab === tabName);
@@ -397,8 +418,6 @@ class ProfilePage {
         this.postsTabPane.classList.toggle('active', tabName === 'posts');
         this.likesTabPane.classList.toggle('active', tabName === 'likes');
     }
-
-    /* ---------------- Helpers ---------------- */
 
     formatJoinDate(dateString) {
         if (!dateString) return 'Joined —';
