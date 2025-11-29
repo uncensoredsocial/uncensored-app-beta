@@ -1,103 +1,193 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign Up - Social Platform</title>
-    <link rel="stylesheet" href="css/styles.css">
-    <link rel="stylesheet" href="css/auth-styles.css">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Join Social</title>
+
+    <link rel="stylesheet" href="css/auth-styles.css" />
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: #fff;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        .auth-page {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        /* App Title */
+        .auth-title {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .auth-title span {
+            color: #1d9bf0;
+        }
+
+        .auth-card {
+            width: 100%;
+            max-width: 420px;
+            background: #111;
+            border: 1px solid #222;
+            padding: 32px;
+            border-radius: 16px;
+            box-shadow: 0 0 25px rgba(0,0,0,0.6);
+        }
+
+        .auth-card h2 {
+            text-align: center;
+            font-size: 28px;
+            margin-bottom: 6px;
+        }
+
+        .auth-subtitle {
+            text-align: center;
+            opacity: 0.7;
+            margin-bottom: 24px;
+        }
+
+        .input-group {
+            width: 100%;
+            margin-bottom: 18px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 6px;
+            opacity: 0.8;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            background: #000;
+            color: #fff;
+            font-size: 16px;
+            outline: none;
+            transition: 0.2s;
+        }
+
+        .input-group input:focus {
+            border-color: #1d9bf0;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .checkbox-group input {
+            width: 18px;
+            height: 18px;
+        }
+
+        .auth-btn {
+            width: 100%;
+            padding: 14px;
+            background: #1d9bf0;
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-top: 10px;
+        }
+
+        .auth-btn:active {
+            transform: scale(0.98);
+        }
+
+        .auth-switch {
+            text-align: center;
+            margin-top: 18px;
+            opacity: 0.75;
+            font-size: 15px;
+        }
+
+        .auth-switch a {
+            color: #9b6bff;
+            font-weight: 600;
+            margin-left: 4px;
+            text-decoration: none;
+        }
+
+        .auth-switch a:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
+
 <body>
-    <div class="auth-container">
+    <div class="auth-page">
+
+        <!-- App Title -->
+        <h1 class="auth-title">Uncensored<span>Social</span></h1>
+
+        <!-- Signup Card -->
         <div class="auth-card">
-            <h1 class="auth-title">Join Social</h1>
-            <p class="auth-subtitle">The private social network</p>
-            
-            <!-- ID changed to signup-form to match auth.js -->
-            <form id="signupForm" class="auth-form" onsubmit="return handleSignup(event)">
-                <div class="form-group">
-                    <label for="displayName">Display Name</label>
-                    <input
-                        type="text"
-                        id="displayName"
-                        name="displayName"
-                        required
-                        placeholder="How people will see you"
-                    >
-                </div>
+            <h2>Join Social</h2>
+            <p class="auth-subtitle">Create your private account</p>
+
+            <form id="signupForm">
                 
-                <div class="form-group">
-                    <label for="username">Username</label>
-                    <input
-                        type="text"
-                        id="username"
-                        name="username"
-                        required
-                        placeholder="Your unique handle"
-                    >
-                    <small>This will be your @username</small>
+                <div class="input-group">
+                    <label>Display Name</label>
+                    <input type="text" id="displayName" placeholder="How people will see you" required>
                 </div>
-                
-                <div class="form-group">
-                    <label for="email">Email</label>
-                    <input
-                        type="email"
-                        id="email"
-                        name="email"
-                        required
-                        placeholder="your@email.com"
-                    >
+
+                <div class="input-group">
+                    <label>Username</label>
+                    <input type="text" id="username" placeholder="Your unique handle" required>
                 </div>
-                
-                <div class="form-group">
-                    <label for="password">Password</label>
-                    <input
-                        type="password"
-                        id="password"
-                        name="password"
-                        required
-                        minlength="6"
-                        placeholder="At least 6 characters"
-                    >
+
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="email" placeholder="your@email.com" required>
                 </div>
-                
-                <div class="form-group">
-                    <label for="confirmPassword">Confirm Password</label>
-                    <input
-                        type="password"
-                        id="confirmPassword"
-                        name="confirmPassword"
-                        required
-                        placeholder="Enter your password again"
-                    >
+
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="password" placeholder="At least 6 characters" required>
                 </div>
-                
-                <div class="form-group checkbox-group">
-                    <input
-                        type="checkbox"
-                        id="privacyPolicy"
-                        name="privacyPolicy"
-                        required
-                    >
-                    <label for="privacyPolicy">
-                        I agree to the
-                        <a href="privacy.html" target="_blank">Privacy Policy</a>
-                        and
-                        <a href="terms.html" target="_blank">Terms of Service</a>
-                    </label>
+
+                <div class="input-group">
+                    <label>Confirm Password</label>
+                    <input type="password" id="confirmPassword" placeholder="Enter password again" required>
                 </div>
-                
-                <button type="submit" class="auth-btn" id="signupBtn">
-                    Create Account
-                </button>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="agree" required>
+                    <label for="agree">I agree to the <a href="#">Privacy Policy</a> & <a href="#">Terms of Service</a></label>
+                </div>
+
+                <button type="submit" class="auth-btn">Create Account</button>
+
             </form>
-            
-            <div class="auth-links">
-                <p>Already have an account? <a href="login.html">Log in</a></p>
-            </div>
-            
-            <div id="errorMessage" class="error-message hidden"></div>
-            <div id="successMessage" class="success-message hidden"></div>
+
+            <p class="auth-switch">
+                Already have an account? <a href="login.html">Log in</a>
+            </p>
         </div>
     </div>
 
