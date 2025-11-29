@@ -1,5 +1,6 @@
 // js/feed.js
-// NOTE: API_BASE_URL comes from auth.js – do NOT redeclare it here.
+
+const API_BASE_URL = "https://uncensored-app-beta-production.up.railway.app/api";
 
 class FeedManager {
     constructor() {
@@ -11,8 +12,6 @@ class FeedManager {
         this.cacheDom();
         this.bindEvents();
         this.updateAuthUI();
-        this.updateCharCounter();       // make sure 0/280 shows correctly
-        this.updatePostButtonState();   // sync button with current text/login
         await this.loadPosts();
     }
 
@@ -22,7 +21,6 @@ class FeedManager {
         this.postButton = document.getElementById("postButton");
         this.charCounter = document.getElementById("charCounter");
         this.postCreation = document.getElementById("postCreation");
-        this.guestMessage = document.getElementById("guestMessage");
     }
 
     bindEvents() {
@@ -45,6 +43,36 @@ class FeedManager {
                 this.handleCreatePost();
             });
         }
+
+        // NEW: delegated click handlers for like/comment/share
+        if (this.feedContainer) {
+            this.feedContainer.addEventListener("click", (e) => {
+                const likeBtn = e.target.closest(".like-btn");
+                const commentBtn = e.target.closest(".comment-btn");
+                const shareBtn = e.target.closest(".share-btn");
+
+                if (likeBtn) {
+                    const postEl = likeBtn.closest(".post");
+                    const postId = postEl?.dataset.postId;
+                    if (postId) this.toggleLike(postId, likeBtn);
+                    return;
+                }
+
+                if (commentBtn) {
+                    const postEl = commentBtn.closest(".post");
+                    const postId = postEl?.dataset.postId;
+                    if (postId) this.openPostComments(postId);
+                    return;
+                }
+
+                if (shareBtn) {
+                    const postEl = shareBtn.closest(".post");
+                    const postId = postEl?.dataset.postId;
+                    if (postId) this.sharePost(postId);
+                    return;
+                }
+            });
+        }
     }
 
     /* ----------------------- AUTH / UI ----------------------- */
@@ -57,11 +85,6 @@ class FeedManager {
             this.postCreation.style.display = loggedIn ? "block" : "none";
         }
 
-        // Show or hide guest message
-        if (this.guestMessage) {
-            this.guestMessage.style.display = loggedIn ? "none" : "block";
-        }
-
         this.updatePostButtonState();
     }
 
@@ -72,11 +95,8 @@ class FeedManager {
         this.charCounter.textContent = `${length}/280`;
 
         this.charCounter.classList.remove("warning", "error");
-        if (length > 280) {
-            this.charCounter.classList.add("error");
-        } else if (length > 240) {
-            this.charCounter.classList.add("warning");
-        }
+        if (length > 280) this.charCounter.classList.add("error");
+        else if (length > 240) this.charCounter.classList.add("warning");
     }
 
     updatePostButtonState() {
@@ -85,7 +105,8 @@ class FeedManager {
         const text = this.postInput.value.trim();
         const loggedIn = typeof isLoggedIn === "function" ? isLoggedIn() : false;
 
-        this.postButton.disabled = !loggedIn || text.length === 0 || text.length > 280;
+        this.postButton.disabled =
+            !loggedIn || text.length === 0 || text.length > 280;
     }
 
     setPostButtonLoading(loading) {
@@ -123,7 +144,6 @@ class FeedManager {
                         <p>Be the first to post something!</p>
                     </div>
                 `;
-                this.isLoading = false;
                 return;
             }
 
@@ -136,16 +156,13 @@ class FeedManager {
                     <p>Please try again later.</p>
                 </div>
             `;
+        } finally {
+            this.isLoading = false;
         }
-
-        this.isLoading = false;
     }
 
     renderPosts() {
-        if (!this.feedContainer) return;
-
         this.feedContainer.innerHTML = "";
-
         this.posts.forEach((post) => {
             this.feedContainer.appendChild(this.createPostElement(post));
         });
@@ -159,6 +176,12 @@ class FeedManager {
         const text = this.postInput.value.trim();
         if (!text || text.length > 280) return;
 
+        const loggedIn = typeof isLoggedIn === "function" ? isLoggedIn() : false;
+        if (!loggedIn) {
+            window.location.href = "login.html";
+            return;
+        }
+
         this.setPostButtonLoading(true);
 
         try {
@@ -166,26 +189,22 @@ class FeedManager {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${getAuthToken ? getAuthToken() : ""}`
+                    Authorization: `Bearer ${getAuthToken()}`
                 },
                 body: JSON.stringify({ content: text })
             });
 
-            const data = await res.json().catch(() => ({}));
-
             if (!res.ok) {
-                alert(data.error || "Error creating post");
-                this.setPostButtonLoading(false);
+                const error = await res.json().catch(() => ({}));
+                alert(error.error || "Error creating post");
                 return;
             }
 
-            const newPost = data;
+            const newPost = await res.json();
 
             // prepend new post
             this.posts.unshift(newPost);
-            if (this.feedContainer) {
-                this.feedContainer.prepend(this.createPostElement(newPost));
-            }
+            this.feedContainer.prepend(this.createPostElement(newPost));
 
             this.postInput.value = "";
             this.updateCharCounter();
@@ -193,9 +212,76 @@ class FeedManager {
         } catch (err) {
             console.error(err);
             alert("Error creating post");
+        } finally {
+            this.setPostButtonLoading(false);
+        }
+    }
+
+    /* ----------------------- LIKE / COMMENT / SHARE ----------------------- */
+
+    async toggleLike(postId, buttonEl) {
+        const loggedIn = typeof isLoggedIn === "function" ? isLoggedIn() : false;
+        if (!loggedIn) {
+            window.location.href = "login.html";
+            return;
         }
 
-        this.setPostButtonLoading(false);
+        try {
+            buttonEl.disabled = true;
+
+            const res = await fetch(`${API_BASE_URL}/posts/${postId}/like`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${getAuthToken()}`
+                }
+            });
+
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                console.error("Like error:", data);
+                return;
+            }
+
+            // update UI
+            const countSpan = buttonEl.querySelector(".post-action-count");
+            if (countSpan) {
+                countSpan.textContent = data.likes ?? 0;
+            }
+            buttonEl.classList.toggle("liked", !!data.liked);
+        } catch (err) {
+            console.error("toggleLike error:", err);
+        } finally {
+            buttonEl.disabled = false;
+        }
+    }
+
+    openPostComments(postId) {
+        // For now, send them to a post detail page (you can build post.html later)
+        window.location.href = `post.html?id=${encodeURIComponent(postId)}`;
+    }
+
+    async sharePost(postId) {
+        const url = `${window.location.origin}/post.html?id=${encodeURIComponent(
+            postId
+        )}`;
+
+        try {
+            if (navigator.share) {
+                await navigator.share({
+                    title: "UncensoredSocial",
+                    text: "Check out this post",
+                    url
+                });
+            } else if (navigator.clipboard) {
+                await navigator.clipboard.writeText(url);
+                alert("Link copied to clipboard");
+            } else {
+                alert(url);
+            }
+        } catch (err) {
+            console.error("sharePost error:", err);
+        }
     }
 
     /* ----------------------- POST ELEMENT ----------------------- */
@@ -203,16 +289,47 @@ class FeedManager {
     createPostElement(post) {
         const div = document.createElement("div");
         div.className = "post";
+        div.dataset.postId = post.id;
 
         const user = post.user || {};
         const avatar = user.avatar_url || "assets/icons/default-profile.png";
 
+        const currentUser =
+            typeof getCurrentUser === "function" ? getCurrentUser() : null;
+
+        const likeCount = Array.isArray(post.post_likes)
+            ? post.post_likes.length
+            : post.likes || 0;
+
+        const commentCount = Array.isArray(post.comments)
+            ? post.comments.length
+            : post.comment_count || 0;
+
+        const likedByCurrentUser =
+            currentUser &&
+            Array.isArray(post.post_likes) &&
+            post.post_likes.some((l) => l.user_id === currentUser.id);
+
+        const created = post.created_at ? new Date(post.created_at) : null;
+        const timestamp = created
+            ? created.toLocaleString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit"
+              })
+            : "";
+
         div.innerHTML = `
             <div class="post-header">
-                <img src="${avatar}" class="post-user-avatar" alt="${user.display_name || "User"}">
+                <img src="${avatar}" class="post-user-avatar" alt="Avatar">
                 <div class="post-user-info">
-                    <div class="post-display-name">${this.escape(user.display_name || "Unknown")}</div>
-                    <div class="post-username">@${this.escape(user.username || "user")}</div>
+                    <div class="post-display-name">${this.escape(
+                        user.display_name || "Unknown"
+                    )}</div>
+                    <div class="post-username">@${this.escape(
+                        user.username || "user"
+                    )}</div>
                 </div>
             </div>
 
@@ -220,9 +337,23 @@ class FeedManager {
                 ${this.escape(post.content || "")}
             </div>
 
-            <div class="post-actions">
-                <span>❤️ ${post.likes_count ?? post.likes?.length ?? 0}</span>
-                <span>💬 ${post.comments_count ?? post.comments?.length ?? 0}</span>
+            <div class="post-footer">
+                <span class="post-timestamp">${timestamp}</span>
+                <div class="post-actions">
+                    <button class="post-action-btn like-btn ${
+                        likedByCurrentUser ? "liked" : ""
+                    }" type="button" aria-label="Like">
+                        <span class="post-action-icon">♥</span>
+                        <span class="post-action-count">${likeCount}</span>
+                    </button>
+                    <button class="post-action-btn comment-btn" type="button" aria-label="Comment">
+                        <span class="post-action-icon">💬</span>
+                        <span class="post-action-count">${commentCount}</span>
+                    </button>
+                    <button class="post-action-btn share-btn" type="button" aria-label="Share">
+                        <span class="post-action-icon">⤴</span>
+                    </button>
+                </div>
             </div>
         `;
 
@@ -247,13 +378,6 @@ class FeedManager {
 document.addEventListener("DOMContentLoaded", () => {
     if (document.getElementById("feedContainer")) {
         window.feedManager = new FeedManager();
-        window.feedManager.init();
+        feedManager.init();
     }
 });
-
-// Global refresh for header button
-window.refreshFeed = function () {
-    if (window.feedManager) {
-        window.feedManager.loadPosts();
-    }
-};
