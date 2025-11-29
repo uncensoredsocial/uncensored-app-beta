@@ -28,14 +28,17 @@ app.use(
   cors({
     origin: [
       'https://spepdb.github.io', // your GitHub Pages frontend
-      'https://uncensored-app-beta-production.up.railway.app' // backend origin for tests / health
+      'https://uncensored-app-beta-production.up.railway.app' // backend origin / health
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
   })
 );
 
-// --- Auth helpers ---
+// ======================================================
+//                    AUTH HELPERS
+// ======================================================
+
 function signToken(user) {
   const payload = { id: user.id, username: user.username, email: user.email };
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -59,14 +62,51 @@ function authMiddleware(req, res, next) {
   }
 }
 
-// --- Utility: profile stats (posts/followers/following) ---
+// Admin / moderator check
+async function adminMiddleware(req, res, next) {
+  try {
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id, is_admin, is_moderator')
+      .eq('id', req.user.id)
+      .single();
+
+    if (error || !user) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    if (!user.is_admin && !user.is_moderator) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    req.admin = user;
+    next();
+  } catch (err) {
+    console.error('adminMiddleware error:', err);
+    return res.status(500).json({ error: 'Admin check failed' });
+  }
+}
+
+// Profile stats helper
 async function getUserStats(userId) {
-  const [{ count: postsCount }, { count: followersCount }, { count: followingCount }] =
-    await Promise.all([
-      supabase.from('posts').select('*', { count: 'exact', head: true }).eq('user_id', userId),
-      supabase.from('follows').select('*', { count: 'exact', head: true }).eq('followed_id', userId),
-      supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', userId)
-    ]);
+  const [
+    { count: postsCount },
+    { count: followersCount },
+    { count: followingCount }
+  ] = await Promise.all([
+    supabase
+      .from('posts')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId),
+    supabase
+      .from('follows')
+      .select('*', { count: 'exact', head: true })
+      .eq('followed_id', userId),
+    supabase
+      .from('follows')
+      .select('*', { count: 'exact', head: true })
+      .eq('follower_id', userId)
+  ]);
 
   return {
     posts_count: postsCount || 0,
@@ -76,10 +116,9 @@ async function getUserStats(userId) {
 }
 
 // ======================================================
-//                    AUTH ROUTES
+//                    HEALTH CHECK
 // ======================================================
 
-// Health check
 app.get('/api/health', async (req, res) => {
   try {
     const { count } = await supabase
@@ -96,6 +135,10 @@ app.get('/api/health', async (req, res) => {
     res.status(500).json({ status: 'ERROR' });
   }
 });
+
+// ======================================================
+//                    AUTH ROUTES
+// ======================================================
 
 // Signup
 app.post('/api/auth/signup', async (req, res) => {
@@ -135,7 +178,9 @@ app.post('/api/auth/signup', async (req, res) => {
       banner_url: null,
       bio: '',
       created_at: now,
-      last_login_at: now
+      last_login_at: now,
+      is_admin: false,
+      is_moderator: false
     };
 
     const { data: inserted, error: insertError } = await supabase
@@ -172,21 +217,21 @@ app.post('/api/auth/signup', async (req, res) => {
   }
 });
 
-// Login (email or username + password)
+// Login (identifier = email OR username)
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { identifier, password } = req.body; // identifier = email OR username
+    const { identifier, password } = req.body;
 
     if (!identifier || !password) {
       return res.status(400).json({ error: 'Missing email/username or password' });
     }
 
     const isEmail = identifier.includes('@');
-    const query = supabase.from('users').select('*').limit(1);
+    const baseQuery = supabase.from('users').select('*').limit(1);
 
     const { data, error: userError } = isEmail
-      ? await query.eq('email', identifier)
-      : await query.eq('username', identifier);
+      ? await baseQuery.eq('email', identifier)
+      : await baseQuery.eq('username', identifier);
 
     if (userError || !data || data.length === 0) {
       return res.status(400).json({ error: 'Invalid credentials' });
@@ -228,12 +273,12 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Get current user (for profile / app.js)
+// Get current user
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
   try {
     const { data: user, error } = await supabase
       .from('users')
-      .select('id,username,email,display_name,avatar_url,banner_url,bio,created_at')
+      .select('id,username,email,display_name,avatar_url,banner_url,bio,created_at,is_admin,is_moderator')
       .eq('id', req.user.id)
       .single();
 
@@ -268,7 +313,7 @@ app.put('/api/auth/me', authMiddleware, async (req, res) => {
       .from('users')
       .update(updates)
       .eq('id', req.user.id)
-      .select('id,username,email,display_name,avatar_url,banner_url,bio,created_at')
+      .select('id,username,email,display_name,avatar_url,banner_url,bio,created_at,is_admin,is_moderator')
       .single();
 
     if (error) {
@@ -292,7 +337,7 @@ app.put('/api/auth/me', authMiddleware, async (req, res) => {
 //                      POSTS
 // ======================================================
 
-// Get global feed (For You – simple version)
+// Get global feed
 app.get('/api/posts', async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -353,7 +398,6 @@ app.post('/api/posts', authMiddleware, async (req, res) => {
       return res.status(500).json({ error: 'Failed to create post' });
     }
 
-    // Attach user object for frontend
     const { data: user } = await supabase
       .from('users')
       .select('id,username,display_name,avatar_url')
@@ -370,13 +414,12 @@ app.post('/api/posts', authMiddleware, async (req, res) => {
   }
 });
 
-// Like/unlike post
+// Like / Unlike post
 app.post('/api/posts/:id/like', authMiddleware, async (req, res) => {
   try {
     const postId = req.params.id;
     const userId = req.user.id;
 
-    // Check if like already exists
     const { data: existing, error: checkError } = await supabase
       .from('post_likes')
       .select('id')
@@ -420,7 +463,6 @@ app.post('/api/posts/:id/like', authMiddleware, async (req, res) => {
       liked = true;
     }
 
-    // Get updated count
     const { count } = await supabase
       .from('post_likes')
       .select('*', { count: 'exact', head: true })
@@ -437,10 +479,10 @@ app.post('/api/posts/:id/like', authMiddleware, async (req, res) => {
 });
 
 // ======================================================
-//                   PROFILE / FOLLOWS
+//                   PROFILE / USERS
 // ======================================================
 
-// Get user by username (for visiting other profiles later)
+// Get user by username (for visiting other profiles)
 app.get('/api/users/:username', async (req, res) => {
   try {
     const { username } = req.params;
@@ -463,7 +505,7 @@ app.get('/api/users/:username', async (req, res) => {
   }
 });
 
-// Get posts for a given username (for profile page)
+// Get posts for a given username (profile page)
 app.get('/api/users/:username/posts', async (req, res) => {
   try {
     const { username } = req.params;
@@ -496,13 +538,12 @@ app.get('/api/users/:username/posts', async (req, res) => {
   }
 });
 
-// Follow / unfollow user by username
+// Follow / unfollow by username
 app.post('/api/users/:username/follow', authMiddleware, async (req, res) => {
   try {
     const { username } = req.params;
     const currentUserId = req.user.id;
 
-    // Find target user
     const { data: target, error: targetError } = await supabase
       .from('users')
       .select('id')
@@ -517,7 +558,6 @@ app.post('/api/users/:username/follow', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'You cannot follow yourself' });
     }
 
-    // Check existing follow
     const { data: existing, error: checkError } = await supabase
       .from('follows')
       .select('id')
@@ -533,7 +573,6 @@ app.post('/api/users/:username/follow', authMiddleware, async (req, res) => {
     let following;
 
     if (existing) {
-      // Unfollow
       const { error: delError } = await supabase
         .from('follows')
         .delete()
@@ -545,7 +584,6 @@ app.post('/api/users/:username/follow', authMiddleware, async (req, res) => {
       }
       following = false;
     } else {
-      // Follow
       const { error: insError } = await supabase
         .from('follows')
         .insert({
@@ -685,6 +723,136 @@ app.get('/api/search/history', authMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Failed to load search history' });
   }
 });
+
+// ======================================================
+//                     ADMIN ROUTES
+// ======================================================
+
+// Simple stats overview
+app.get('/api/admin/stats', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const now = new Date();
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+
+    const [
+      { count: totalUsers },
+      { count: totalPosts },
+      { count: totalLikes },
+      { count: totalFollows },
+      { count: signupsLast24h },
+      { count: activeLast24h }
+    ] = await Promise.all([
+      supabase.from('users').select('*', { count: 'exact', head: true }),
+      supabase.from('posts').select('*', { count: 'exact', head: true }),
+      supabase.from('post_likes').select('*', { count: 'exact', head: true }),
+      supabase.from('follows').select('*', { count: 'exact', head: true }),
+      supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', yesterday),
+      supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true })
+        .gte('last_login_at', yesterday)
+    ]);
+
+    res.json({
+      total_users: totalUsers || 0,
+      total_posts: totalPosts || 0,
+      total_likes: totalLikes || 0,
+      total_follows: totalFollows || 0,
+      signups_last_24h: signupsLast24h || 0,
+      active_users_last_24h: activeLast24h || 0
+    });
+  } catch (err) {
+    console.error('GET /admin/stats error:', err);
+    res.status(500).json({ error: 'Failed to load admin stats' });
+  }
+});
+
+// List latest users (for admin dashboard)
+app.get('/api/admin/users', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit || '50', 10), 200);
+
+    const { data, error } = await supabase
+      .from('users')
+      .select('id,username,email,display_name,created_at,last_login_at,is_admin,is_moderator')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error('GET /admin/users error:', error);
+      return res.status(500).json({ error: 'Failed to load users' });
+    }
+
+    res.json(data || []);
+  } catch (err) {
+    console.error('GET /admin/users error:', err);
+    res.status(500).json({ error: 'Failed to load users' });
+  }
+});
+
+// List latest posts with author (for moderation)
+app.get('/api/admin/posts', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit || '100', 10), 200);
+
+    const { data, error } = await supabase
+      .from('posts')
+      .select(`
+        id,
+        content,
+        created_at,
+        user:users (
+          id,
+          username,
+          display_name,
+          email
+        )
+      `)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error('GET /admin/posts error:', error);
+      return res.status(500).json({ error: 'Failed to load posts' });
+    }
+
+    res.json(data || []);
+  } catch (err) {
+    console.error('GET /admin/posts error:', err);
+    res.status(500).json({ error: 'Failed to load posts' });
+  }
+});
+
+// HARD DELETE a post (no hiding)
+app.delete('/api/admin/posts/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const postId = req.params.id;
+
+    // Delete likes first (if any)
+    await supabase.from('post_likes').delete().eq('post_id', postId);
+
+    // Delete the post itself
+    const { error } = await supabase
+      .from('posts')
+      .delete()
+      .eq('id', postId);
+
+    if (error) {
+      console.error('Delete post error:', error);
+      return res.status(500).json({ error: 'Failed to delete post' });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /admin/posts/:id error:', err);
+    res.status(500).json({ error: 'Failed to delete post' });
+  }
+});
+
+// (You can later add hard-delete for users, reports, etc. here)
 
 // ======================================================
 //                     START SERVER
