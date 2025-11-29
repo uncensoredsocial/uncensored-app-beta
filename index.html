@@ -1,14 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Profile - Uncensored Social</title>
-
-    <link rel="stylesheet" href="css/styles.css" />
-    <link rel="stylesheet" href="css/feed-styles.css" />   <!-- ✅ add this -->
-    <link rel="stylesheet" href="css/profile-styles.css" />
-    <link rel="stylesheet" href="css/icons.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home - Uncensored Social</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/feed-styles.css">
+    <link rel="stylesheet" href="css/icons.css">
 </head>
 <body>
     <!-- Top Header -->
@@ -16,7 +14,7 @@
         <div class="header-left">
             <!-- Profile Section - Shown when logged in -->
             <div class="profile-section" id="profileSection">
-                <!-- CHANGED: make profile clickable and go to profile.html -->
+                <!-- make profile clickable and go to profile.html -->
                 <a href="profile.html?user=me" class="profile-icon" id="profileMenuBtn">
                     <img src="assets/icons/default-profile.png" alt="Profile" id="headerProfileImg">
                 </a>
@@ -72,20 +70,21 @@
                     <div class="post-options">
                         <span class="char-counter" id="charCounter">0/280</span>
                     </div>
-                    <button class="btn btn-primary" id="postButton" disabled>Post</button>
+                    <!-- NEW: avatar next to Post button -->
+                    <div class="post-actions-right">
+                        <img src="assets/icons/default-profile.png"
+                             alt="You"
+                             class="post-avatar-small"
+                             id="postUserAvatarSmall">
+                        <button class="btn btn-primary" id="postButton" disabled>Post</button>
+                    </div>
                 </div>
             </div>
 
-            <!-- Guest Message - Shown when not logged in (kept but controlled by JS) -->
-            <div class="guest-message" id="guestMessage">
-                <div class="guest-content">
-                    <h2>Join the Conversation</h2>
-                    <p>Sign up to connect with others, share your thoughts, and be part of our community.</p>
-                    <div class="guest-actions">
-                        <a href="signup.html" class="btn btn-primary btn-lg">Create Account</a>
-                        <a href="login.html" class="btn btn-secondary btn-lg">Log In</a>
-                    </div>
-                </div>
+            <!-- Feed Tabs (Recent / Popular) -->
+            <div class="feed-tabs" id="feedTabs">
+                <button class="feed-tab-btn active" data-tab="recent">Recent</button>
+                <button class="feed-tab-btn" data-tab="popular">Popular</button>
             </div>
 
             <!-- Feed Content -->
@@ -137,7 +136,6 @@
             </div>
             
             <ul class="menu-items">
-                <!-- Profile page link -->
                 <li>
                     <a href="profile.html?user=me">
                         <span class="icon icon-profile"></span>
@@ -156,7 +154,6 @@
                         <span>Saved Posts</span>
                     </a>
                 </li>
-                <!-- Settings page link -->
                 <li>
                     <a href="settings.html">
                         <span class="icon icon-settings"></span>
