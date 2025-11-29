@@ -1,6 +1,5 @@
 // js/feed.js
-
-const API_BASE_URL = "https://uncensored-app-beta-production.up.railway.app/api";
+// NOTE: API_BASE_URL comes from auth.js – do NOT redeclare it here.
 
 class FeedManager {
     constructor() {
@@ -12,6 +11,8 @@ class FeedManager {
         this.cacheDom();
         this.bindEvents();
         this.updateAuthUI();
+        this.updateCharCounter();       // make sure 0/280 shows correctly
+        this.updatePostButtonState();   // sync button with current text/login
         await this.loadPosts();
     }
 
@@ -21,6 +22,7 @@ class FeedManager {
         this.postButton = document.getElementById("postButton");
         this.charCounter = document.getElementById("charCounter");
         this.postCreation = document.getElementById("postCreation");
+        this.guestMessage = document.getElementById("guestMessage");
     }
 
     bindEvents() {
@@ -48,11 +50,16 @@ class FeedManager {
     /* ----------------------- AUTH / UI ----------------------- */
 
     updateAuthUI() {
-        const loggedIn = isLoggedIn();
+        const loggedIn = typeof isLoggedIn === "function" ? isLoggedIn() : false;
 
         // Show or hide post creation
         if (this.postCreation) {
             this.postCreation.style.display = loggedIn ? "block" : "none";
+        }
+
+        // Show or hide guest message
+        if (this.guestMessage) {
+            this.guestMessage.style.display = loggedIn ? "none" : "block";
         }
 
         this.updatePostButtonState();
@@ -65,15 +72,18 @@ class FeedManager {
         this.charCounter.textContent = `${length}/280`;
 
         this.charCounter.classList.remove("warning", "error");
-        if (length > 280) this.charCounter.classList.add("error");
-        else if (length > 240) this.charCounter.classList.add("warning");
+        if (length > 280) {
+            this.charCounter.classList.add("error");
+        } else if (length > 240) {
+            this.charCounter.classList.add("warning");
+        }
     }
 
     updatePostButtonState() {
         if (!this.postButton || !this.postInput) return;
 
         const text = this.postInput.value.trim();
-        const loggedIn = isLoggedIn();
+        const loggedIn = typeof isLoggedIn === "function" ? isLoggedIn() : false;
 
         this.postButton.disabled = !loggedIn || text.length === 0 || text.length > 280;
     }
@@ -113,11 +123,11 @@ class FeedManager {
                         <p>Be the first to post something!</p>
                     </div>
                 `;
+                this.isLoading = false;
                 return;
             }
 
             this.renderPosts();
-
         } catch (err) {
             console.error(err);
             this.feedContainer.innerHTML = `
@@ -132,6 +142,8 @@ class FeedManager {
     }
 
     renderPosts() {
+        if (!this.feedContainer) return;
+
         this.feedContainer.innerHTML = "";
 
         this.posts.forEach((post) => {
@@ -154,27 +166,30 @@ class FeedManager {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${getAuthToken()}`
+                    "Authorization": `Bearer ${getAuthToken ? getAuthToken() : ""}`
                 },
                 body: JSON.stringify({ content: text })
             });
 
+            const data = await res.json().catch(() => ({}));
+
             if (!res.ok) {
-                const error = await res.json();
-                alert(error.error || "Error creating post");
+                alert(data.error || "Error creating post");
+                this.setPostButtonLoading(false);
                 return;
             }
 
-            const newPost = await res.json();
+            const newPost = data;
 
             // prepend new post
             this.posts.unshift(newPost);
-            this.feedContainer.prepend(this.createPostElement(newPost));
+            if (this.feedContainer) {
+                this.feedContainer.prepend(this.createPostElement(newPost));
+            }
 
             this.postInput.value = "";
             this.updateCharCounter();
             this.updatePostButtonState();
-
         } catch (err) {
             console.error(err);
             alert("Error creating post");
@@ -194,18 +209,20 @@ class FeedManager {
 
         div.innerHTML = `
             <div class="post-header">
-                <img src="${avatar}" class="post-user-avatar">
+                <img src="${avatar}" class="post-user-avatar" alt="${user.display_name || "User"}">
                 <div class="post-user-info">
-                    <div class="post-display-name">${user.display_name || "Unknown"}</div>
-                    <div class="post-username">@${user.username || "user"}</div>
+                    <div class="post-display-name">${this.escape(user.display_name || "Unknown")}</div>
+                    <div class="post-username">@${this.escape(user.username || "user")}</div>
                 </div>
             </div>
 
-            <div class="post-content">${this.escape(post.content)}</div>
+            <div class="post-content">
+                ${this.escape(post.content || "")}
+            </div>
 
             <div class="post-actions">
-                <span>❤️ ${post.likes?.length || 0}</span>
-                <span>💬 ${post.comments?.length || 0}</span>
+                <span>❤️ ${post.likes_count ?? post.likes?.length ?? 0}</span>
+                <span>💬 ${post.comments_count ?? post.comments?.length ?? 0}</span>
             </div>
         `;
 
@@ -215,7 +232,7 @@ class FeedManager {
     /* ----------------------- UTILITIES ----------------------- */
 
     escape(str) {
-        return str.replace(/[&<>"']/g, (m) => ({
+        return String(str).replace(/[&<>"']/g, (m) => ({
             "&": "&amp;",
             "<": "&lt;",
             ">": "&gt;",
@@ -230,6 +247,13 @@ class FeedManager {
 document.addEventListener("DOMContentLoaded", () => {
     if (document.getElementById("feedContainer")) {
         window.feedManager = new FeedManager();
-        feedManager.init();
+        window.feedManager.init();
     }
 });
+
+// Global refresh for header button
+window.refreshFeed = function () {
+    if (window.feedManager) {
+        window.feedManager.loadPosts();
+    }
+};
