@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Set up your profile - Uncensored Social</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/profile-setup.css" />
+</head>
+<body class="auth-page">
+  <header class="header simple-header">
+    <h1 class="logo">Uncensored<span>Social</span></h1>
+  </header>
+
+  <main class="auth-wrapper">
+    <section class="auth-card setup-card">
+      <h2>Set up your profile</h2>
+      <p class="auth-subtitle">Add a photo and bio so people know who you are.</p>
+
+      <div id="setupMessage" class="auth-message hidden"></div>
+
+      <form id="profileSetupForm">
+        <div class="setup-avatar-row">
+          <img id="setupAvatarPreview" src="assets/icons/default-profile.png" alt="Avatar preview" />
+          <div>
+            <label for="avatarUrl" class="field-label">Profile picture URL</label>
+            <input id="avatarUrl" type="url" class="field-input" placeholder="https://example.com/avatar.png" />
+            <small class="field-hint">You can change this later in your profile.</small>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label for="bannerUrl" class="field-label">Banner image URL</label>
+          <input id="bannerUrl" type="url" class="field-input" placeholder="https://example.com/banner.jpg" />
+        </div>
+
+        <div class="field-group">
+          <label for="displayName" class="field-label">Display name</label>
+          <input id="displayName" type="text" class="field-input" maxlength="50" />
+        </div>
+
+        <div class="field-group">
+          <label for="bio" class="field-label">Bio</label>
+          <textarea id="bio" class="field-input" maxlength="160" rows="3"
+            placeholder="Tell people a little about you"></textarea>
+          <div class="char-counter" id="bioCounter">0/160</div>
+        </div>
+
+        <button id="setupSubmitBtn" class="btn btn-primary btn-lg" type="submit">
+          Continue to Home
+        </button>
+
+        <button type="button" id="skipSetupBtn" class="btn btn-ghost btn-lg">
+          Skip for now
+        </button>
+      </form>
+    </section>
+  </main>
+
+  <script src="js/auth.js"></script>
+  <script src="js/setup-profile.js"></script>
+</body>
+</html>
