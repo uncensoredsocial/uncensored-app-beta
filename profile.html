@@ -4,87 +4,130 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Profile - Uncensored Social</title>
-
     <link rel="stylesheet" href="css/styles.css" />
     <link rel="stylesheet" href="css/profile-styles.css" />
     <link rel="stylesheet" href="css/icons.css" />
 </head>
 <body class="profile-page-body">
-    <!-- Top bar (simple) -->
-    <header class="profile-header-bar">
-        <h1 class="profile-header-title">Profile</h1>
-        <button class="profile-header-settings" id="settingsButton" aria-label="Settings">
-            <!-- you can swap this for your icon font class -->
-            ⚙️
-        </button>
+    <!-- Top bar -->
+    <header class="header">
+        <div class="header-left"><!-- empty on purpose: no avatar here --></div>
+
+        <h1 class="header-title">Profile</h1>
+
+        <div class="header-actions">
+            <button
+                id="settingsButton"
+                class="btn btn-ghost btn-icon"
+                title="Settings"
+            >
+                <span class="icon icon-settings"></span>
+            </button>
+        </div>
     </header>
 
     <main class="profile-main">
-        <!-- Top section: banner + avatar + basic info -->
-        <section class="profile-hero">
-            <div class="profile-banner" id="profileBanner"></div>
+        <!-- Banner -->
+        <section id="profileBanner" class="profile-banner">
+            <!-- background image applied via CSS/JS -->
+        </section>
 
-            <div class="profile-hero-inner">
+        <!-- Card with avatar + info -->
+        <section class="profile-header-card">
+            <div class="profile-header-top-row">
                 <div class="profile-avatar-wrapper">
                     <img
                         id="profileAvatar"
+                        class="profile-avatar"
                         src="assets/icons/default-profile.png"
                         alt="Profile picture"
-                        class="profile-avatar"
                     />
                 </div>
 
-                <button class="btn btn-primary profile-edit-btn" id="editProfileBtn">
+                <button
+                    id="editProfileBtn"
+                    class="btn btn-primary profile-edit-btn"
+                >
                     Edit Profile
                 </button>
             </div>
 
-            <div class="profile-info">
-                <h2 id="profileDisplayName" class="profile-name">Loading...</h2>
-                <p id="profileUsername" class="profile-username">@username</p>
-                <p id="profileBio" class="profile-bio">Loading bio...</p>
-                <p id="profileJoinDate" class="profile-join">Joined —</p>
+            <div class="profile-text-block">
+                <h2 id="profileDisplayName" class="profile-name">
+                    Loading…
+                </h2>
+                <div id="profileUsername" class="profile-username">
+                    @username
+                </div>
+
+                <p id="profileBio" class="profile-bio">
+                    Loading bio…
+                </p>
+
+                <div id="profileJoinDate" class="profile-join-date">
+                    Joined —
+                </div>
 
                 <div class="profile-stats-row">
-                    <div class="profile-stat">
-                        <span id="postsCount" class="profile-stat-number">0</span>
-                        <span class="profile-stat-label">Posts</span>
+                    <div class="stat-item">
+                        <span id="postsCount" class="stat-number">0</span>
+                        <span class="stat-label">Posts</span>
                     </div>
-                    <div class="profile-stat">
-                        <span id="followersCount" class="profile-stat-number">0</span>
-                        <span class="profile-stat-label">Followers</span>
+                    <div class="stat-item">
+                        <span id="followersCount" class="stat-number">0</span>
+                        <span class="stat-label">Followers</span>
                     </div>
-                    <div class="profile-stat">
-                        <span id="followingCount" class="profile-stat-number">0</span>
-                        <span class="profile-stat-label">Following</span>
+                    <div class="stat-item">
+                        <span id="followingCount" class="stat-number">0</span>
+                        <span class="stat-label">Following</span>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Tabs: Posts / Likes -->
-        <section class="profile-tabs">
-            <button class="tab-btn active" data-tab="posts">Posts</button>
-            <button class="tab-btn" data-tab="likes">Likes</button>
-        </section>
-
-        <!-- Tab content -->
-        <section class="profile-tab-content">
-            <div id="postsTab" class="tab-pane active">
-                <div id="profilePosts" class="profile-posts">
-                    <div class="loading-indicator">Loading posts...</div>
-                </div>
+        <!-- Tabs -->
+        <section class="profile-tabs-wrapper">
+            <div class="profile-tabs">
+                <button
+                    class="tab-btn active"
+                    data-tab="posts"
+                    type="button"
+                >
+                    Posts
+                </button>
+                <button
+                    class="tab-btn"
+                    data-tab="likes"
+                    type="button"
+                >
+                    Likes
+                </button>
             </div>
 
-            <div id="likesTab" class="tab-pane">
-                <div class="empty-state">
-                    <h3>No liked posts yet</h3>
+            <div class="tab-content">
+                <!-- Posts tab -->
+                <div id="postsTab" class="tab-pane active">
+                    <div
+                        id="profilePosts"
+                        class="posts-container"
+                    >
+                        <div class="loading-indicator">
+                            Loading posts...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Likes tab -->
+                <div id="likesTab" class="tab-pane">
+                    <div class="empty-state">
+                        <h3>No liked posts yet</h3>
+                    </div>
                 </div>
             </div>
         </section>
     </main>
 
-    <!-- Bottom Navigation - same as index.html -->
+    <!-- Bottom Navigation - same as home -->
     <nav class="bottom-nav" id="bottomNav">
         <a href="index.html" class="nav-item">
             <span class="icon icon-home"></span>
@@ -104,61 +147,102 @@
         </a>
     </nav>
 
-    <!-- EDIT PROFILE MODAL -->
-    <div class="profile-modal-backdrop" id="editProfileModal">
-        <div class="profile-modal">
-            <div class="profile-modal-header">
-                <h2>Edit Profile</h2>
-                <button class="profile-modal-close" id="closeEditProfileBtn" aria-label="Close">✕</button>
+    <!-- Edit Profile Modal -->
+    <div id="editProfileModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Profile</h3>
+                <button
+                    id="closeEditProfileBtn"
+                    class="close-modal"
+                    type="button"
+                >
+                    &times;
+                </button>
             </div>
-            <div class="profile-modal-body">
-                <form id="editProfileForm">
-                    <label class="profile-form-label" for="editDisplayName">Display name</label>
+
+            <form id="editProfileForm">
+                <div class="modal-body">
+                    <div
+                        id="editProfileError"
+                        class="status-message status-error hidden"
+                    ></div>
+                    <div
+                        id="editProfileSuccess"
+                        class="status-message status-success hidden"
+                    ></div>
+
+                    <label
+                        class="profile-form-label"
+                        for="editDisplayName"
+                    >
+                        Display name
+                    </label>
                     <input
                         type="text"
                         id="editDisplayName"
                         class="profile-input"
                         maxlength="50"
+                        placeholder="Your name"
                     />
 
-                    <label class="profile-form-label" for="editBio">Bio</label>
+                    <label class="profile-form-label" for="editBio">
+                        Bio
+                    </label>
                     <textarea
                         id="editBio"
-                        class="profile-textarea"
-                        rows="3"
+                        class="profile-input"
                         maxlength="160"
+                        rows="3"
+                        placeholder="Tell people who you are"
                     ></textarea>
-                    <div id="bioCharCounter" class="profile-char-counter">0/160</div>
-
-                    <label class="profile-form-label" for="editProfileImage">Profile picture</label>
-<input
-    type="file"
-    id="editProfileImage"
-    class="profile-input"
-    accept="image/*"
-/>
-
-<label class="profile-form-label" for="editBannerImage">Banner image</label>
-<input
-    type="file"
-    id="editBannerImage"
-    class="profile-input"
-    accept="image/*"
-/>
-
-                    <div class="profile-modal-actions">
-                        <button type="button" class="btn btn-secondary" id="cancelEditProfileBtn">
-                            Cancel
-                        </button>
-                        <button type="submit" class="btn btn-primary" id="saveProfileBtn">
-                            Save
-                        </button>
+                    <div id="bioCharCounter" class="char-counter">
+                        0/160
                     </div>
 
-                    <p id="editProfileError" class="profile-error-message hidden"></p>
-                    <p id="editProfileSuccess" class="profile-success-message hidden"></p>
-                </form>
-            </div>
+                    <label
+                        class="profile-form-label"
+                        for="editProfileImage"
+                    >
+                        Profile picture
+                    </label>
+                    <input
+                        type="file"
+                        id="editProfileImage"
+                        class="profile-input"
+                        accept="image/*"
+                    />
+
+                    <label
+                        class="profile-form-label"
+                        for="editBannerImage"
+                    >
+                        Banner image
+                    </label>
+                    <input
+                        type="file"
+                        id="editBannerImage"
+                        class="profile-input"
+                        accept="image/*"
+                    />
+                </div>
+
+                <div class="modal-footer">
+                    <button
+                        type="button"
+                        id="cancelEditProfileBtn"
+                        class="btn btn-secondary"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        class="btn btn-primary"
+                    >
+                        Save
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
