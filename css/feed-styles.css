@@ -499,3 +499,94 @@
     color: var(--text-color);
     border-bottom-color: var(--primary-color);
 }
+/* ===== User profile card (user.html) ===== */
+
+.profile-header-card {
+  background: #050505;
+  border-radius: 16px;
+  border: 1px solid #222;
+  padding: 0 16px 16px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+/* Banner spans the full card width, fixed height, cropped */
+.profile-banner-wrapper {
+  width: 100%;
+  height: 120px;          /* adjust height to taste */
+  overflow: hidden;
+  margin: 0 -16px 12px;   /* pull banner to card edges */
+}
+
+.profile-banner-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Avatar overlaps the banner like on profile.html */
+.profile-header-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profile-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 3px solid #050505; /* border matches card bg */
+  margin-top: -40px;         /* overlap the banner */
+  flex-shrink: 0;
+}
+
+.profile-header-info {
+  margin-top: 12px;
+}
+
+.profile-header-info h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.profile-header-info p {
+  margin: 0;
+}
+
+.profile-bio {
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #ccc;
+}
+
+.profile-stats-row {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: #aaa;
+}
+
+.profile-stats-row strong {
+  color: #fff;
+}
+
+/* Posts section spacing */
+.profile-posts-section {
+  margin-top: 16px;
+}
+
+.profile-posts-section .section-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+/* Make posts in user profile use the same card width as feed */
+.profile-posts-section .feed {
+  margin-top: 4px;
+}
