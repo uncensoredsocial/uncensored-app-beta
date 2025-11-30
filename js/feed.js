@@ -1,4 +1,4 @@
-//// js/feed.js
+// js/feed.js
 
 // Use global API_BASE_URL from auth.js if available
 const FEED_API_BASE_URL =
@@ -387,8 +387,9 @@ class FeedManager {
           e.stopPropagation();
           const username = userEl.getAttribute('data-username');
           if (username) {
+            // CHANGED: point to user.html instead of profile.html
             window.location.href =
-              'profile.html?user=' + encodeURIComponent(username);
+              'user.html?user=' + encodeURIComponent(username);
           }
         });
       }
@@ -666,8 +667,8 @@ class FeedManager {
   }
 
   getPostUrl(postId) {
-    const origin = window.location.origin;
-    return `${origin}/post.html?id=${encodeURIComponent(postId)}`;
+    // CHANGED: use relative URL so GitHub Pages respects /uncensored-app-beta/
+    return `post.html?id=${encodeURIComponent(postId)}`;
   }
 
   /* ----------------------- UTILITIES ----------------------- */
