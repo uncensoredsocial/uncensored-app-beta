@@ -380,19 +380,31 @@ class FeedManager {
         }
       });
 
-      // User profile click (avatar/name)
-      const userEl = card.querySelector('.post-user');
-      if (userEl) {
-        userEl.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const username = userEl.getAttribute('data-username');
-          if (username) {
-            // CHANGED: point to user.html instead of profile.html
-            window.location.href =
-              'user.html?user=' + encodeURIComponent(username);
-          }
-        });
-      }
+      // User profile click
+const userEl = card.querySelector('.post-user');
+if (userEl) {
+  userEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const username = userEl.getAttribute('data-username');
+
+    if (!username) return;
+
+    // Get the currently logged-in user (from auth.js)
+    const currentUser =
+      typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+
+    // If it's *your* username, go to your normal profile page
+    if (currentUser && currentUser.username === username) {
+      // if you use profile.html?user=me, use that instead:
+      // window.location.href = 'profile.html?user=me';
+      window.location.href = 'profile.html';
+    } else {
+      // Otherwise go to the public user view
+      window.location.href =
+        'user.html?user=' + encodeURIComponent(username);
+    }
+  });
+}
 
       // Like button
       const likeBtn = card.querySelector('.like-btn');
