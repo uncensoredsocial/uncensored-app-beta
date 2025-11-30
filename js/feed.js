@@ -1,4 +1,4 @@
-// js/feed.js
+//// js/feed.js
 
 // Use global API_BASE_URL from auth.js if available
 const FEED_API_BASE_URL =
@@ -26,7 +26,7 @@ class FeedManager {
     this.cacheDom();
     this.bindEvents();
     this.updateAuthUI();
-    this.updateCharCount(); // start at 0/280
+    this.updateCharCount(); // initialize 0/280 + button state
     await this.loadPosts(true);
   }
 
@@ -43,10 +43,11 @@ class FeedManager {
     this.mediaRemoveBtn = document.getElementById('mediaRemoveBtn');
     this.feedModeTabs = document.querySelectorAll('[data-feed-mode]');
 
-    // char counter (support either id)
+    // character count element: try a few selectors so we don't break
     this.charCountEl =
       document.getElementById('postCharCount') ||
-      document.getElementById('charCount');
+      document.querySelector('.char-count') ||
+      document.querySelector('.composer-char-count');
 
     // loading / empty states
     this.feedLoading = document.getElementById('feedLoading');
@@ -72,7 +73,7 @@ class FeedManager {
         }
       });
 
-      // character count
+      // live char counter
       this.postInput.addEventListener('input', () => this.updateCharCount());
     }
 
@@ -82,7 +83,7 @@ class FeedManager {
         const file = e.target.files[0];
         if (file) {
           this.handleMediaSelected(file);
-          this.updateCharCount(); // media counts as content so enable button
+          this.updateCharCount(); // adding media counts as content
         }
       });
     }
@@ -159,7 +160,6 @@ class FeedManager {
     this.charCountEl.textContent = `${count}/${this.maxChars}`;
 
     const hasContent = count > 0 || !!this.selectedMediaFile;
-
     if (this.postButton) {
       this.postButton.disabled = !hasContent;
     }
@@ -184,14 +184,29 @@ class FeedManager {
     }
 
     try {
-      // Try /posts first, if that fails, try /feed
-      let posts;
-      try {
-        posts = await this.fetchPostsFrom('/posts');
-      } catch (err1) {
-        console.warn('GET /posts failed, trying /feed', err1);
-        posts = await this.fetchPostsFrom('/feed');
+      // Use /posts (your backend already uses this)
+      const url = new URL(`${FEED_API_BASE_URL}/posts`);
+      url.searchParams.set('mode', this.currentMode);
+      url.searchParams.set('page', this.page.toString());
+      url.searchParams.set('pageSize', this.pageSize.toString());
+
+      const token = this.getAuthToken();
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(url.toString(), { headers });
+
+      if (!res.ok) {
+        throw new Error(`Failed to load feed: ${res.status}`);
       }
+
+      const data = await res.json();
+
+      const posts = Array.isArray(data)
+        ? data
+        : Array.isArray(data.posts)
+        ? data.posts
+        : [];
 
       if (reset) {
         this.posts = posts;
@@ -215,31 +230,6 @@ class FeedManager {
     }
   }
 
-  async fetchPostsFrom(path) {
-    const url = new URL(`${FEED_API_BASE_URL}${path}`);
-    // These query params are safe; backend can ignore if it doesn't use them
-    url.searchParams.set('mode', this.currentMode);
-    url.searchParams.set('page', this.page.toString());
-    url.searchParams.set('pageSize', this.pageSize.toString());
-
-    const token = this.getAuthToken();
-    const headers = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    const res = await fetch(url.toString(), { headers });
-
-    if (!res.ok) {
-      throw new Error(`Feed request failed: ${res.status}`);
-    }
-
-    const data = await res.json();
-    // Support several shapes
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data.posts)) return data.posts;
-    if (Array.isArray(data.data)) return data.data;
-    return [];
-  }
-
   showLoadingState() {
     if (this.feedLoading) this.feedLoading.style.display = 'flex';
     if (this.feedEmpty) this.feedEmpty.style.display = 'none';
@@ -251,7 +241,7 @@ class FeedManager {
   }
 
   showFeedSpinner() {
-    // optional small spinner at bottom
+    // optional mini-spinner at bottom if you want later
   }
 
   handleScroll() {
@@ -283,6 +273,7 @@ class FeedManager {
     this.attachPostEvents();
   }
 
+  // Keep class names simple so your CSS still works
   renderPostHtml(post) {
     const user = post.user || {};
     const username = user.username || 'unknown';
@@ -300,7 +291,6 @@ class FeedManager {
 
     const postUrl = this.getPostUrl(post.id);
 
-    // IMPORTANT: keep original class names: post-actions + post-action
     return `
       <article class="post" data-post-id="${post.id}">
         <div class="post-header">
@@ -371,6 +361,8 @@ class FeedManager {
   }
 
   attachPostEvents() {
+    if (!this.feedContainer) return;
+
     const cards = this.feedContainer.querySelectorAll('.post');
     cards.forEach((card) => {
       const postId = card.getAttribute('data-post-id');
@@ -454,8 +446,9 @@ class FeedManager {
     }
 
     if (this.isPosting) return;
+    if (!this.postInput) return;
 
-    const content = (this.postInput?.value || '').trim();
+    const content = (this.postInput.value || '').trim();
     if (!content && !this.selectedMediaFile) {
       this.showMessage('Write something or add media first', 'info');
       return;
@@ -494,7 +487,7 @@ class FeedManager {
       this.posts.unshift(newPost);
       this.renderPosts();
 
-      if (this.postInput) this.postInput.value = '';
+      this.postInput.value = '';
       this.clearMedia();
       this.updateCharCount();
 
@@ -560,7 +553,7 @@ class FeedManager {
     const likeCountSpan = button.querySelector('.like-count');
     let likeCount = parseInt(likeCountSpan?.textContent || '0', 10);
 
-    // Optimistic UI
+    // Optimistic UI update
     if (isCurrentlyLiked) {
       button.classList.remove('liked');
       const icon = button.querySelector('i');
@@ -597,25 +590,6 @@ class FeedManager {
       }
     } catch (err) {
       console.error('Like error:', err);
-      // revert UI on error
-      if (isCurrentlyLiked) {
-        button.classList.add('liked');
-        const icon = button.querySelector('i');
-        if (icon) {
-          icon.classList.remove('fa-regular');
-          icon.classList.add('fa-solid');
-        }
-        likeCount = likeCount + 1;
-      } else {
-        button.classList.remove('liked');
-        const icon = button.querySelector('i');
-        if (icon) {
-          icon.classList.remove('fa-solid');
-          icon.classList.add('fa-regular');
-        }
-        likeCount = Math.max(0, likeCount - 1);
-      }
-      if (likeCountSpan) likeCountSpan.textContent = likeCount.toString();
       this.showMessage('Failed to update like', 'error');
     }
   }
@@ -630,13 +604,13 @@ class FeedManager {
 
     const token = this.getAuthToken();
     if (!token) {
-      this.showMessage('Missing auth token', 'error');
+      this.showMessage('Missing auth token, please log in again', 'error');
       return;
     }
 
     const isCurrentlySaved = button.classList.contains('saved');
 
-    // Optimistic UI
+    // Optimistic UI update
     if (isCurrentlySaved) {
       button.classList.remove('saved');
       const icon = button.querySelector('i');
@@ -670,22 +644,6 @@ class FeedManager {
       }
     } catch (err) {
       console.error('Save error:', err);
-      // revert UI
-      if (isCurrentlySaved) {
-        button.classList.add('saved');
-        const icon = button.querySelector('i');
-        if (icon) {
-          icon.classList.remove('fa-regular');
-          icon.classList.add('fa-solid');
-        }
-      } else {
-        button.classList.remove('saved');
-        const icon = button.querySelector('i');
-        if (icon) {
-          icon.classList.remove('fa-solid');
-          icon.classList.add('fa-regular');
-        }
-      }
       this.showMessage('Failed to update saved post', 'error');
     }
   }
