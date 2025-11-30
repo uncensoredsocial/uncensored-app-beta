@@ -2,6 +2,18 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     /* -------------------------------------------
+       Back arrow in header -> profile.html
+    ------------------------------------------- */
+    const backToProfileBtn = document.getElementById('settingsBackToProfile');
+    if (backToProfileBtn) {
+        backToProfileBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            // change to profile.html?user=me if you prefer
+            window.location.href = 'profile.html';
+        });
+    }
+
+    /* -------------------------------------------
        Make entire settings card clickable
     ------------------------------------------- */
     const settingCards = document.querySelectorAll('.settings-link-card');
