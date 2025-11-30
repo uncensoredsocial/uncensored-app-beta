@@ -1,0 +1,279 @@
+/* SETTINGS PAGE GENERAL LAYOUT */
+
+.settings-page {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 16px 16px 80px; /* bottom padding for bottom nav */
+}
+
+/* Header tweaks just for pages using `header-centered` */
+
+.header.header-centered {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid #222;
+    background: #000;
+}
+
+.header.header-centered .logo {
+    flex: 1;
+    text-align: center;
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+    color: #fff;
+}
+
+/* Ensure left and right areas don’t squash the title */
+.header-left,
+.header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    width: 40px; /* keeps title visually centered */
+}
+
+/* Back button with Font Awesome arrow */
+
+.header-back-button {
+    border: none;
+    background: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    cursor: pointer;
+    border-radius: 999px;
+}
+
+.header-back-button i {
+    font-size: 16px;
+    color: #fff;
+}
+
+.header-back-button:hover,
+.header-back-button:focus-visible {
+    background: #111;
+    outline: none;
+}
+
+/* SETTINGS HUB LIST (settings.html) */
+
+.settings-section {
+    margin-top: 8px;
+}
+
+.settings-section-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #fff;
+}
+
+.settings-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Each setting card on the hub */
+
+.settings-link-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    text-decoration: none;
+    background: #050505;
+    border: 1px solid #222;
+    border-radius: 12px;
+    padding: 12px 16px;
+    color: #fff;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.settings-link-card:hover {
+    background: #0b0b0b;
+    border-color: #333;
+    transform: translateY(-1px);
+}
+
+.settings-link-card:active {
+    transform: translateY(0);
+}
+
+.settings-link-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.settings-link-title {
+    font-size: 15px;
+    font-weight: 500;
+}
+
+.settings-link-description {
+    font-size: 13px;
+    color: #aaa;
+}
+
+.settings-link-arrow {
+    font-size: 18px;
+    color: #888;
+    margin-left: 12px;
+}
+
+/* Danger variant (Delete account link on hub) */
+
+.settings-link-danger {
+    border-color: #661111;
+}
+
+.settings-link-danger .settings-link-title {
+    color: #ff4d4d;
+}
+
+/* DETAIL PAGES SHARED STYLES (account-settings.html, etc.) */
+
+.settings-back-row {
+    margin-bottom: 12px;
+}
+
+.settings-back-row .btn {
+    font-size: 13px;
+    padding: 6px 10px;
+}
+
+/* Generic settings item style */
+
+.settings-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid #151515;
+}
+
+.settings-item:last-child {
+    border-bottom: none;
+}
+
+.settings-item-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.settings-item-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: #fff;
+    margin-bottom: 3px;
+}
+
+.settings-item-description {
+    font-size: 12px;
+    color: #aaa;
+}
+
+/* Buttons inside settings items */
+
+.settings-item .btn.btn-sm {
+    white-space: nowrap;
+}
+
+/* Toggles (for detail pages that use them) */
+
+.settings-toggle {
+    align-items: center;
+}
+
+/* Simple toggle switch */
+
+.toggle {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    width: 42px;
+    height: 22px;
+    cursor: pointer;
+}
+
+.toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    inset: 0;
+    background-color: #333;
+    border-radius: 999px;
+    transition: background-color 0.2s ease;
+}
+
+.toggle-slider::before {
+    content: "";
+    position: absolute;
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    top: 3px;
+    background-color: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s ease;
+}
+
+.toggle input:checked + .toggle-slider {
+    background-color: #fff;
+}
+
+.toggle input:checked + .toggle-slider::before {
+    transform: translateX(18px);
+}
+
+/* Select dropdown styling */
+
+.settings-select {
+    background: #050505;
+    border: 1px solid #333;
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+/* Danger section (delete account page / items) */
+
+.settings-danger .settings-section-title {
+    color: #ff4d4d;
+}
+
+.settings-danger .settings-item-title {
+    color: #ff4d4d;
+}
+
+/* RESPONSIVE TWEAKS */
+
+@media (min-width: 768px) {
+    .settings-page {
+        padding: 24px 24px 80px;
+    }
+
+    .settings-link-card {
+        padding: 14px 18px;
+    }
+}
+
+@media (max-width: 480px) {
+    .settings-page {
+        padding: 12px 12px 72px;
+    }
+
+    .header.header-centered {
+        padding: 8px 12px;
+    }
+}
