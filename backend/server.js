@@ -27,6 +27,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 // Bucket for profile + banner images
 const USER_MEDIA_BUCKET = 'user-media';
+const POST_MEDIA_BUCKET = 'post-media';
 
 // Admin emails (hard-coded plus optional env override)
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'ssssss@gmail.com')
