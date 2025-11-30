@@ -11,6 +11,9 @@ class FeedManager {
     this.posts = [];
     this.isLoading = false;
     this.currentMode = 'recent'; // 'recent' | 'popular'
+
+    // media state
+    this.selectedMediaFile = null;
   }
 
   async init() {
@@ -32,10 +35,16 @@ class FeedManager {
     this.guestMessage = document.getElementById('guestMessage');
     this.postUserAvatar = document.getElementById('postUserAvatar');
 
-    // tabs
+    // media controls
+    this.postMediaInput = document.getElementById('postMediaInput');
+    this.addMediaBtn = document.getElementById('addMediaBtn');
+    this.mediaFileName = document.getElementById('mediaFileName');
+
+    // tabs (use your .feed-tab-btn buttons with data-tab)
     this.feedTabs = document.getElementById('feedTabs');
-    this.tabRecent = document.getElementById('tabRecent');
-    this.tabPopular = document.getElementById('tabPopular');
+    this.tabButtons = this.feedTabs
+      ? this.feedTabs.querySelectorAll('.feed-tab-btn')
+      : [];
   }
 
   /* ----------------------- EVENTS ----------------------- */
@@ -61,12 +70,37 @@ class FeedManager {
       this.postButton.addEventListener('click', () => this.handleCreatePost());
     }
 
-    // Tabs
-    if (this.tabRecent) {
-      this.tabRecent.addEventListener('click', () => this.switchMode('recent'));
+    // Media button -> open file picker
+    if (this.addMediaBtn && this.postMediaInput) {
+      this.addMediaBtn.addEventListener('click', () => {
+        this.postMediaInput.click();
+      });
     }
-    if (this.tabPopular) {
-      this.tabPopular.addEventListener('click', () => this.switchMode('popular'));
+
+    // File selected
+    if (this.postMediaInput) {
+      this.postMediaInput.addEventListener('change', () => {
+        const file = this.postMediaInput.files[0];
+        this.selectedMediaFile = file || null;
+
+        if (this.mediaFileName) {
+          if (file) {
+            this.mediaFileName.textContent = file.name;
+          } else {
+            this.mediaFileName.textContent = '';
+          }
+        }
+      });
+    }
+
+    // Tabs: use data-tab attributes
+    if (this.tabButtons && this.tabButtons.length > 0) {
+      this.tabButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const mode = btn.dataset.tab; // 'recent' or 'popular'
+          this.switchMode(mode);
+        });
+      });
     }
   }
 
@@ -155,12 +189,11 @@ class FeedManager {
 
     this.currentMode = mode;
 
-    // visual active state
-    if (this.tabRecent) {
-      this.tabRecent.classList.toggle('active', mode === 'recent');
-    }
-    if (this.tabPopular) {
-      this.tabPopular.classList.toggle('active', mode === 'popular');
+    // visual active state on .feed-tab-btn
+    if (this.tabButtons && this.tabButtons.length > 0) {
+      this.tabButtons.forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.tab === mode);
+      });
     }
 
     this.loadPosts();
@@ -240,6 +273,85 @@ class FeedManager {
     });
   }
 
+  /* ----------------------- MEDIA HELPERS ----------------------- */
+
+  fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result || '';
+        // result like "data:image/png;base64,AAA..."
+        const parts = String(result).split(',');
+        if (parts.length === 2) {
+          resolve(parts[1]); // base64 only
+        } else {
+          resolve('');
+        }
+      };
+      reader.onerror = (e) => reject(e);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async uploadMediaIfNeeded() {
+    if (!this.selectedMediaFile) return { media_url: null, media_type: null };
+
+    const token =
+      typeof getAuthToken === 'function' ? getAuthToken() : null;
+    if (!token) {
+      this.showToast('Missing auth token for media upload.', 'error');
+      return { media_url: null, media_type: null };
+    }
+
+    try {
+      const base64 = await this.fileToBase64(this.selectedMediaFile);
+      if (!base64) {
+        this.showToast('Could not read media file.', 'error');
+        return { media_url: null, media_type: null };
+      }
+
+      const mediaType = this.selectedMediaFile.type.startsWith('video')
+        ? 'video'
+        : 'image';
+
+      const res = await fetch(`${FEED_API_BASE_URL}/posts/upload-media`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          mediaData: base64,
+          mediaType
+        })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Media upload failed');
+      }
+
+      return {
+        media_url: data.url || null,
+        media_type: data.media_type || mediaType
+      };
+    } catch (err) {
+      console.error('uploadMediaIfNeeded error:', err);
+      this.showToast(err.message || 'Media upload failed', 'error');
+      return { media_url: null, media_type: null };
+    }
+  }
+
+  resetMediaState() {
+    this.selectedMediaFile = null;
+    if (this.postMediaInput) {
+      this.postMediaInput.value = '';
+    }
+    if (this.mediaFileName) {
+      this.mediaFileName.textContent = '';
+    }
+  }
+
   /* ----------------------- CREATE POST ----------------------- */
 
   async handleCreatePost() {
@@ -263,13 +375,21 @@ class FeedManager {
     this.setPostButtonLoading(true);
 
     try {
+      // 1) upload media (if any)
+      const { media_url, media_type } = await this.uploadMediaIfNeeded();
+
+      // 2) create the post
       const res = await fetch(`${FEED_API_BASE_URL}/posts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ content: text })
+        body: JSON.stringify({
+          content: text,
+          media_url: media_url || null,
+          media_type: media_type || null
+        })
       });
 
       const data = await res.json().catch(() => ({}));
@@ -286,9 +406,11 @@ class FeedManager {
         this.feedContainer.prepend(el);
       }
 
+      // reset composer
       this.postInput.value = '';
       this.updateCharCounter();
       this.updatePostButtonState();
+      this.resetMediaState();
       this.showToast('Posted!', 'success');
     } catch (err) {
       console.error('handleCreatePost error:', err);
@@ -323,6 +445,26 @@ class FeedManager {
     const commentsCount =
       typeof post.comments_count === 'number' ? post.comments_count : 0;
 
+    // media HTML if present
+    let mediaHtml = '';
+    if (post.media_url) {
+      if (post.media_type === 'video') {
+        mediaHtml = `
+          <div class="post-media">
+            <video src="${this.escape(post.media_url)}" controls playsinline></video>
+          </div>
+        `;
+      } else {
+        mediaHtml = `
+          <div class="post-media">
+            <img src="${this.escape(
+              post.media_url
+            )}" alt="Post media" onerror="this.style.display='none';" />
+          </div>
+        `;
+      }
+    }
+
     article.innerHTML = `
       <header class="post-header">
         <img
@@ -344,6 +486,7 @@ class FeedManager {
 
       <div class="post-content">
         <p>${this.formatContent(post.content || '')}</p>
+        ${mediaHtml}
       </div>
 
       <footer class="post-footer">
