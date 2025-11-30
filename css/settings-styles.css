@@ -11,32 +11,31 @@
 -------------------------------------------------- */
 
 .header.header-centered {
-    position: relative;
-    display: flex;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
     align-items: center;
     padding: 10px 16px;
     border-bottom: 1px solid #222;
     background: #000;
 }
 
-/* Absolutely center the title so it stays centered
-   even if the left/right contents change */
-.header.header-centered .logo {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    margin: 0;
-    font-size: 18px;
-    font-weight: 600;
-    color: #fff;
-}
+/* Left/right areas for arrow / future buttons */
 
-/* Left/right containers just hold icons/buttons */
 .header-left,
 .header-actions {
     display: flex;
     align-items: center;
     justify-content: flex-start;
+}
+
+/* Centered title */
+
+.header.header-centered .logo {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+    color: #fff;
 }
 
 /* Back button with Font Awesome arrow */
