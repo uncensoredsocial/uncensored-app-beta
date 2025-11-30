@@ -331,9 +331,13 @@ class FeedManager {
         throw new Error(data.error || 'Media upload failed');
       }
 
+      // Accept flexible keys from backend
+      const urlFromServer = data.url || data.media_url || null;
+      const typeFromServer = data.media_type || data.type || mediaType;
+
       return {
-        media_url: data.url || null,
-        media_type: data.media_type || mediaType
+        media_url: urlFromServer,
+        media_type: typeFromServer
       };
     } catch (err) {
       console.error('uploadMediaIfNeeded error:', err);
