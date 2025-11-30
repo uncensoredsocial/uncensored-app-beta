@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings - Uncensored Social</title>
 
-    <!-- Font Awesome (optional icons) -->
+    <!-- Font Awesome (optional, for icons if you want them here) -->
     <link rel="stylesheet"
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
           integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
@@ -44,542 +44,91 @@
             </a>
         </nav>
 
-        <!-- Main Settings Content -->
+        <!-- Main Settings Hub -->
         <main class="main-content settings-page">
-            <!-- ACCOUNT -->
-            <section class="settings-section" id="settingsAccount">
-                <h2 class="settings-section-title">Account</h2>
+            <section class="settings-section">
+                <h2 class="settings-section-title">Settings</h2>
 
-                <div class="settings-item">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Account details</div>
-                        <div class="settings-item-description">
-                            View or update your username, email, and phone number.
-                        </div>
-                    </div>
-                    <button class="btn btn-sm btn-secondary" id="btnManageAccountInfo">
-                        Manage
-                    </button>
-                </div>
-
-                <div class="settings-item">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Change password</div>
-                        <div class="settings-item-description">
-                            Update your password to keep your account secure.
-                        </div>
-                    </div>
-                    <button class="btn btn-sm btn-secondary" id="btnChangePassword">
-                        Change
-                    </button>
-                </div>
-
-                <div class="settings-item">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Manage accounts</div>
-                        <div class="settings-item-description">
-                            Switch between accounts or add a new one.
-                        </div>
-                    </div>
-                    <button class="btn btn-sm btn-secondary" id="btnManageAccounts">
-                        Manage
-                    </button>
-                </div>
-            </section>
-
-            <!-- SECURITY -->
-            <section class="settings-section" id="settingsSecurity">
-                <h2 class="settings-section-title">Security</h2>
-
-                <div class="settings-item">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Active sessions</div>
-                        <div class="settings-item-description">
-                            See where you’re logged in and sign out of devices you don’t recognize.
-                        </div>
-                    </div>
-                    <button class="btn btn-sm btn-secondary" id="btnActiveSessions">
-                        View sessions
-                    </button>
-                </div>
-
-                <div class="settings-item settings-toggle">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Two-factor authentication (2FA)</div>
-                        <div class="settings-item-description">
-                            Add an extra step to log in to your account.
-                        </div>
-                    </div>
-                    <label class="toggle">
-                        <input type="checkbox" id="toggle2FA">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-
-                <div class="settings-subgroup" id="settings2faMethods">
-                    <div class="settings-item settings-toggle">
-                        <div class="settings-item-text">
-                            <div class="settings-item-title">Email codes</div>
-                            <div class="settings-item-description">
-                                Receive a login code via email.
+                <div class="settings-list">
+                    <a href="account-settings.html" class="settings-link-card">
+                        <div class="settings-link-text">
+                            <div class="settings-link-title">Account</div>
+                            <div class="settings-link-description">
+                                Username, email, phone, and account basics.
                             </div>
                         </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="toggle2faEmail">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
+                        <span class="settings-link-arrow">›</span>
+                    </a>
 
-                    <div class="settings-item settings-toggle">
-                        <div class="settings-item-text">
-                            <div class="settings-item-title">SMS codes</div>
-                            <div class="settings-item-description">
-                                Receive a login code via SMS.
+                    <a href="security-settings.html" class="settings-link-card">
+                        <div class="settings-link-text">
+                            <div class="settings-link-title">Security</div>
+                            <div class="settings-link-description">
+                                Password, active sessions, and two-factor authentication.
                             </div>
                         </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="toggle2faSms">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
+                        <span class="settings-link-arrow">›</span>
+                    </a>
 
-                    <div class="settings-item settings-toggle">
-                        <div class="settings-item-text">
-                            <div class="settings-item-title">Authenticator app</div>
-                            <div class="settings-item-description">
-                                Use an authenticator app for one-time codes.
+                    <a href="privacy-safety-settings.html" class="settings-link-card">
+                        <div class="settings-link-text">
+                            <div class="settings-link-title">Privacy &amp; Safety</div>
+                            <div class="settings-link-description">
+                                Private account, who can contact you, and analytics preferences.
                             </div>
                         </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="toggle2faApp">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
+                        <span class="settings-link-arrow">›</span>
+                    </a>
 
-                    <div class="settings-item settings-toggle">
-                        <div class="settings-item-text">
-                            <div class="settings-item-title">Anonymous 2FA</div>
-                            <div class="settings-item-description">
-                                Use 2FA without attaching your real-world identity (e.g., app-based only).
+                    <a href="notifications-settings.html" class="settings-link-card">
+                        <div class="settings-link-text">
+                            <div class="settings-link-title">Notifications</div>
+                            <div class="settings-link-description">
+                                Control alerts for likes, comments, follows, DMs, and more.
                             </div>
                         </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="toggle2faAnonymous">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-                </div>
+                        <span class="settings-link-arrow">›</span>
+                    </a>
 
-                <div class="settings-item settings-toggle">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Login alerts</div>
-                        <div class="settings-item-description">
-                            Get alerts when your account is accessed from a new device.
-                        </div>
-                    </div>
-                    <label class="toggle">
-                        <input type="checkbox" id="toggleLoginAlerts">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-            </section>
-
-            <!-- PRIVACY & SAFETY -->
-            <section class="settings-section" id="settingsPrivacy">
-                <h2 class="settings-section-title">Privacy &amp; Safety</h2>
-
-                <div class="settings-item settings-toggle">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Private account</div>
-                        <div class="settings-item-description">
-                            Approve new followers before they can see your content.
-                        </div>
-                    </div>
-                    <label class="toggle">
-                        <input type="checkbox" id="togglePrivateAccount">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-
-                <div class="settings-item">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Who can message you</div>
-                        <div class="settings-item-description">
-                            Choose who can start new DMs with you.
-                        </div>
-                    </div>
-                    <select id="selectDmPrivacy" class="settings-select">
-                        <option value="everyone">Everyone</option>
-                        <option value="followers">People I follow</option>
-                        <option value="no_one">No one</option>
-                    </select>
-                </div>
-
-                <div class="settings-item settings-toggle">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Show online status</div>
-                        <div class="settings-item-description">
-                            Let others see when you’re active or recently active.
-                        </div>
-                    </div>
-                    <label class="toggle">
-                        <input type="checkbox" id="toggleOnlineStatus">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-
-                <div class="settings-item settings-toggle">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Read receipts</div>
-                        <div class="settings-item-description">
-                            Let others see when you’ve read their messages.
-                        </div>
-                    </div>
-                    <label class="toggle">
-                        <input type="checkbox" id="toggleReadReceipts">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-
-                <div class="settings-item settings-toggle">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Incognito mode</div>
-                        <div class="settings-item-description">
-                            Reduce logging and avoid saving local activity on this device.
-                        </div>
-                    </div>
-                    <label class="toggle">
-                        <input type="checkbox" id="toggleIncognito">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-
-                <div class="settings-item">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Blocked accounts</div>
-                        <div class="settings-item-description">
-                            View and manage users you’ve blocked.
-                        </div>
-                    </div>
-                    <button class="btn btn-sm btn-secondary" id="btnManageBlocks">
-                        Manage
-                    </button>
-                </div>
-
-                <div class="settings-item">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Muted accounts &amp; words</div>
-                        <div class="settings-item-description">
-                            Edit your muted users and keywords.
-                        </div>
-                    </div>
-                    <button class="btn btn-sm btn-secondary" id="btnManageMutes">
-                        Manage
-                    </button>
-                </div>
-
-                <div class="settings-item settings-toggle">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Analytics tracking</div>
-                        <div class="settings-item-description">
-                            Allow anonymous analytics to help improve the platform.
-                        </div>
-                    </div>
-                    <label class="toggle">
-                        <input type="checkbox" id="toggleAnalytics">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-            </section>
-
-            <!-- NOTIFICATIONS -->
-            <section class="settings-section" id="settingsNotifications">
-                <h2 class="settings-section-title">Notifications</h2>
-
-                <div class="settings-item settings-toggle">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Enable notifications</div>
-                        <div class="settings-item-description">
-                            Turn all notifications on or off for this account.
-                        </div>
-                    </div>
-                    <label class="toggle">
-                        <input type="checkbox" id="toggleNotifications">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-
-                <div class="settings-subgroup">
-                    <div class="settings-item settings-toggle">
-                        <div class="settings-item-text">
-                            <div class="settings-item-title">Likes</div>
-                            <div class="settings-item-description">
-                                Notify me when someone likes my posts.
+                    <a href="appearance-settings.html" class="settings-link-card">
+                        <div class="settings-link-text">
+                            <div class="settings-link-title">Appearance</div>
+                            <div class="settings-link-description">
+                                Theme, font size, motion, and display preferences.
                             </div>
                         </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="toggleNotifyLikes">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
+                        <span class="settings-link-arrow">›</span>
+                    </a>
 
-                    <div class="settings-item settings-toggle">
-                        <div class="settings-item-text">
-                            <div class="settings-item-title">Comments &amp; replies</div>
-                            <div class="settings-item-description">
-                                Notify me when someone comments on or replies to my posts.
+                    <a href="language-settings.html" class="settings-link-card">
+                        <div class="settings-link-text">
+                            <div class="settings-link-title">Language</div>
+                            <div class="settings-link-description">
+                                Interface language and right-to-left layout.
                             </div>
                         </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="toggleNotifyComments">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
+                        <span class="settings-link-arrow">›</span>
+                    </a>
 
-                    <div class="settings-item settings-toggle">
-                        <div class="settings-item-text">
-                            <div class="settings-item-title">Reposts</div>
-                            <div class="settings-item-description">
-                                Notify me when someone reposts my content.
+                    <a href="data-settings.html" class="settings-link-card">
+                        <div class="settings-link-text">
+                            <div class="settings-link-title">Data</div>
+                            <div class="settings-link-description">
+                                Download your data, clear history, and clear cache.
                             </div>
                         </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="toggleNotifyReposts">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
+                        <span class="settings-link-arrow">›</span>
+                    </a>
 
-                    <div class="settings-item settings-toggle">
-                        <div class="settings-item-text">
-                            <div class="settings-item-title">New followers</div>
-                            <div class="settings-item-description">
-                                Notify me when someone follows me.
+                    <a href="delete-account-settings.html" class="settings-link-card settings-link-danger">
+                        <div class="settings-link-text">
+                            <div class="settings-link-title">Delete account</div>
+                            <div class="settings-link-description">
+                                Permanently delete your account and all associated data.
                             </div>
                         </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="toggleNotifyFollows">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-
-                    <div class="settings-item settings-toggle">
-                        <div class="settings-item-text">
-                            <div class="settings-item-title">Mentions</div>
-                            <div class="settings-item-description">
-                                Notify me when someone mentions @myhandle.
-                            </div>
-                        </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="toggleNotifyMentions">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-
-                    <div class="settings-item settings-toggle">
-                        <div class="settings-item-text">
-                            <div class="settings-item-title">Direct messages</div>
-                            <div class="settings-item-description">
-                                Notify me about new DMs and group chats.
-                            </div>
-                        </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="toggleNotifyDMs">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-
-                    <div class="settings-item settings-toggle">
-                        <div class="settings-item-text">
-                            <div class="settings-item-title">Groups &amp; communities</div>
-                            <div class="settings-item-description">
-                                Activity in groups I’ve joined.
-                            </div>
-                        </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="toggleNotifyGroups">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-
-                    <div class="settings-item settings-toggle">
-                        <div class="settings-item-text">
-                            <div class="settings-item-title">System &amp; updates</div>
-                            <div class="settings-item-description">
-                                Important security and platform updates.
-                            </div>
-                        </div>
-                        <label class="toggle">
-                            <input type="checkbox" id="toggleNotifySystem">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-                </div>
-            </section>
-
-            <!-- APPEARANCE -->
-            <section class="settings-section" id="settingsAppearance">
-                <h2 class="settings-section-title">Appearance</h2>
-
-                <div class="settings-item">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Theme</div>
-                        <div class="settings-item-description">
-                            Choose your preferred theme. The default is a pure black &amp; white experience.
-                        </div>
-                    </div>
-                    <select id="selectTheme" class="settings-select">
-                        <option value="dark" selected>Dark</option>
-                        <option value="light">Light</option>
-                        <option value="system">Match system</option>
-                    </select>
-                </div>
-
-                <div class="settings-item">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Font size</div>
-                        <div class="settings-item-description">
-                            Adjust text size across the app.
-                        </div>
-                    </div>
-                    <select id="selectFontSize" class="settings-select">
-                        <option value="small">Small</option>
-                        <option value="medium" selected>Default</option>
-                        <option value="large">Large</option>
-                    </select>
-                </div>
-
-                <div class="settings-item settings-toggle">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">High contrast mode</div>
-                        <div class="settings-item-description">
-                            Extra-strong contrast for improved visibility.
-                        </div>
-                    </div>
-                    <label class="toggle">
-                        <input type="checkbox" id="toggleHighContrast">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-
-                <div class="settings-item settings-toggle">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Reduce motion</div>
-                        <div class="settings-item-description">
-                            Minimize animations and transitions.
-                        </div>
-                    </div>
-                    <label class="toggle">
-                        <input type="checkbox" id="toggleReduceMotion">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-
-                <div class="settings-item settings-toggle">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Autoplay videos</div>
-                        <div class="settings-item-description">
-                            Automatically start videos as they appear on screen.
-                        </div>
-                    </div>
-                    <label class="toggle">
-                        <input type="checkbox" id="toggleAutoplayVideos">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-            </section>
-
-            <!-- LANGUAGE -->
-            <section class="settings-section" id="settingsLanguage">
-                <h2 class="settings-section-title">Language</h2>
-
-                <div class="settings-item">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Language</div>
-                        <div class="settings-item-description">
-                            Set the language used for the interface.
-                        </div>
-                    </div>
-                    <select id="selectLanguage" class="settings-select">
-                        <option value="auto" selected>Auto (detect)</option>
-                        <option value="en">English</option>
-                        <option value="es">Español</option>
-                        <option value="fr">Français</option>
-                        <option value="de">Deutsch</option>
-                        <option value="ar">العربية</option>
-                        <!-- Add more as needed -->
-                    </select>
-                </div>
-
-                <div class="settings-item settings-toggle">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Right-to-left layout</div>
-                        <div class="settings-item-description">
-                            Force RTL layout for languages like Arabic and Hebrew.
-                        </div>
-                    </div>
-                    <label class="toggle">
-                        <input type="checkbox" id="toggleRtl">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-            </section>
-
-            <!-- DATA -->
-            <section class="settings-section" id="settingsData">
-                <h2 class="settings-section-title">Data</h2>
-
-                <div class="settings-item">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Download your data</div>
-                        <div class="settings-item-description">
-                            Request a copy of your posts, DMs, and account info.
-                        </div>
-                    </div>
-                    <button class="btn btn-sm btn-secondary" id="btnDownloadData">
-                        Request export
-                    </button>
-                </div>
-
-                <div class="settings-item">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Clear search history</div>
-                        <div class="settings-item-description">
-                            Remove your recent searches from this account.
-                        </div>
-                    </div>
-                    <button class="btn btn-sm btn-secondary" id="btnClearSearchHistory">
-                        Clear history
-                    </button>
-                </div>
-
-                <div class="settings-item">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Clear cached &amp; offline data</div>
-                        <div class="settings-item-description">
-                            Delete cached media and offline content stored on this device.
-                        </div>
-                    </div>
-                    <button class="btn btn-sm btn-secondary" id="btnClearCache">
-                        Clear cache
-                    </button>
-                </div>
-            </section>
-
-            <!-- DELETE ACCOUNT -->
-            <section class="settings-section settings-danger" id="settingsDeleteAccount">
-                <h2 class="settings-section-title">Delete account</h2>
-
-                <div class="settings-item">
-                    <div class="settings-item-text">
-                        <div class="settings-item-title">Permanently delete your account</div>
-                        <div class="settings-item-description">
-                            This will remove your profile, posts, DMs, groups, and all other data linked to this account.
-                            <strong>We don’t keep any of your data after deletion.</strong>
-                        </div>
-                    </div>
-                    <button class="btn btn-sm btn-danger" id="btnDeleteAccount">
-                        Delete account
-                    </button>
+                        <span class="settings-link-arrow">›</span>
+                    </a>
                 </div>
             </section>
         </main>
@@ -605,7 +154,7 @@
         </a>
     </nav>
 
-    <!-- Sidebar Menu (same structure so app.js works) -->
+    <!-- Sidebar Menu (same layout so app.js works) -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-content">
             <div class="sidebar-header">
@@ -667,6 +216,5 @@
 
     <script src="js/auth.js"></script>
     <script src="js/app.js"></script>
-    <!-- later: <script src="js/settings.js"></script> for saving/loading settings -->
 </body>
 </html>
