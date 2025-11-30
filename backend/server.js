@@ -408,9 +408,17 @@ app.post('/api/profile/upload-image', authMiddleware, async (req, res) => {
 // Global feed
 app.get('/api/posts', async (req, res) => {
   try {
+    // optional: ?sort=popular or ?sort=recent (default)
+    const sort = (req.query.sort || 'recent').toLowerCase();
+
+    const orderOptions =
+      sort === 'popular'
+        ? { column: 'created_at', ascending: false } // later change to likes sorting
+        : { column: 'created_at', ascending: false };
+
     const { data, error } = await supabase
       .from('posts')
-            .select(
+      .select(
         `
         id,
         content,
@@ -422,10 +430,12 @@ app.get('/api/posts', async (req, res) => {
           username,
           display_name,
           avatar_url
-        )
+        ),
+        post_likes ( user_id ),
+        comments ( id )
       `
       )
-      .order('created_at', { ascending: false })
+      .order(orderOptions.column, { ascending: orderOptions.ascending })
       .limit(50);
 
     if (error) {
@@ -433,13 +443,24 @@ app.get('/api/posts', async (req, res) => {
       return res.status(500).json({ error: 'Failed to load posts' });
     }
 
-    res.json(data || []);
+    // Shape final payload for frontend
+    const shaped = (data || []).map((p) => ({
+      id: p.id,
+      content: p.content,
+      media_url: p.media_url || null,
+      media_type: p.media_type || null,
+      created_at: p.created_at,
+      user: p.user,
+      likes: (p.post_likes || []).length,
+      comments_count: (p.comments || []).length
+    }));
+
+    res.json(shaped);
   } catch (err) {
-    console.error('GET /posts error:', err);
+    console.error('GET /api/posts error:', err);
     res.status(500).json({ error: 'Failed to load posts' });
   }
 });
-
 // Create new post
 app.post('/api/posts', authMiddleware, async (req, res) => {
   try {
