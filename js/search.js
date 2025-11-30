@@ -32,12 +32,6 @@ class SearchManager {
         const filterTabs = document.querySelectorAll('.filter-tab');
         const recentList = document.getElementById('recentList');
         const searchButton = document.getElementById('searchButton');
-...
-if (searchButton && searchInput) {
-    searchButton.addEventListener('click', () => {
-        this.performSearch(searchInput.value.trim());
-    });
-}
 
         // Search input events
         if (searchInput) {
@@ -47,12 +41,21 @@ if (searchButton && searchInput) {
 
             searchInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
-                    this.performSearch(e.target.value);
+                    this.performSearch(e.target.value.trim());
                 }
             });
 
             searchInput.addEventListener('focus', () => {
                 this.showSearchSuggestions();
+            });
+        }
+
+        // Search button events (NEW)
+        if (searchButton) {
+            searchButton.addEventListener('click', () => {
+                const value = searchInput ? searchInput.value.trim() : '';
+                console.log('Search button clicked with value:', value);
+                this.performSearch(value);
             });
         }
 
@@ -562,9 +565,9 @@ if (searchButton && searchInput) {
 
     showNoResults() {
         const noResults = document.getElementById('noResults');
-        if (noResults) {
-            noResults.style.display = 'block';
-        }
+        const resultsState = document.getElementById('searchResultsState');
+        if (resultsState) resultsState.style.display = 'block';
+        if (noResults) noResults.style.display = 'block';
     }
 
     showErrorState() {
@@ -599,8 +602,7 @@ if (searchButton && searchInput) {
     }
 
     showSearchSuggestions() {
-        // Implement search suggestions dropdown
-        // This would show a dropdown with suggested searches
+        // Implement search suggestions dropdown (optional)
     }
 
     // Recent Searches Management
@@ -791,7 +793,7 @@ if (searchButton && searchInput) {
     }
 
     updateUI() {
-        const currentUser = getCurrentUser();
+        const currentUser = getCurrentUser ? getCurrentUser() : null;
         const profileSection = document.getElementById('profileSection');
         const authButtons = document.getElementById('authButtons');
 
@@ -831,7 +833,6 @@ let searchManager;
 
 document.addEventListener('DOMContentLoaded', () => {
     searchManager = new SearchManager();
+    // Make globally available for inline onclick handlers
+    window.searchManager = searchManager;
 });
-
-// Make functions globally available for onclick handlers
-window.searchManager = searchManager;
