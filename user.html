@@ -15,40 +15,39 @@
     referrerpolicy="no-referrer"
   />
 </head>
-<body>
-  <!-- Header -->
-  <header class="header header-centered">
-    <div class="header-left">
-      <button class="btn btn-ghost btn-icon" aria-label="Go back" onclick="history.back()">
-        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
-      </button>
-    </div>
-    <h1 class="logo" id="viewProfileTitle">Profile</h1>
-    <div class="header-actions">
-      <button class="btn btn-ghost btn-icon" id="userProfileMoreBtn" aria-label="Profile options">
-        <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
-      </button>
-    </div>
+<body class="profile-page-body">
+  <!-- Top bar: back + centered name + 3 dots -->
+  <header class="profile-header-bar">
+    <button
+      class="btn btn-ghost btn-icon"
+      style="position:absolute; left:12px;"
+      aria-label="Go back"
+      onclick="history.back()"
+    >
+      <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+    </button>
+
+    <h1 class="profile-header-title" id="viewProfileTitle">Profile</h1>
+
+    <button
+      class="profile-header-settings"
+      id="userProfileMoreBtn"
+      aria-label="Profile options"
+    >
+      <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
+    </button>
   </header>
 
-  <div class="content-wrapper">
-    <main class="main-content">
+  <!-- MAIN -->
+  <main class="profile-main">
+    <!-- ===== HERO (banner + avatar + info) ===== -->
+    <section class="profile-hero">
+      <!-- Banner: fixed height; default grey; JS may add background-image -->
+      <div id="viewProfileBanner" class="profile-banner"></div>
 
-      <!-- PROFILE HEADER -->
-      <section class="profile-header-card">
-        <!-- Banner (cropped) -->
-        <div class="profile-banner-wrapper" id="profileBannerWrapper">
-          <img
-            id="viewProfileBanner"
-            class="profile-banner-img"
-            src="assets/images/default-banner.jpg"
-            alt=""
-            onerror="this.src='assets/images/default-banner.jpg'"
-          />
-        </div>
-
-        <!-- Avatar + follow button -->
-        <div class="profile-header-top">
+      <!-- Avatar + follow button -->
+      <div class="profile-hero-inner">
+        <div class="profile-avatar-wrapper">
           <img
             id="viewProfileAvatar"
             class="profile-avatar"
@@ -56,45 +55,54 @@
             alt="Profile picture"
             onerror="this.src='assets/icons/default-profile.png'"
           />
-
-          <button id="followButton" class="btn btn-primary">
-            Follow
-          </button>
         </div>
 
-        <!-- Name / handle / bio / stats -->
-        <div class="profile-header-info">
-          <h2 id="viewProfileName">Loading...</h2>
-          <p id="viewProfileUsername">@...</p>
-          <p id="viewProfileBio" class="profile-bio"></p>
+        <button id="followButton" class="btn btn-primary profile-follow-btn">
+          Follow
+        </button>
+      </div>
 
-          <div class="profile-stats-row">
-            <span><strong id="profilePostsCount">0</strong> Posts</span>
-            <span><strong id="profileFollowersCount">0</strong> Followers</span>
-            <span><strong id="profileFollowingCount">0</strong> Following</span>
+      <!-- Text info -->
+      <div class="profile-info">
+        <h2 id="viewProfileName" class="profile-name">Loading...</h2>
+        <p id="viewProfileUsername" class="profile-username">@...</p>
+        <p id="viewProfileBio" class="profile-bio"></p>
+
+        <div class="profile-stats-row">
+          <div class="profile-stat">
+            <span id="profilePostsCount" class="profile-stat-number">0</span>
+            <span class="profile-stat-label">Posts</span>
+          </div>
+          <div class="profile-stat">
+            <span id="profileFollowersCount" class="profile-stat-number">0</span>
+            <span class="profile-stat-label">Followers</span>
+          </div>
+          <div class="profile-stat">
+            <span id="profileFollowingCount" class="profile-stat-number">0</span>
+            <span class="profile-stat-label">Following</span>
           </div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <!-- POSTS LIST -->
-      <section class="profile-posts-section">
-        <h3 class="section-title">Posts</h3>
+    <!-- ===== POSTS ===== -->
+    <section class="profile-posts">
+      <div class="profile-tabs" style="display:none;">
+        <!-- if you add tabs later, they can go here -->
+      </div>
 
-        <div id="userPostsLoading" class="loading-indicator">
-          <div class="loading-spinner"></div>
-          <span>Loading posts...</span>
-        </div>
+      <div id="userPostsLoading" class="loading-indicator">
+        <span>Loading posts...</span>
+      </div>
 
-        <div id="userPostsEmpty" class="empty-state" style="display:none;">
-          <h3>No posts yet.</h3>
-          <p>When this user posts, their posts will show up here.</p>
-        </div>
+      <div id="userPostsEmpty" class="empty-state" style="display:none;">
+        <h3>No posts yet.</h3>
+        <p>When this user posts, their posts will show up here.</p>
+      </div>
 
-        <div id="userPostsContainer" class="feed"></div>
-      </section>
-
-    </main>
-  </div>
+      <div id="userPostsContainer" class="profile-posts-list"></div>
+    </section>
+  </main>
 
   <!-- Bottom nav -->
   <nav class="bottom-nav" id="bottomNav">
