@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>User Profile</title>
+
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/profile.css" />
+  <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+</head>
+
+<body>
+  <header class="header header-centered">
+    <div class="header-left">
+      <button class="btn btn-ghost btn-icon" onclick="history.back()">
+        <i class="fa-solid fa-arrow-left"></i>
+      </button>
+    </div>
+
+    <h1 class="logo" id="viewProfileHeader">Profile</h1>
+
+    <div class="header-actions">
+      <button id="profileMoreButton" class="btn btn-ghost btn-icon">
+        <i class="fa-solid fa-ellipsis"></i>
+      </button>
+    </div>
+  </header>
+
+  <div class="content-wrapper">
+    <main class="main-content">
+      <div class="profile-header">
+        <img id="viewProfileAvatar" class="profile-avatar" src="assets/icons/default-profile.png" />
+
+        <h2 id="viewProfileName">Loading...</h2>
+        <p id="viewProfileUsername">@...</p>
+        <p id="viewProfileBio"></p>
+
+        <button id="followButton" class="btn btn-primary">Follow</button>
+      </div>
+
+      <div id="userPostsContainer"></div>
+    </main>
+  </div>
+
+  <nav class="bottom-nav">
+    <a href="index.html" class="nav-item"><span class="icon icon-home"></span>Home</a>
+    <a href="search.html" class="nav-item"><span class="icon icon-search"></span>Search</a>
+    <a href="notifications.html" class="nav-item"><span class="icon icon-notifications"></span>Alerts</a>
+    <a href="dms.html" class="nav-item"><span class="icon icon-messages"></span>Messages</a>
+  </nav>
+
+  <script src="js/auth.js"></script>
+  <script src="js/user-profile.js"></script>
+</body>
+</html>
