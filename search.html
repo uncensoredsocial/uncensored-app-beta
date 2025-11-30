@@ -4,12 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Search - Uncensored Social</title>
+
+    <!-- Font Awesome for magnifying glass icon -->
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+          integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+          crossorigin="anonymous"
+          referrerpolicy="no-referrer" />
+
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/search-styles.css">
     <link rel="stylesheet" href="css/icons.css">
 </head>
 <body>
-    <!-- Top Header -->
+    <!-- Top Header (centered Search text, no profile/menu) -->
     <header class="header header-centered">
         <h1 class="logo">Search</h1>
     </header>
@@ -42,18 +50,27 @@
             <div class="search-header">
                 <div class="search-container">
                     <div class="search-input-wrapper">
+                        <!-- Text input -->
                         <input
                             type="text"
                             id="searchInput"
                             placeholder="Search users, posts, or hashtags..."
                             class="search-input"
                         >
+
+                        <!-- Clear (X) button – already used by your JS -->
+                        <button class="btn btn-ghost btn-icon clear-search"
+                                id="clearSearch"
+                                style="display: none;">
+                            <span class="icon icon-close"></span>
+                        </button>
+
+                        <!-- NEW search button with magnifying glass icon -->
                         <button
                             class="btn btn-primary btn-icon search-button"
                             id="searchButton"
-                            aria-label="Search"
-                        >
-                            <span class="icon icon-search"></span>
+                            aria-label="Search">
+                            <i class="fa-solid fa-magnifying-glass"></i>
                         </button>
                     </div>
                 </div>
@@ -69,21 +86,42 @@
                 </div>
             </div>
 
-            <!-- Search Results -->
+            <!-- Search Results Wrapper -->
             <div class="search-results" id="searchResults">
                 <!-- Default State - Before Search -->
                 <div class="search-default-state" id="searchDefault">
                     <div class="trending-section">
                         <h3>Trending Now</h3>
-                        <div class="trending-list" id="trendingHashtagsList">
-                            <!-- Top 5 hashtags will be loaded here by JS -->
+                        <!-- Your JS replaces this .trending-list content -->
+                        <div class="trending-list">
+                            <div class="trending-item">
+                                <span class="trending-rank">1</span>
+                                <div class="trending-content">
+                                    <span class="trending-tag">#SocialMedia</span>
+                                    <span class="trending-count">2.5K posts</span>
+                                </div>
+                            </div>
+                            <div class="trending-item">
+                                <span class="trending-rank">2</span>
+                                <div class="trending-content">
+                                    <span class="trending-tag">#Tech</span>
+                                    <span class="trending-count">1.8K posts</span>
+                                </div>
+                            </div>
+                            <div class="trending-item">
+                                <span class="trending-rank">3</span>
+                                <div class="trending-content">
+                                    <span class="trending-tag">#Uncensored</span>
+                                    <span class="trending-count">1.2K posts</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     <div class="recent-searches" id="recentSearches">
                         <h3>Recent Searches</h3>
-                        <div class="recent-list" id="recentSearchesList">
-                            <!-- Recent searches will be loaded here by JS -->
+                        <div class="recent-list" id="recentList">
+                            <!-- Recent searches are rendered here by search.js -->
                         </div>
                     </div>
                 </div>
@@ -159,7 +197,7 @@
         </a>
     </nav>
 
-    <!-- Sidebar Menu (kept, but no profile button on this page to open it) -->
+    <!-- Sidebar Menu (still present, but no profile button on this page to open it) -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-content">
             <div class="sidebar-header">
