@@ -1,6 +1,6 @@
 // js/feed.js
 
-// Prefer global API_BASE_URL from auth.js if it exists, otherwise fallback:
+// Use global API_BASE_URL from auth.js if available
 const FEED_API_BASE_URL =
   typeof API_BASE_URL !== 'undefined'
     ? API_BASE_URL
@@ -10,7 +10,7 @@ class FeedManager {
   constructor() {
     this.posts = [];
     this.isLoading = false;
-    this.currentTab = 'recent'; // 'recent' | 'popular'
+    this.currentMode = 'recent'; // 'recent' | 'popular'
   }
 
   async init() {
@@ -23,32 +23,31 @@ class FeedManager {
   /* ----------------------- DOM CACHE ----------------------- */
 
   cacheDom() {
+    // feed + composer
     this.feedContainer = document.getElementById('feedContainer');
     this.postInput = document.getElementById('postInput');
     this.postButton = document.getElementById('postButton');
     this.charCounter = document.getElementById('charCounter');
     this.postCreation = document.getElementById('postCreation');
     this.guestMessage = document.getElementById('guestMessage');
-
-    // NEW: composer avatars
     this.postUserAvatar = document.getElementById('postUserAvatar');
-    this.postUserAvatarSmall = document.getElementById('postUserAvatarSmall');
 
-    // NEW: feed tabs
-    this.feedTabButtons = document.querySelectorAll('.feed-tab-btn');
+    // tabs
+    this.feedTabs = document.getElementById('feedTabs');
+    this.tabRecent = document.getElementById('tabRecent');
+    this.tabPopular = document.getElementById('tabPopular');
   }
 
   /* ----------------------- EVENTS ----------------------- */
 
   bindEvents() {
-    // Typing in composer
+    // Composer typing
     if (this.postInput) {
       this.postInput.addEventListener('input', () => {
         this.updateCharCounter();
         this.updatePostButtonState();
       });
 
-      // Ctrl+Enter / Cmd+Enter to post
       this.postInput.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
           e.preventDefault();
@@ -57,21 +56,17 @@ class FeedManager {
       });
     }
 
-    // Click Post button
+    // Post button
     if (this.postButton) {
-      this.postButton.addEventListener('click', () => {
-        this.handleCreatePost();
-      });
+      this.postButton.addEventListener('click', () => this.handleCreatePost());
     }
 
-    // NEW: Recent / Popular tabs
-    if (this.feedTabButtons && this.feedTabButtons.length) {
-      this.feedTabButtons.forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const tab = btn.dataset.tab || 'recent';
-          this.switchTab(tab);
-        });
-      });
+    // Tabs
+    if (this.tabRecent) {
+      this.tabRecent.addEventListener('click', () => this.switchMode('recent'));
+    }
+    if (this.tabPopular) {
+      this.tabPopular.addEventListener('click', () => this.switchMode('popular'));
     }
   }
 
@@ -85,58 +80,57 @@ class FeedManager {
     }
   }
 
+  getCurrentUserSafe() {
+    try {
+      return typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+    } catch {
+      return null;
+    }
+  }
+
   updateAuthUI() {
     const loggedIn = this.isLoggedInSafe();
 
-    // Show or hide composer
+    // composer visible only when logged in
     if (this.postCreation) {
       this.postCreation.style.display = loggedIn ? 'block' : 'none';
     }
 
-    // Optional: show / hide "Join the Conversation"
+    // guest message
     if (this.guestMessage) {
       this.guestMessage.style.display = loggedIn ? 'none' : 'block';
     }
 
-    // NEW: update composer avatars from current user
-    if (loggedIn && typeof getCurrentUser === 'function') {
-      const user = getCurrentUser();
-      const avatarUrl =
+    // set avatar next to textarea
+    if (this.postUserAvatar) {
+      const user = this.getCurrentUserSafe();
+      this.postUserAvatar.src =
         user && user.avatar_url
           ? user.avatar_url
           : 'assets/icons/default-profile.png';
-
-      if (this.postUserAvatar) {
-        this.postUserAvatar.src = avatarUrl;
-      }
-      if (this.postUserAvatarSmall) {
-        this.postUserAvatarSmall.src = avatarUrl;
-      }
     }
 
-    this.updatePostButtonState();
     this.updateCharCounter();
+    this.updatePostButtonState();
   }
 
   updateCharCounter() {
     if (!this.charCounter || !this.postInput) return;
 
-    const length = this.postInput.value.length;
-    this.charCounter.textContent = `${length}/280`;
-
+    const len = this.postInput.value.length;
+    this.charCounter.textContent = `${len}/280`;
     this.charCounter.classList.remove('warning', 'error');
-    if (length > 280) this.charCounter.classList.add('error');
-    else if (length > 240) this.charCounter.classList.add('warning');
+
+    if (len > 280) this.charCounter.classList.add('error');
+    else if (len > 240) this.charCounter.classList.add('warning');
   }
 
   updatePostButtonState() {
     if (!this.postButton || !this.postInput) return;
-
-    const text = this.postInput.value.trim();
     const loggedIn = this.isLoggedInSafe();
-
-    this.postButton.disabled =
-      !loggedIn || text.length === 0 || text.length > 280;
+    const text = this.postInput.value.trim();
+    const disabled = !loggedIn || !text || text.length > 280;
+    this.postButton.disabled = disabled;
   }
 
   setPostButtonLoading(loading) {
@@ -151,6 +145,25 @@ class FeedManager {
       this.postButton.textContent = 'Post';
       this.updatePostButtonState();
     }
+  }
+
+  /* ----------------------- TABS ----------------------- */
+
+  switchMode(mode) {
+    if (mode !== 'recent' && mode !== 'popular') return;
+    if (this.currentMode === mode) return;
+
+    this.currentMode = mode;
+
+    // visual active state
+    if (this.tabRecent) {
+      this.tabRecent.classList.toggle('active', mode === 'recent');
+    }
+    if (this.tabPopular) {
+      this.tabPopular.classList.toggle('active', mode === 'popular');
+    }
+
+    this.loadPosts();
   }
 
   /* ----------------------- LOAD POSTS ----------------------- */
@@ -168,14 +181,33 @@ class FeedManager {
 
     try {
       const res = await fetch(`${FEED_API_BASE_URL}/posts`);
-
       if (!res.ok) {
         throw new Error(`Failed to load posts (${res.status})`);
       }
 
-      const data = await res.json();
-      this.posts = Array.isArray(data) ? data : [];
+      let posts = await res.json();
+      if (!Array.isArray(posts)) posts = [];
 
+      // “Popular” = sort by likes (if present) desc
+      if (this.currentMode === 'popular') {
+        posts.sort((a, b) => {
+          const aLikes =
+            typeof a.likes_count === 'number'
+              ? a.likes_count
+              : Array.isArray(a.likes)
+              ? a.likes.length
+              : 0;
+          const bLikes =
+            typeof b.likes_count === 'number'
+              ? b.likes_count
+              : Array.isArray(b.likes)
+              ? b.likes.length
+              : 0;
+          return bLikes - aLikes;
+        });
+      }
+
+      this.posts = posts;
       if (this.posts.length === 0) {
         this.feedContainer.innerHTML = `
           <div class="empty-state">
@@ -183,11 +215,9 @@ class FeedManager {
             <p>Be the first to post something!</p>
           </div>
         `;
-        this.isLoading = false;
-        return;
+      } else {
+        this.renderPosts();
       }
-
-      this.renderPosts();
     } catch (err) {
       console.error('loadPosts error:', err);
       this.feedContainer.innerHTML = `
@@ -201,65 +231,11 @@ class FeedManager {
     this.isLoading = false;
   }
 
-  /* ----------------------- TABS / FILTERING ----------------------- */
-
-  switchTab(tab) {
-    if (tab !== 'recent' && tab !== 'popular') {
-      tab = 'recent';
-    }
-    this.currentTab = tab;
-
-    if (this.feedTabButtons && this.feedTabButtons.length) {
-      this.feedTabButtons.forEach((btn) => {
-        const btnTab = btn.dataset.tab || 'recent';
-        btn.classList.toggle('active', btnTab === this.currentTab);
-      });
-    }
-
-    this.renderPosts();
-  }
-
-  getPostsForCurrentTab() {
-    // Recent: just return in API order (newest first)
-    if (this.currentTab === 'recent') {
-      return this.posts.slice();
-    }
-
-    // Popular: sort by like count, then newest first
-    const arr = this.posts.slice();
-
-    arr.sort((a, b) => {
-      const aLikes =
-        typeof a.likes === 'number'
-          ? a.likes
-          : Array.isArray(a.likes)
-          ? a.likes.length
-          : a.like_count ?? 0;
-      const bLikes =
-        typeof b.likes === 'number'
-          ? b.likes
-          : Array.isArray(b.likes)
-          ? b.likes.length
-          : b.like_count ?? 0;
-
-      if (bLikes !== aLikes) return bLikes - aLikes;
-
-      const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
-      const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
-      return bTime - aTime;
-    });
-
-    return arr;
-  }
-
   renderPosts() {
     if (!this.feedContainer) return;
-
-    const postsToRender = this.getPostsForCurrentTab();
-
     this.feedContainer.innerHTML = '';
 
-    postsToRender.forEach((post) => {
+    this.posts.forEach((post) => {
       this.feedContainer.appendChild(this.createPostElement(post));
     });
   }
@@ -277,40 +253,43 @@ class FeedManager {
       return;
     }
 
+    const token =
+      typeof getAuthToken === 'function' ? getAuthToken() : null;
+    if (!token) {
+      this.showToast('Missing auth token.', 'error');
+      return;
+    }
+
     this.setPostButtonLoading(true);
 
     try {
-      const token =
-        typeof getAuthToken === 'function' ? getAuthToken() : null;
-
       const res = await fetch(`${FEED_API_BASE_URL}/posts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({ content: text })
       });
 
       const data = await res.json().catch(() => ({}));
-
       if (!res.ok) {
         throw new Error(data.error || 'Error creating post');
       }
 
       const newPost = data;
 
-      // Prepend new post locally
+      // add at top
       this.posts.unshift(newPost);
+      if (this.feedContainer) {
+        const el = this.createPostElement(newPost);
+        this.feedContainer.prepend(el);
+      }
 
-      // Clear composer
       this.postInput.value = '';
       this.updateCharCounter();
       this.updatePostButtonState();
       this.showToast('Posted!', 'success');
-
-      // Re-render according to current tab (so Popular updates too)
-      this.renderPosts();
     } catch (err) {
       console.error('handleCreatePost error:', err);
       this.showToast(err.message || 'Error creating post', 'error');
@@ -322,10 +301,10 @@ class FeedManager {
   /* ----------------------- POST ELEMENT ----------------------- */
 
   createPostElement(post) {
-    const div = document.createElement('article');
-    div.className = 'post';
-    div.setAttribute('tabindex', '0');
-    div.dataset.postId = post.id;
+    const article = document.createElement('article');
+    article.className = 'post';
+    article.setAttribute('tabindex', '0');
+    article.dataset.postId = post.id;
 
     const user = post.user || {};
     const avatar = user.avatar_url || 'assets/icons/default-profile.png';
@@ -335,15 +314,16 @@ class FeedManager {
     const timeLabel = createdAt ? createdAt.toLocaleString() : '';
 
     const likeCount =
-      typeof post.likes === 'number'
-        ? post.likes
+      typeof post.likes_count === 'number'
+        ? post.likes_count
         : Array.isArray(post.likes)
         ? post.likes.length
-        : post.like_count ?? 0;
+        : 0;
 
-    const commentsCount = post.comments_count || 0;
+    const commentsCount =
+      typeof post.comments_count === 'number' ? post.comments_count : 0;
 
-    div.innerHTML = `
+    article.innerHTML = `
       <header class="post-header">
         <img
           src="${avatar}"
@@ -387,16 +367,18 @@ class FeedManager {
           </button>
         </div>
       </footer>
-    */
+    `;
 
-    // Wire up buttons
-    const likeBtn = div.querySelector('.post-like-btn');
-    const commentBtn = div.querySelector('.post-comment-btn');
-    const saveBtn = div.querySelector('.post-save-btn');
-    const shareBtn = div.querySelector('.post-share-btn');
+    // Wire actions
+    const likeBtn = article.querySelector('.post-like-btn');
+    const commentBtn = article.querySelector('.post-comment-btn');
+    const saveBtn = article.querySelector('.post-save-btn');
+    const shareBtn = article.querySelector('.post-share-btn');
 
     if (likeBtn) {
-      likeBtn.addEventListener('click', () => this.handleLike(post, likeBtn));
+      likeBtn.addEventListener('click', () =>
+        this.handleLike(post, likeBtn)
+      );
     }
 
     if (commentBtn) {
@@ -417,26 +399,22 @@ class FeedManager {
       );
     }
 
-    return div;
+    return article;
   }
 
   formatContent(text) {
-    // basic escaping + links/hashtags/mentions
     const safe = this.escape(text);
 
     return safe
-      // URLs
       .replace(
         /(https?:\/\/[^\s]+)/g,
         '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
       )
-      // hashtags
       .replace(/#(\w+)/g, '<span class="hashtag">#$1</span>')
-      // mentions
       .replace(/@(\w+)/g, '<span class="mention">@$1</span>');
   }
 
-  /* ----------------------- ACTION HANDLERS ----------------------- */
+  /* ----------------------- ACTIONS ----------------------- */
 
   async handleLike(post, btn) {
     if (!this.isLoggedInSafe()) {
@@ -458,9 +436,7 @@ class FeedManager {
         `${FEED_API_BASE_URL}/posts/${encodeURIComponent(post.id)}/like`,
         {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+          headers: { Authorization: `Bearer ${token}` }
         }
       );
 
@@ -474,11 +450,8 @@ class FeedManager {
         likeCountEl.textContent = data.likes ?? 0;
       }
 
-      if (data.liked) {
-        btn.classList.add('liked');
-      } else {
-        btn.classList.remove('liked');
-      }
+      if (data.liked) btn.classList.add('liked');
+      else btn.classList.remove('liked');
     } catch (err) {
       console.error('handleLike error:', err);
       this.showToast(err.message || 'Failed to like post', 'error');
@@ -488,12 +461,11 @@ class FeedManager {
   }
 
   handleCommentClick(post) {
-    // For now, just a simple message. Later you can route to post detail.
+    // Placeholder – later you can route to a post detail page
     this.showToast('Comments coming soon!', 'info');
   }
 
   handleSaveClick(post, btn) {
-    // simple client-side toggle for now
     const saved = btn.classList.toggle('saved');
     this.showToast(
       saved ? 'Saved post (placeholder).' : 'Unsaved post (placeholder).',
@@ -502,7 +474,7 @@ class FeedManager {
   }
 
   handleShareClick(post) {
-    const url = window.location.origin + '/index.html#post-' + post.id;
+    const url = `${window.location.origin}/index.html#post-${post.id}`;
 
     if (navigator.share) {
       navigator
@@ -511,22 +483,18 @@ class FeedManager {
           text: post.content || '',
           url
         })
-        .catch(() => {
-          // user cancelled, ignore
-        });
+        .catch(() => {});
     } else if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard
         .writeText(url)
         .then(() => this.showToast('Post link copied!', 'success'))
-        .catch(() =>
-          this.showToast('Could not copy link.', 'error')
-        );
+        .catch(() => this.showToast('Could not copy link.', 'error'));
     } else {
       alert('Share this link:\n' + url);
     }
   }
 
-  /* ----------------------- UTIL / TOAST ----------------------- */
+  /* ----------------------- UTIL ----------------------- */
 
   escape(str = '') {
     return String(str).replace(/[&<>"']/g, (m) => {
@@ -566,7 +534,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.feedManager.init();
 });
 
-// optional: used by the refresh button in header
+// called by the refresh button in header
 window.refreshFeed = function () {
   if (window.feedManager) {
     window.feedManager.loadPosts();
