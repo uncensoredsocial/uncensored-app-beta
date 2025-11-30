@@ -1,36 +1,46 @@
 // js/settings.js
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Top-left back arrow (Font Awesome) -> go to profile
-    const backToProfileBtn = document.getElementById('settingsBackToProfile');
-    if (backToProfileBtn) {
-        backToProfileBtn.addEventListener('click', () => {
+    /* -------------------------------------------
+       Back arrow in header -> profile.html
+    ------------------------------------------- */
+    const headerBackButtons = document.querySelectorAll('.header-back-button');
+    headerBackButtons.forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
             window.location.href = 'profile.html?user=me';
         });
-    }
+    });
 
-    // "Back to Settings" buttons on detail pages (optional)
+    /* -------------------------------------------
+       "Back to Settings" buttons on detail pages
+       (use data-back-to-settings attribute)
+    ------------------------------------------- */
     const backToSettingsButtons = document.querySelectorAll('[data-back-to-settings]');
     backToSettingsButtons.forEach((btn) => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
             window.location.href = 'settings.html';
         });
     });
 
-    // Make entire settings-card clickable even if clicking on text
+    /* -------------------------------------------
+       Make entire settings card clickable
+    ------------------------------------------- */
     const settingCards = document.querySelectorAll('.settings-link-card');
     settingCards.forEach((card) => {
         card.addEventListener('click', (e) => {
-            // If it's already an <a>, browser handles navigation, but this ensures
-            // clicks on inner elements also trigger it cleanly.
             const href = card.getAttribute('href');
             if (href) {
+                e.preventDefault();
                 window.location.href = href;
             }
         });
     });
 
-    // Optional: handle "master" notifications toggle if present
+    /* -------------------------------------------
+       Master notifications toggle (optional)
+    ------------------------------------------- */
     const masterNotificationsToggle = document.getElementById('toggleNotifications');
 
     if (masterNotificationsToggle) {
@@ -44,24 +54,22 @@ document.addEventListener('DOMContentLoaded', () => {
             'toggleNotifyGroups',
             'toggleNotifySystem'
         ]
-        .map(id => document.getElementById(id))
-        .filter(Boolean);
+            .map(id => document.getElementById(id))
+            .filter(Boolean);
 
-        // Remember last per-type state so we can restore when turning master back on
         let lastPerTypeState = null;
 
         masterNotificationsToggle.addEventListener('change', () => {
             if (!perTypeToggles.length) return;
 
             if (!masterNotificationsToggle.checked) {
-                // Save state
+                // Save previous state then turn all off
                 lastPerTypeState = perTypeToggles.map(input => input.checked);
-                // Turn all off
                 perTypeToggles.forEach(input => {
                     input.checked = false;
                 });
             } else {
-                // Restore previous state if we have it, else enable all
+                // Restore previous state or enable all if none saved
                 if (lastPerTypeState && lastPerTypeState.length === perTypeToggles.length) {
                     perTypeToggles.forEach((input, idx) => {
                         input.checked = lastPerTypeState[idx];
@@ -73,15 +81,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // Here is where you’d call your API to persist these changes
-            // e.g. saveNotificationSettings(masterNotificationsToggle.checked, perTypeToggles)
+            // TODO: send to backend if needed
         });
     }
 
-    // Hook for theme toggle (if present)
+    /* -------------------------------------------
+       Theme select (basic localStorage handling)
+    ------------------------------------------- */
     const themeSelect = document.getElementById('selectTheme');
     if (themeSelect) {
-        // Load stored theme from localStorage (just as a start)
         const storedTheme = localStorage.getItem('appTheme');
         if (storedTheme) {
             themeSelect.value = storedTheme;
@@ -92,11 +100,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const value = themeSelect.value;
             localStorage.setItem('appTheme', value);
             applyTheme(value);
-            // You can also send this to your backend / Supabase here
         });
     }
 
-    // Example: simple font-size handling
+    /* -------------------------------------------
+       Font-size select (basic localStorage handling)
+    ------------------------------------------- */
     const fontSizeSelect = document.getElementById('selectFontSize');
     if (fontSizeSelect) {
         const storedSize = localStorage.getItem('appFontSize');
@@ -113,17 +122,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-/* Helper: apply theme (you can customize this with your existing CSS setup) */
+/* Helper: apply theme by setting data attribute on <html> */
 function applyTheme(value) {
     const root = document.documentElement;
-
-    // This assumes your main theme is already dark; we just set a data attribute
-    // you can use in CSS if you want:
-    // html[data-theme="light"] {...} etc.
     root.setAttribute('data-theme', value);
 }
 
-/* Helper: apply font size */
+/* Helper: apply font size using a CSS variable */
 function applyFontSize(value) {
     const root = document.documentElement;
     if (value === 'small') {
