@@ -16,7 +16,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  // Basic title to start with
   const titleEl = document.getElementById('viewProfileTitle');
   if (titleEl) titleEl.textContent = 'Profile';
 
@@ -29,14 +28,12 @@ function attachMoreMenu() {
   if (!btn) return;
 
   btn.addEventListener('click', () => {
-    // simple placeholder menu for now
+    // placeholder for now
     alert('Options coming soon: block, report, share profile, etc.');
   });
 }
 
-// We DON'T rely on /users/:username (since it's failing).
-// Instead, we call /posts?username=... and use the first post's user object
-// to build the profile header, and list all their posts underneath.
+// We call /posts?username=... and use the first post's user object
 async function loadUserProfileAndPosts(username) {
   const loadingEl = document.getElementById('userPostsLoading');
   const emptyEl = document.getElementById('userPostsEmpty');
@@ -65,25 +62,21 @@ async function loadUserProfileAndPosts(username) {
       : [];
 
     if (!posts.length) {
-      // No posts: still show a basic header using just the username
       fillProfileHeaderFromUsernameOnly(username);
       if (loadingEl) loadingEl.style.display = 'none';
       if (emptyEl) emptyEl.style.display = 'block';
       return;
     }
 
-    // Use first post's user info to populate header
     const user = posts[0].user || {};
     fillProfileHeaderFromUserObject(user, username, posts.length);
 
-    // Render posts list
     const html = posts.map(renderPostHtml).join('');
     if (postsContainer) postsContainer.innerHTML = html;
 
     attachPostEvents(postsContainer);
 
     if (loadingEl) loadingEl.style.display = 'none';
-    if (!posts.length && emptyEl) emptyEl.style.display = 'block';
   } catch (err) {
     console.error('Profile load error:', err);
     fillProfileHeaderFromUsernameOnly(username);
@@ -98,6 +91,21 @@ function fillProfileHeaderFromUserObject(user, usernameFallback, postsCount) {
   const avatarUrl =
     user.avatar_url || user.avatar || 'assets/icons/default-profile.png';
   const bio = user.bio || '';
+
+  const bannerWrapper = document.getElementById('profileBannerWrapper');
+  const bannerImg = document.getElementById('viewProfileBanner');
+  const bannerUrl =
+    user.banner_url || user.header_url || user.banner || null;
+
+  if (bannerWrapper && bannerImg) {
+    if (bannerUrl) {
+      bannerImg.src = bannerUrl;
+      bannerWrapper.style.display = 'block';
+    } else {
+      // hide banner if user doesn't have one
+      bannerWrapper.style.display = 'none';
+    }
+  }
 
   const titleEl = document.getElementById('viewProfileTitle');
   const avatarEl = document.getElementById('viewProfileAvatar');
@@ -124,6 +132,9 @@ function fillProfileHeaderFromUserObject(user, usernameFallback, postsCount) {
 }
 
 function fillProfileHeaderFromUsernameOnly(username) {
+  const bannerWrapper = document.getElementById('profileBannerWrapper');
+  if (bannerWrapper) bannerWrapper.style.display = 'none';
+
   const titleEl = document.getElementById('viewProfileTitle');
   const nameEl = document.getElementById('viewProfileName');
   const usernameEl = document.getElementById('viewProfileUsername');
@@ -141,7 +152,6 @@ function setupFollowButton(user) {
   const btn = document.getElementById('followButton');
   if (!btn) return;
 
-  // For now this is just a front-end toggle until you wire it to your backend.
   btn.addEventListener('click', () => {
     const isFollowing = btn.classList.contains('following');
     if (isFollowing) {
@@ -229,7 +239,6 @@ function attachPostEvents(container) {
   cards.forEach((card) => {
     const postId = card.getAttribute('data-post-id');
 
-    // Card click => open post
     card.addEventListener('click', (e) => {
       if (e.target.closest('.post-actions') || e.target.closest('.post-user')) {
         return;
@@ -239,16 +248,14 @@ function attachPostEvents(container) {
       }
     });
 
-    // Username click => stay on same profile (already here)
     const userEl = card.querySelector('.post-user');
     if (userEl) {
       userEl.addEventListener('click', (e) => {
         e.stopPropagation();
-        // could navigate to the same profile; do nothing for now
+        // already on this profile; do nothing
       });
     }
 
-    // Share button
     const shareBtn = card.querySelector('.share-btn');
     if (shareBtn) {
       shareBtn.addEventListener('click', async (e) => {
@@ -278,7 +285,7 @@ function getProfilePostUrl(postId) {
   return `post.html?id=${encodeURIComponent(postId)}`;
 }
 
-/* ---------- Utility helpers (copied from feed style) ---------- */
+/* ---------- Utility helpers ---------- */
 
 function formatTime(timestamp) {
   if (!timestamp) return '';
