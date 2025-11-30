@@ -9,15 +9,16 @@
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/feed-styles.css" />
   <link rel="stylesheet" href="css/icons.css" />
-  <link rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-      integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
-      crossorigin="anonymous"
-      referrerpolicy="no-referrer" />
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer"
+  />
 </head>
 
 <body>
-
   <!-- ================= HEADER ================= -->
   <header class="header">
     <div class="header-left">
@@ -40,7 +41,11 @@
     <h1 class="logo">Uncensored<span>Social</span></h1>
 
     <div class="header-actions">
-      <button class="btn btn-ghost btn-icon" onclick="refreshFeed()" title="Refresh">
+      <button
+        class="btn btn-ghost btn-icon"
+        onclick="refreshFeed()"
+        title="Refresh"
+      >
         <span class="icon icon-refresh"></span>
       </button>
     </div>
@@ -49,11 +54,9 @@
   <!-- ================= MAIN CONTENT ================= -->
   <div class="content-wrapper">
     <main class="main-content">
-
       <!-- ===== Post Creation Box ===== -->
       <div class="post-creation auth-dependent" id="postCreation">
         <div class="post-input-container">
-
           <!-- SINGLE PROFILE PIC -->
           <img
             src="assets/icons/default-profile.png"
@@ -64,31 +67,42 @@
 
           <textarea
             id="postInput"
+            class="post-input"
             placeholder="What's happening?"
             maxlength="280"
           ></textarea>
         </div>
 
-        <!-- 🔵🔵🔵 BEGIN — ADDED MEDIA UPLOAD UI 🔵🔵🔵 -->
+        <!-- Media upload row -->
         <div class="post-media-row">
           <input
             type="file"
-            id="postMediaInput"
+            id="mediaInput"
             accept="image/*,video/*"
-            style="display:none"
+            style="display: none"
           />
 
-          <button type="button" class="btn btn-secondary" id="addMediaBtn">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            id="addMediaBtn"
+            onclick="document.getElementById('mediaInput').click()"
+          >
             Add image / video
           </button>
 
           <span id="mediaFileName" class="media-filename"></span>
         </div>
-        <!-- 🔵🔵🔵 END — ADDED MEDIA UPLOAD UI 🔵🔵🔵 -->
 
         <div class="post-actions-bar">
           <div class="post-options">
-            <span id="charCounter" class="char-counter">0/280</span>
+            <!-- character counter that feed.js updates -->
+            <span
+              id="postCharCount"
+              class="char-counter composer-char-count"
+            >
+              0/280
+            </span>
           </div>
 
           <button class="btn btn-primary" id="postButton" disabled>
@@ -99,8 +113,20 @@
 
       <!-- ===== FEED TABS ===== -->
       <div class="feed-tabs" id="feedTabs">
-        <button class="feed-tab-btn active" data-tab="recent">Recent</button>
-        <button class="feed-tab-btn" data-tab="popular">Popular</button>
+        <button
+          class="feed-tab-btn active"
+          data-tab="recent"
+          data-feed-mode="recent"
+        >
+          Recent
+        </button>
+        <button
+          class="feed-tab-btn"
+          data-tab="popular"
+          data-feed-mode="popular"
+        >
+          Popular
+        </button>
       </div>
 
       <!-- ===== Guest Message ===== -->
@@ -110,7 +136,9 @@
           <p>Create an account to interact, like, post, and more.</p>
 
           <div class="guest-actions">
-            <a href="signup.html" class="btn btn-primary btn-lg">Create Account</a>
+            <a href="signup.html" class="btn btn-primary btn-lg"
+              >Create Account</a
+            >
             <a href="login.html" class="btn btn-secondary btn-lg">Log In</a>
           </div>
         </div>
@@ -122,8 +150,11 @@
           <div class="loading-spinner"></div>
           <span>Loading posts...</span>
         </div>
+        <!-- shown when there are no posts -->
+        <div class="feed-empty" id="feedEmpty" style="display: none;">
+          <p>No posts yet. Be the first to post!</p>
+        </div>
       </div>
-
     </main>
   </div>
 
@@ -152,5 +183,15 @@
   <script src="js/feed.js"></script>
   <script src="js/app.js"></script>
 
+  <!-- small helper for the refresh button -->
+  <script>
+    function refreshFeed() {
+      if (window.feedManager) {
+        window.feedManager.page = 1;
+        window.feedManager.hasMore = true;
+        window.feedManager.loadPosts(true);
+      }
+    }
+  </script>
 </body>
 </html>
