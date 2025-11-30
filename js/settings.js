@@ -2,13 +2,16 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     /* -------------------------------------------
-       Back arrow in header -> profile.html
+       Make entire settings card clickable
     ------------------------------------------- */
-    const headerBackButtons = document.querySelectorAll('.header-back-button');
-    headerBackButtons.forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            window.location.href = 'profile.html?user=me';
+    const settingCards = document.querySelectorAll('.settings-link-card');
+    settingCards.forEach((card) => {
+        card.addEventListener('click', (e) => {
+            const href = card.getAttribute('href');
+            if (href) {
+                e.preventDefault();
+                window.location.href = href;
+            }
         });
     });
 
@@ -21,20 +24,6 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', (e) => {
             e.preventDefault();
             window.location.href = 'settings.html';
-        });
-    });
-
-    /* -------------------------------------------
-       Make entire settings card clickable
-    ------------------------------------------- */
-    const settingCards = document.querySelectorAll('.settings-link-card');
-    settingCards.forEach((card) => {
-        card.addEventListener('click', (e) => {
-            const href = card.getAttribute('href');
-            if (href) {
-                e.preventDefault();
-                window.location.href = href;
-            }
         });
     });
 
