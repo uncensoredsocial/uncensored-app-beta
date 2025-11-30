@@ -31,6 +31,13 @@ class SearchManager {
         const clearSearch = document.getElementById('clearSearch');
         const filterTabs = document.querySelectorAll('.filter-tab');
         const recentList = document.getElementById('recentList');
+        const searchButton = document.getElementById('searchButton');
+...
+if (searchButton && searchInput) {
+    searchButton.addEventListener('click', () => {
+        this.performSearch(searchInput.value.trim());
+    });
+}
 
         // Search input events
         if (searchInput) {
