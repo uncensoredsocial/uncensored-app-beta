@@ -1,6 +1,5 @@
 // js/user-profile.js
 
-// Same API base style as feed.js
 const PROFILE_API_BASE_URL =
   typeof API_BASE_URL !== 'undefined'
     ? API_BASE_URL
@@ -28,18 +27,17 @@ function attachMoreMenu() {
   if (!btn) return;
 
   btn.addEventListener('click', () => {
-    // placeholder for now
+    // placeholder actions for now
     alert('Options coming soon: block, report, share profile, etc.');
   });
 }
 
-// We call /posts?username=... and use the first post's user object
 async function loadUserProfileAndPosts(username) {
   const loadingEl = document.getElementById('userPostsLoading');
   const emptyEl = document.getElementById('userPostsEmpty');
   const postsContainer = document.getElementById('userPostsContainer');
 
-  if (loadingEl) loadingEl.style.display = 'flex';
+  if (loadingEl) loadingEl.style.display = 'block';
   if (emptyEl) emptyEl.style.display = 'none';
   if (postsContainer) postsContainer.innerHTML = '';
 
@@ -50,9 +48,7 @@ async function loadUserProfileAndPosts(username) {
     url.searchParams.set('pageSize', '50');
 
     const res = await fetch(url.toString());
-    if (!res.ok) {
-      throw new Error('Failed to load posts for user');
-    }
+    if (!res.ok) throw new Error('Failed to load posts for user');
 
     const data = await res.json();
     const posts = Array.isArray(data)
@@ -71,10 +67,10 @@ async function loadUserProfileAndPosts(username) {
     const user = posts[0].user || {};
     fillProfileHeaderFromUserObject(user, username, posts.length);
 
-    const html = posts.map(renderPostHtml).join('');
-    if (postsContainer) postsContainer.innerHTML = html;
-
-    attachPostEvents(postsContainer);
+    if (postsContainer) {
+      postsContainer.innerHTML = posts.map(renderPostHtml).join('');
+      attachPostEvents(postsContainer);
+    }
 
     if (loadingEl) loadingEl.style.display = 'none';
   } catch (err) {
@@ -92,18 +88,18 @@ function fillProfileHeaderFromUserObject(user, usernameFallback, postsCount) {
     user.avatar_url || user.avatar || 'assets/icons/default-profile.png';
   const bio = user.bio || '';
 
-  const bannerWrapper = document.getElementById('profileBannerWrapper');
-  const bannerImg = document.getElementById('viewProfileBanner');
+  const bannerEl = document.getElementById('viewProfileBanner');
   const bannerUrl =
     user.banner_url || user.header_url || user.banner || null;
 
-  if (bannerWrapper && bannerImg) {
+  if (bannerEl) {
     if (bannerUrl) {
-      bannerImg.src = bannerUrl;
-      bannerWrapper.style.display = 'block';
+      bannerEl.style.backgroundImage = `url("${bannerUrl}")`;
+      bannerEl.classList.add('profile-banner-image');
     } else {
-      // hide banner if user doesn't have one
-      bannerWrapper.style.display = 'none';
+      // default grey banner, no image
+      bannerEl.style.backgroundImage = '';
+      bannerEl.classList.remove('profile-banner-image');
     }
   }
 
@@ -132,8 +128,11 @@ function fillProfileHeaderFromUserObject(user, usernameFallback, postsCount) {
 }
 
 function fillProfileHeaderFromUsernameOnly(username) {
-  const bannerWrapper = document.getElementById('profileBannerWrapper');
-  if (bannerWrapper) bannerWrapper.style.display = 'none';
+  const bannerEl = document.getElementById('viewProfileBanner');
+  if (bannerEl) {
+    bannerEl.style.backgroundImage = '';
+    bannerEl.classList.remove('profile-banner-image');
+  }
 
   const titleEl = document.getElementById('viewProfileTitle');
   const nameEl = document.getElementById('viewProfileName');
@@ -164,7 +163,7 @@ function setupFollowButton(user) {
   });
 }
 
-/* ---------- Post rendering (same style as feed) ---------- */
+/* ===== POSTS RENDERING (reuse feed style) ===== */
 
 function renderPostHtml(post) {
   const user = post.user || {};
@@ -183,47 +182,42 @@ function renderPostHtml(post) {
   return `
     <article class="post" data-post-id="${post.id}">
       <div class="post-header">
-        <div class="post-user" data-username="${escapeHtml(username)}">
-          <img
-            src="${avatarUrl}"
-            alt="${escapeHtml(displayName)}"
-            class="post-avatar"
-            onerror="this.src='assets/icons/default-profile.png'"
-          >
-          <div class="post-user-meta">
-            <span class="post-display-name">${escapeHtml(displayName)}</span>
-            <span class="post-username">@${escapeHtml(username)}</span>
-          </div>
+        <img
+          src="${avatarUrl}"
+          alt="${escapeHtml(displayName)}"
+          class="post-user-avatar"
+          onerror="this.src='assets/icons/default-profile.png'"
+        />
+        <div class="post-user-info">
+          <div class="post-display-name">${escapeHtml(displayName)}</div>
+          <div class="post-username">@${escapeHtml(username)}</div>
         </div>
-        <span class="post-time">${formatTime(createdAt)}</span>
+        <div class="post-time">${formatTime(createdAt)}</div>
       </div>
 
-      <div class="post-body">
-        <div class="post-text">
-          ${formatPostContent(post.content || '')}
-        </div>
-        ${
-          mediaUrl
-            ? `
+      <div class="post-content">
+        ${formatPostContent(post.content || '')}
+      </div>
+
+      ${
+        mediaUrl
+          ? `
         <div class="post-media">
           <img src="${mediaUrl}" alt="Post media">
         </div>
-        `
-            : ''
-        }
-      </div>
+      `
+          : ''
+      }
 
       <div class="post-actions">
         <button class="post-action like-btn">
           <i class="fa-regular fa-heart"></i>
           <span class="like-count">${likeCount}</span>
         </button>
-
         <button class="post-action comment-btn">
           <i class="fa-regular fa-comment"></i>
           <span class="comment-count">${commentCount}</span>
         </button>
-
         <button class="post-action share-btn" data-post-url="${postUrl}">
           <i class="fa-solid fa-arrow-up-from-bracket"></i>
         </button>
@@ -234,27 +228,16 @@ function renderPostHtml(post) {
 
 function attachPostEvents(container) {
   if (!container) return;
-
   const cards = container.querySelectorAll('.post');
+
   cards.forEach((card) => {
     const postId = card.getAttribute('data-post-id');
 
+    // Click card → open post detail
     card.addEventListener('click', (e) => {
-      if (e.target.closest('.post-actions') || e.target.closest('.post-user')) {
-        return;
-      }
-      if (postId) {
-        window.location.href = getProfilePostUrl(postId);
-      }
+      if (e.target.closest('.post-actions')) return;
+      if (postId) window.location.href = getProfilePostUrl(postId);
     });
-
-    const userEl = card.querySelector('.post-user');
-    if (userEl) {
-      userEl.addEventListener('click', (e) => {
-        e.stopPropagation();
-        // already on this profile; do nothing
-      });
-    }
 
     const shareBtn = card.querySelector('.share-btn');
     if (shareBtn) {
@@ -281,15 +264,14 @@ function attachPostEvents(container) {
 }
 
 function getProfilePostUrl(postId) {
-  // relative so GitHub Pages respects /uncensored-app-beta/
+  // relative so GitHub Pages works under /uncensored-app-beta/
   return `post.html?id=${encodeURIComponent(postId)}`;
 }
 
-/* ---------- Utility helpers ---------- */
+/* ===== UTILITIES ===== */
 
 function formatTime(timestamp) {
   if (!timestamp) return '';
-
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) return '';
 
