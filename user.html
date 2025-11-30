@@ -19,14 +19,14 @@
   <!-- Header -->
   <header class="header header-centered">
     <div class="header-left">
-      <button class="btn btn-ghost btn-icon" onclick="history.back()">
-        <i class="fa-solid fa-arrow-left"></i>
+      <button class="btn btn-ghost btn-icon" aria-label="Go back" onclick="history.back()">
+        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
       </button>
     </div>
     <h1 class="logo" id="viewProfileTitle">Profile</h1>
     <div class="header-actions">
-      <button class="btn btn-ghost btn-icon" id="userProfileMoreBtn">
-        <i class="fa-solid fa-ellipsis"></i>
+      <button class="btn btn-ghost btn-icon" id="userProfileMoreBtn" aria-label="Profile options">
+        <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
       </button>
     </div>
   </header>
@@ -36,6 +36,18 @@
 
       <!-- PROFILE HEADER -->
       <section class="profile-header-card">
+        <!-- Banner (cropped) -->
+        <div class="profile-banner-wrapper" id="profileBannerWrapper">
+          <img
+            id="viewProfileBanner"
+            class="profile-banner-img"
+            src="assets/images/default-banner.jpg"
+            alt=""
+            onerror="this.src='assets/images/default-banner.jpg'"
+          />
+        </div>
+
+        <!-- Avatar + follow button -->
         <div class="profile-header-top">
           <img
             id="viewProfileAvatar"
@@ -50,6 +62,7 @@
           </button>
         </div>
 
+        <!-- Name / handle / bio / stats -->
         <div class="profile-header-info">
           <h2 id="viewProfileName">Loading...</h2>
           <p id="viewProfileUsername">@...</p>
