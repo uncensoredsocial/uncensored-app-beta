@@ -461,15 +461,22 @@ app.get('/api/posts', async (req, res) => {
     res.status(500).json({ error: 'Failed to load posts' });
   }
 });
-// Create new post
+// Create post
 app.post('/api/posts', authMiddleware, async (req, res) => {
   try {
-    const { content } = req.body;
+    const { content, media_url, media_type } = req.body;
 
-    if (!content || !content.trim()) {
-      return res.status(400).json({ error: 'Post content is required' });
+    // Allow: text only, media only, or both.
+    const hasText = content && content.trim().length > 0;
+    const hasMedia = !!media_url;
+
+    if (!hasText && !hasMedia) {
+      return res
+        .status(400)
+        .json({ error: 'Post must have text or media.' });
     }
-    if (content.length > 280) {
+
+    if (hasText && content.trim().length > 280) {
       return res
         .status(400)
         .json({ error: 'Post must be 280 characters or less' });
@@ -478,8 +485,10 @@ app.post('/api/posts', authMiddleware, async (req, res) => {
     const post = {
       id: uuidv4(),
       user_id: req.user.id,
-      content: content.trim(),
-      created_at: new Date().toISOString()
+      content: hasText ? content.trim() : '',
+      created_at: new Date().toISOString(),
+      media_url: media_url || null,
+      media_type: media_type || null
     };
 
     const { data: inserted, error } = await supabase
@@ -493,6 +502,7 @@ app.post('/api/posts', authMiddleware, async (req, res) => {
       return res.status(500).json({ error: 'Failed to create post' });
     }
 
+    // Attach user object for frontend
     const { data: user } = await supabase
       .from('users')
       .select('id,username,display_name,avatar_url')
