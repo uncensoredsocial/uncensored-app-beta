@@ -410,19 +410,19 @@ app.get('/api/posts', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('posts')
-      .select(
+            .select(
         `
         id,
         content,
+        media_url,
+        media_type,
         created_at,
         user:users (
           id,
           username,
           display_name,
           avatar_url
-        ),
-        post_likes ( user_id ),
-        comments ( id )
+        )
       `
       )
       .order('created_at', { ascending: false })
