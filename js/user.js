@@ -1,4 +1,4 @@
-// js/user-profile.js
+// js/user.js
 
 // If you change your Supabase URL/key, update here to match search.js
 const USER_SUPABASE_URL = 'https://hbbbsreonwhvqfvbszne.supabase.co';
