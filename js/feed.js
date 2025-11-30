@@ -143,7 +143,9 @@ class FeedManager {
     }
 
     try {
-      const url = new URL(`${FEED_API_BASE_URL}/feed`);
+      // IMPORTANT: use /posts (not /feed)
+      const url = new URL(`${FEED_API_BASE_URL}/posts`);
+      // If your backend supports these params, cool; if not, it will just ignore them
       url.searchParams.set('mode', this.currentMode);
       url.searchParams.set('page', this.page.toString());
       url.searchParams.set('pageSize', this.pageSize.toString());
@@ -157,13 +159,16 @@ class FeedManager {
       });
 
       if (!res.ok) {
-        throw new Error('Failed to load feed');
+        throw new Error(`Failed to load feed: ${res.status}`);
       }
 
       const data = await res.json();
 
-      const posts = Array.isArray(data.posts || data)
-        ? data.posts || data
+      // Support either { posts: [...] } or just [...]
+      const posts = Array.isArray(data)
+        ? data
+        : Array.isArray(data.posts)
+        ? data.posts
         : [];
 
       if (reset) {
@@ -199,14 +204,12 @@ class FeedManager {
   }
 
   showFeedSpinner() {
-    // Optionally show a small spinner at bottom when loading more
-    // You can implement a specific element for this if you want.
+    // optional: small spinner at bottom while loading more
   }
 
   handleScroll() {
     if (!this.hasMore || this.isLoading) return;
-    const scrollPosition =
-      window.innerHeight + window.scrollY;
+    const scrollPosition = window.innerHeight + window.scrollY;
     const threshold = document.body.offsetHeight - 600;
     if (scrollPosition >= threshold) {
       this.loadPosts(false);
@@ -230,7 +233,6 @@ class FeedManager {
       .map((post) => this.renderPostHtml(post))
       .join('');
 
-    // Attach events AFTER rendering
     this.attachPostEvents();
   }
 
@@ -330,7 +332,7 @@ class FeedManager {
     cards.forEach((card) => {
       const postId = card.getAttribute('data-post-id');
 
-      // Whole card click -> open post detail, except when clicking buttons/user
+      // Whole card click -> open post detail (unless clicking actions/user)
       card.addEventListener('click', (e) => {
         if (
           e.target.closest('.post-actions') ||
@@ -370,7 +372,6 @@ class FeedManager {
       if (commentBtn) {
         commentBtn.addEventListener('click', (e) => {
           e.stopPropagation();
-          // For now, send them to the post page where full comments live
           if (postId) {
             window.location.href = this.getPostUrl(postId) + '#comments';
           }
@@ -447,11 +448,9 @@ class FeedManager {
 
       const newPost = await res.json();
 
-      // Prepend new post to feed
       this.posts.unshift(newPost);
       this.renderPosts();
 
-      // Clear composer
       if (this.postInput) this.postInput.value = '';
       this.clearMedia();
 
@@ -556,7 +555,6 @@ class FeedManager {
       console.error('Like error:', err);
       // Revert optimistic update on error
       if (isCurrentlyLiked) {
-        // we tried to unlike but failed -> re-like
         button.classList.add('liked');
         const icon = button.querySelector('i');
         if (icon) {
@@ -565,7 +563,6 @@ class FeedManager {
         }
         likeCount = likeCount + 1;
       } else {
-        // we tried to like but failed -> un-like
         button.classList.remove('liked');
         const icon = button.querySelector('i');
         if (icon) {
@@ -731,7 +728,6 @@ class FeedManager {
   }
 
   showMessage(message, type = 'info') {
-    // Remove existing message
     const existingMsg = document.querySelector('.status-message');
     if (existingMsg) existingMsg.remove();
 
@@ -772,6 +768,5 @@ let feedManager;
 document.addEventListener('DOMContentLoaded', () => {
   feedManager = new FeedManager();
   feedManager.init();
-  // expose globally if needed elsewhere
   window.feedManager = feedManager;
 });
