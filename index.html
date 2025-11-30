@@ -15,7 +15,6 @@
 
   <!-- ================= HEADER ================= -->
   <header class="header">
-    <!-- Left side -->
     <div class="header-left">
       <div class="profile-section" id="profileSection">
         <a href="profile.html" class="profile-icon">
@@ -36,11 +35,7 @@
     <h1 class="logo">Uncensored<span>Social</span></h1>
 
     <div class="header-actions">
-      <button
-        class="btn btn-ghost btn-icon"
-        onclick="refreshFeed()"
-        title="Refresh"
-      >
+      <button class="btn btn-ghost btn-icon" onclick="refreshFeed()" title="Refresh">
         <span class="icon icon-refresh"></span>
       </button>
     </div>
@@ -54,7 +49,7 @@
       <div class="post-creation auth-dependent" id="postCreation">
         <div class="post-input-container">
 
-          <!-- SINGLE PROFILE PIC ONLY -->
+          <!-- SINGLE PROFILE PIC -->
           <img
             src="assets/icons/default-profile.png"
             alt="You"
@@ -68,6 +63,23 @@
             maxlength="280"
           ></textarea>
         </div>
+
+        <!-- 🔵🔵🔵 BEGIN — ADDED MEDIA UPLOAD UI 🔵🔵🔵 -->
+        <div class="post-media-row">
+          <input
+            type="file"
+            id="postMediaInput"
+            accept="image/*,video/*"
+            style="display:none"
+          />
+
+          <button type="button" class="btn btn-secondary" id="addMediaBtn">
+            Add image / video
+          </button>
+
+          <span id="mediaFileName" class="media-filename"></span>
+        </div>
+        <!-- 🔵🔵🔵 END — ADDED MEDIA UPLOAD UI 🔵🔵🔵 -->
 
         <div class="post-actions-bar">
           <div class="post-options">
@@ -93,12 +105,8 @@
           <p>Create an account to interact, like, post, and more.</p>
 
           <div class="guest-actions">
-            <a href="signup.html" class="btn btn-primary btn-lg">
-              Create Account
-            </a>
-            <a href="login.html" class="btn btn-secondary btn-lg">
-              Log In
-            </a>
+            <a href="signup.html" class="btn btn-primary btn-lg">Create Account</a>
+            <a href="login.html" class="btn btn-secondary btn-lg">Log In</a>
           </div>
         </div>
       </div>
@@ -110,6 +118,7 @@
           <span>Loading posts...</span>
         </div>
       </div>
+
     </main>
   </div>
 
@@ -119,17 +128,14 @@
       <span class="icon icon-home"></span>
       <span class="nav-label">Home</span>
     </a>
-
     <a href="search.html" class="nav-item">
       <span class="icon icon-search"></span>
       <span class="nav-label">Search</span>
     </a>
-
     <a href="notifications.html" class="nav-item">
       <span class="icon icon-notifications"></span>
       <span class="nav-label">Alerts</span>
     </a>
-
     <a href="dms.html" class="nav-item">
       <span class="icon icon-messages"></span>
       <span class="nav-label">Messages</span>
