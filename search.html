@@ -10,27 +10,8 @@
 </head>
 <body>
     <!-- Top Header -->
-    <header class="header">
-        <div class="header-left">
-            <!-- Profile Section - Shown when logged in -->
-            <div class="profile-section" id="profileSection">
-                <div class="profile-icon" id="profileMenuBtn">
-                    <img src="assets/icons/default-profile.png" alt="Profile" id="headerProfileImg">
-                </div>
-            </div>
-            
-            <!-- Auth Buttons - Shown when guest -->
-            <div class="auth-buttons" id="authButtons">
-                <a href="login.html" class="btn btn-sm btn-login">Log In</a>
-                <a href="signup.html" class="btn btn-sm btn-signup">Sign Up</a>
-            </div>
-        </div>
-
+    <header class="header header-centered">
         <h1 class="logo">Search</h1>
-        
-        <div class="header-actions">
-            <!-- Empty for balance -->
-        </div>
     </header>
 
     <!-- Main Content Area -->
@@ -61,10 +42,18 @@
             <div class="search-header">
                 <div class="search-container">
                     <div class="search-input-wrapper">
-                        <span class="icon icon-search search-icon"></span>
-                        <input type="text" id="searchInput" placeholder="Search users, posts, or hashtags..." class="search-input">
-                        <button class="btn btn-ghost btn-icon clear-search" id="clearSearch" style="display: none;">
-                            <span class="icon icon-close"></span>
+                        <input
+                            type="text"
+                            id="searchInput"
+                            placeholder="Search users, posts, or hashtags..."
+                            class="search-input"
+                        >
+                        <button
+                            class="btn btn-primary btn-icon search-button"
+                            id="searchButton"
+                            aria-label="Search"
+                        >
+                            <span class="icon icon-search"></span>
                         </button>
                     </div>
                 </div>
@@ -86,35 +75,15 @@
                 <div class="search-default-state" id="searchDefault">
                     <div class="trending-section">
                         <h3>Trending Now</h3>
-                        <div class="trending-list">
-                            <div class="trending-item">
-                                <span class="trending-rank">1</span>
-                                <div class="trending-content">
-                                    <span class="trending-tag">#SocialMedia</span>
-                                    <span class="trending-count">2.5K posts</span>
-                                </div>
-                            </div>
-                            <div class="trending-item">
-                                <span class="trending-rank">2</span>
-                                <div class="trending-content">
-                                    <span class="trending-tag">#Tech</span>
-                                    <span class="trending-count">1.8K posts</span>
-                                </div>
-                            </div>
-                            <div class="trending-item">
-                                <span class="trending-rank">3</span>
-                                <div class="trending-content">
-                                    <span class="trending-tag">#Uncensored</span>
-                                    <span class="trending-count">1.2K posts</span>
-                                </div>
-                            </div>
+                        <div class="trending-list" id="trendingHashtagsList">
+                            <!-- Top 5 hashtags will be loaded here by JS -->
                         </div>
                     </div>
 
                     <div class="recent-searches" id="recentSearches">
                         <h3>Recent Searches</h3>
-                        <div class="recent-list" id="recentList">
-                            <!-- Recent searches will be loaded here -->
+                        <div class="recent-list" id="recentSearchesList">
+                            <!-- Recent searches will be loaded here by JS -->
                         </div>
                     </div>
                 </div>
@@ -190,7 +159,7 @@
         </a>
     </nav>
 
-    <!-- Sidebar Menu -->
+    <!-- Sidebar Menu (kept, but no profile button on this page to open it) -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-content">
             <div class="sidebar-header">
