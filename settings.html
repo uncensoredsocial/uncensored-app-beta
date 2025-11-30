@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings - Uncensored Social</title>
 
-    <!-- Font Awesome (optional, for icons if you want them here) -->
+    <!-- Font Awesome (for the arrow icon) -->
     <link rel="stylesheet"
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
           integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
@@ -18,15 +18,19 @@
 </head>
 <body>
     <!-- Top Header -->
-   <header class="header header-centered">
-    <div class="header-left">
-        <button class="btn btn-ghost btn-icon header-back-button" id="settingsBackToProfile">
-            <i class="fa-solid fa-arrow-left"></i>
-        </button>
-    </div>
-    <h1 class="logo">Settings</h1>
-    <div class="header-actions"></div>
-</header>
+    <header class="header header-centered">
+        <div class="header-left">
+            <!-- THIS is the button. Inline onclick guarantees it works -->
+            <button
+                class="btn btn-ghost btn-icon header-back-button"
+                id="settingsBackToProfile"
+                onclick="window.location.href='profile.html?user=me'">
+                <i class="fa-solid fa-arrow-left"></i>
+            </button>
+        </div>
+        <h1 class="logo">Settings</h1>
+        <div class="header-actions"></div>
+    </header>
 
     <!-- Main Content Area -->
     <div class="content-wrapper">
@@ -222,5 +226,6 @@
 
     <script src="js/auth.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/settings.js"></script>
 </body>
 </html>
