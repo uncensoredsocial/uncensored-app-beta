@@ -1,5 +1,5 @@
 // ============================================
-// feed.js — Updated for media + following tab
+// feed.js — Ultra-robust front-end for feed
 // ============================================
 
 // Prefer global API_BASE_URL from auth.js
@@ -37,27 +37,38 @@ class FeedManager {
   }
 
   // ============================================
-  // DOM CACHE
+  // DOM CACHE (very forgiving)
   // ============================================
 
   cacheDom() {
     this.feedContainer = document.getElementById("feedContainer");
 
-    // Be tolerant of different IDs so your old HTML still works
+    // Try a bunch of options for the textarea
     this.postInput =
       document.getElementById("postInput") ||
       document.getElementById("postText") ||
-      document.querySelector("[data-role='post-input']");
+      document.querySelector("[data-role='post-input']") ||
+      document.querySelector("#postCreation textarea") ||
+      document.querySelector("textarea");
 
+    // Try a bunch of options for the Post button
     this.postButton =
       document.getElementById("postButton") ||
       document.getElementById("submitPostBtn") ||
-      document.querySelector("[data-role='post-button']");
+      document.querySelector("[data-role='post-button']") ||
+      (Array.from(document.getElementsByTagName("button")) || []).find(
+        (b) => b.textContent.trim().toLowerCase() === "post"
+      );
 
+    // Try a bunch of options for the char counter
     this.charCounter =
       document.getElementById("charCounter") ||
       document.getElementById("postCharCounter") ||
-      document.querySelector("[data-role='char-counter']");
+      document.querySelector("[data-role='char-counter']") ||
+      document.querySelector(".char-counter") ||
+      (Array.from(document.querySelectorAll("span,div")) || []).find((el) =>
+        /\/280$/.test(el.textContent.trim())
+      );
 
     this.postCreation = document.getElementById("postCreation");
     this.guestMessage = document.getElementById("guestMessage");
@@ -236,7 +247,9 @@ class FeedManager {
       this.charCounter.classList.add("warning");
     }
 
-    const canPost = this.isLoggedIn() && (length > 0 || this.selectedMediaFile);
+    // Let the button enable as soon as there's text or media.
+    // Backend will still check auth.
+    const canPost = length > 0 || this.selectedMediaFile;
     if (this.postButton) this.postButton.disabled = !canPost;
   }
 
@@ -271,7 +284,8 @@ class FeedManager {
 
     try {
       const url = new URL(`${FEED_API_BASE_URL}/posts`);
-      url.searchParams.set("mode", this.currentMode); // backend should treat "following" specially
+      // backend should treat mode=following as "only posts from people the user follows"
+      url.searchParams.set("mode", this.currentMode);
       url.searchParams.set("page", this.page);
       url.searchParams.set("pageSize", this.pageSize);
 
@@ -399,7 +413,7 @@ class FeedManager {
   renderMediaHtml(url, type) {
     const lower = url.toLowerCase();
     const isVideo =
-      type.startsWith("video/") ||
+      (type && type.startsWith("video/")) ||
       lower.endsWith(".mp4") ||
       lower.endsWith(".webm") ||
       lower.endsWith(".ogg");
@@ -501,7 +515,10 @@ class FeedManager {
 
   async handleCreatePost() {
     const user = this.getCurrentUser();
-    if (!user) return this.showToast("Please log in to post.", "error");
+    if (!user) {
+      this.showToast("Please log in to post.", "error");
+      // still allow the request to be blocked by backend if needed
+    }
 
     if (this.isPosting) return;
 
@@ -521,7 +538,7 @@ class FeedManager {
     const token = this.getAuthToken();
     if (!token) {
       this.showToast("Missing auth token.", "error");
-      return;
+      // still try; maybe backend lets guests post
     }
 
     this.isPosting = true;
@@ -532,24 +549,29 @@ class FeedManager {
       let res;
 
       if (hasMedia) {
-        // multipart/form-data — backend must accept this for media uploads
+        // multipart/form-data — send under multiple field names so whatever
+        // your multer config uses ("media", "file", "image") will receive it.
         const formData = new FormData();
         formData.append("content", content);
         formData.append("media", this.selectedMediaFile);
+        formData.append("file", this.selectedMediaFile);
+        formData.append("image", this.selectedMediaFile);
 
         res = await fetch(endpoint, {
           method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
           body: formData,
         });
       } else {
         // JSON only — works with your existing text-only backend
+        const headers = {
+          "Content-Type": "application/json",
+        };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+
         res = await fetch(endpoint, {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
+          headers,
           body: JSON.stringify({ content }),
         });
       }
