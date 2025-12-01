@@ -1,5 +1,5 @@
 // ============================================
-// feed.js — Stable Version (Media-ready)
+// feed.js — Stable Version (JSON + Media Ready)
 // ============================================
 
 // Prefer global API_BASE_URL from auth.js
@@ -48,7 +48,7 @@ class FeedManager {
     this.guestMessage = document.getElementById("guestMessage");
     this.postUserAvatar = document.getElementById("postUserAvatar");
 
-    // Original media setup
+    // Media picker
     this.postMediaInput = document.getElementById("postMediaInput");
     this.addMediaBtn = document.getElementById("addMediaBtn");
     this.mediaFileName = document.getElementById("mediaFileName");
@@ -90,7 +90,7 @@ class FeedManager {
       this.postButton.addEventListener("click", () => this.handleCreatePost());
     }
 
-    // Media picker
+    // Media picker UI
     if (this.addMediaBtn && this.postMediaInput) {
       this.addMediaBtn.addEventListener("click", () => {
         this.postMediaInput.click();
@@ -124,7 +124,7 @@ class FeedManager {
   }
 
   // ============================================
-  // AUTH
+  // AUTH HELPERS
   // ============================================
 
   isLoggedIn() {
@@ -157,7 +157,7 @@ class FeedManager {
     const user = this.getCurrentUser();
     const loggedIn = !!user;
 
-    // Composer
+    // Composer visibility
     if (this.postCreation)
       this.postCreation.style.display = loggedIn ? "block" : "none";
 
@@ -202,9 +202,11 @@ class FeedManager {
     this.charCounter.textContent = `${length}/${this.maxChars}`;
 
     this.charCounter.classList.remove("warning", "error");
-    if (length > this.maxChars) this.charCounter.classList.add("error");
-    else if (length > this.maxChars - 40)
+    if (length > this.maxChars) {
+      this.charCounter.classList.add("error");
+    } else if (length > this.maxChars - 40) {
       this.charCounter.classList.add("warning");
+    }
 
     const canPost = this.isLoggedIn() && (length > 0 || this.selectedMediaFile);
     if (this.postButton) this.postButton.disabled = !canPost;
@@ -305,7 +307,9 @@ class FeedManager {
     const saved = !!post.is_saved;
 
     const likeCount =
-      post.like_count || post.likes || (Array.isArray(post.likes) ? post.likes.length : 0);
+      post.like_count ||
+      post.likes ||
+      (Array.isArray(post.likes) ? post.likes.length : 0);
     const commentCount = post.comment_count || post.comments || 0;
 
     const mediaUrl = post.media_url || null;
@@ -324,7 +328,9 @@ class FeedManager {
         </header>
 
         <div class="post-body">
-          <div class="post-text">${this.formatPostContent(post.content || "")}</div>
+          <div class="post-text">${this.formatPostContent(
+            post.content || ""
+          )}</div>
 
           ${
             mediaUrl
@@ -372,7 +378,8 @@ class FeedManager {
 
       // Click post -> open post page
       postEl.addEventListener("click", (e) => {
-        if (e.target.closest(".post-actions") || e.target.closest(".post-user")) return;
+        if (e.target.closest(".post-actions") || e.target.closest(".post-user"))
+          return;
         window.location.href = `post.html?id=${postId}`;
       });
 
@@ -383,8 +390,12 @@ class FeedManager {
           e.stopPropagation();
           const username = userEl.dataset.username;
           const me = this.getCurrentUser();
-          if (me && me.username === username) window.location.href = "profile.html";
-          else window.location.href = `user.html?user=${encodeURIComponent(username)}`;
+          if (me && me.username === username)
+            window.location.href = "profile.html";
+          else
+            window.location.href = `user.html?user=${encodeURIComponent(
+              username
+            )}`;
         });
       }
 
@@ -438,11 +449,16 @@ class FeedManager {
 
     if (this.isPosting) return;
 
-    const content = (this.postInput.value || "").trim();
+    const content = (this.postInput?.value || "").trim();
     const hasMedia = !!this.selectedMediaFile;
 
     if (!content && !hasMedia) {
       this.showToast("Write something or add media.", "error");
+      return;
+    }
+
+    if (content.length > this.maxChars) {
+      this.showToast("Post is over 280 characters.", "error");
       return;
     }
 
@@ -453,28 +469,44 @@ class FeedManager {
     }
 
     this.isPosting = true;
-    this.postButton.disabled = true;
+    if (this.postButton) this.postButton.disabled = true;
 
     try {
-      // FormData — works with your backend
-      const formData = new FormData();
-      formData.append("content", content);
-      if (hasMedia) formData.append("media", this.selectedMediaFile);
+      const endpoint = `${FEED_API_BASE_URL}/posts`;
+      let res;
 
-      const res = await fetch(`${FEED_API_BASE_URL}/posts`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
+      if (hasMedia) {
+        // BACKEND MUST ACCEPT multipart/form-data FOR THIS
+        const formData = new FormData();
+        formData.append("content", content);
+        formData.append("media", this.selectedMediaFile);
+
+        res = await fetch(endpoint, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+      } else {
+        // Works with your current JSON backend
+        res = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ content }),
+        });
+      }
 
       const data = await res.json();
-
       if (!res.ok) throw new Error(data.error || "Could not create post.");
 
+      // Prepend new post
       this.posts.unshift(data);
       this.renderPosts();
 
-      this.postInput.value = "";
+      // Reset composer
+      if (this.postInput) this.postInput.value = "";
       this.selectedMediaFile = null;
       if (this.mediaFileName) this.mediaFileName.textContent = "";
       this.updateCharCounter();
@@ -486,7 +518,7 @@ class FeedManager {
     }
 
     this.isPosting = false;
-    this.postButton.disabled = false;
+    if (this.postButton) this.postButton.disabled = false;
   }
 
   // ============================================
@@ -504,7 +536,7 @@ class FeedManager {
     const icon = btn.querySelector("i");
 
     const wasLiked = btn.classList.contains("liked");
-    let newCount = parseInt(countEl.textContent || "0");
+    let newCount = parseInt(countEl.textContent || "0", 10);
 
     // Optimistic UI
     if (wasLiked) {
@@ -598,7 +630,10 @@ class FeedManager {
 
   formatPostContent(text) {
     let t = this.escape(text);
-    t = t.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>');
+    t = t.replace(
+      /(https?:\/\/[^\s]+)/g,
+      '<a href="$1" target="_blank">$1</a>'
+    );
     t = t.replace(/#(\w+)/g, '<span class="hashtag">#$1</span>');
     t = t.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
     return t;
@@ -617,7 +652,12 @@ class FeedManager {
     d.style.transform = "translateX(-50%)";
     d.style.padding = "8px 14px";
     d.style.borderRadius = "999px";
-    d.style.background = type === "error" ? "#3b0f0f" : type === "success" ? "#0f3b1f" : "#111";
+    d.style.background =
+      type === "error"
+        ? "#3b0f0f"
+        : type === "success"
+        ? "#0f3b1f"
+        : "#111";
     d.style.border = "1px solid #333";
     d.style.color = "#fff";
     d.style.zIndex = "9999";
