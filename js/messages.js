@@ -1,540 +1,586 @@
 // js/messages.js
+/* ============================================================
+   MESSAGES PAGE
+   ------------------------------------------------------------
+   - DOES NOT REDIRECT TO LOGIN
+   - If NOT logged in  -> shows guest message section
+   - If logged in      -> shows conversations + chat UI
+   - Uses helpers from auth.js:
+       isLoggedIn(), getCurrentUser(), getAuthToken()
+   - Backend (same as before – adjust URLs only if yours differ):
+       GET  /api/messages/conversations
+       GET  /api/messages/:conversationId/messages
+       POST /api/messages/:conversationId/messages
+       POST /api/messages/start   { recipientId }
+ ============================================================ */
 
-// NOTE: backend routes remain the same:
-// GET /api/messages/threads
-// POST /api/messages/start { recipientId }
-// GET /api/messages/threads/:threadId
-// POST /api/messages { threadId, recipientId, ciphertext, iv }
+const MESSAGES_API_BASE_URL =
+  typeof API_BASE_URL !== "undefined"
+    ? API_BASE_URL
+    : "https://uncensored-app-beta-production.up.railway.app/api";
 
-const LOGIN_URL = 'login.html';
+/* ------------------------- AUTH HELPERS ------------------------- */
 
-let currentUser = null;
-let authToken = null;
-
-let threads = [];
-let activeThreadId = null;
-let activeRecipient = null;
-let messagePollIntervalId = null;
-
-// cache of CryptoKey per thread
-const threadKeyCache = new Map();
-
-// DOM refs
-const conversationSearchEl = document.getElementById('conversationSearch');
-const conversationListEl = document.getElementById('conversationList');
-const conversationsLoadingEl = document.getElementById('conversationsLoading');
-const conversationsEmptyEl = document.getElementById('conversationsEmpty');
-
-const chatHeaderAvatarEl = document.getElementById('chatHeaderAvatar');
-const chatHeaderNameEl = document.getElementById('chatHeaderName');
-const chatHeaderUsernameEl = document.getElementById('chatHeaderUsername');
-const chatEncryptedPillEl = document.getElementById('chatEncryptedPill');
-
-const chatPlaceholderEl = document.getElementById('chatPlaceholder');
-const messageListEl = document.getElementById('messageList');
-const messagesLoadingEl = document.getElementById('messagesLoading');
-
-const chatComposerEl = document.getElementById('chatComposer');
-const messageInputEl = document.getElementById('messageInput');
-const messageCharCounterEl = document.getElementById('messageCharCounter');
-const sendMessageButtonEl = document.getElementById('sendMessageButton');
-
-// ===== INIT =====
-document.addEventListener('DOMContentLoaded', () => {
+function isLoggedInSafe() {
   try {
-    const stored = localStorage.getItem('user');
-    const token = localStorage.getItem('token');
+    return typeof isLoggedIn === "function" ? isLoggedIn() : false;
+  } catch {
+    return false;
+  }
+}
 
-    if (!stored || !token) {
-      window.location.href = LOGIN_URL;
+function getCurrentUserSafe() {
+  try {
+    return typeof getCurrentUser === "function" ? getCurrentUser() : null;
+  } catch {
+    return null;
+  }
+}
+
+function getAuthTokenSafe() {
+  try {
+    return typeof getAuthToken === "function" ? getAuthToken() : null;
+  } catch {
+    return null;
+  }
+}
+
+/* ------------------------- PAGE STATE ------------------------- */
+
+const messagesState = {
+  conversations: [],
+  activeConversationId: null,
+  activePartner: null,
+  loadingConversations: false,
+  loadingMessages: false,
+};
+
+/* -------------------------- DOM CACHE -------------------------- */
+
+const dom = {};
+
+function cacheDom() {
+  dom.guestSection = document.getElementById("messagesGuestMessage");
+  dom.layout = document.getElementById("messagesLayout");
+
+  dom.conversationList = document.getElementById("conversationList");
+  dom.conversationsLoading = document.getElementById("conversationsLoading");
+  dom.conversationsEmpty = document.getElementById("conversationsEmpty");
+  dom.conversationSearch = document.getElementById("conversationSearch");
+
+  dom.chatHeaderUser = document.getElementById("chatHeaderUser");
+  dom.chatHeaderAvatar = document.getElementById("chatHeaderAvatar");
+  dom.chatHeaderName = document.getElementById("chatHeaderName");
+  dom.chatHeaderUsername = document.getElementById("chatHeaderUsername");
+  dom.chatHeaderStatus = document.getElementById("chatHeaderStatus");
+  dom.chatEncryptedPill = document.getElementById("chatEncryptedPill");
+
+  dom.chatBody = document.getElementById("chatBody");
+  dom.chatPlaceholder = document.getElementById("chatPlaceholder");
+  dom.messageList = document.getElementById("messageList");
+  dom.messagesLoading = document.getElementById("messagesLoading");
+
+  dom.chatComposer = document.getElementById("chatComposer");
+  dom.messageInput = document.getElementById("messageInput");
+  dom.messageCharCounter = document.getElementById("messageCharCounter");
+  dom.sendMessageButton = document.getElementById("sendMessageButton");
+}
+
+/* -------------------------- INIT PAGE -------------------------- */
+
+document.addEventListener("DOMContentLoaded", () => {
+  cacheDom();
+  initMessagesPage();
+});
+
+async function initMessagesPage() {
+  const loggedIn = isLoggedInSafe();
+
+  if (!loggedIn) {
+    // NOT LOGGED IN -> stay on page, just show guest message UI
+    if (dom.guestSection) dom.guestSection.style.display = "flex";
+    if (dom.layout) dom.layout.style.display = "none";
+    return;
+  }
+
+  // LOGGED IN -> show full messages UI
+  if (dom.guestSection) dom.guestSection.style.display = "none";
+  if (dom.layout) dom.layout.style.display = "grid"; // two-panel layout
+
+  setupComposer();
+  setupSearch();
+  showNoConversationSelected();
+
+  await loadConversations();
+
+  // If user.html sent ?userId=... open / create DM with that user
+  const userIdFromUrl = getUserIdFromUrl();
+  if (userIdFromUrl) {
+    await openOrStartConversationWithUser(userIdFromUrl);
+  }
+}
+
+/* -------------------------- URL PARAM -------------------------- */
+
+function getUserIdFromUrl() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("userId");
+    return id ? id.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+/* -------------------------- CONVERSATIONS -------------------------- */
+
+async function loadConversations() {
+  const token = getAuthTokenSafe();
+  if (!token || !dom.conversationList) return;
+
+  messagesState.loadingConversations = true;
+  dom.conversationsLoading.style.display = "flex";
+  dom.conversationsEmpty.style.display = "none";
+  dom.conversationList.innerHTML = "";
+
+  try {
+    const res = await fetch(`${MESSAGES_API_BASE_URL}/messages/conversations`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await res.json().catch(() => []);
+    if (!res.ok) {
+      throw new Error(data.error || "Failed to load conversations");
+    }
+
+    messagesState.conversations = Array.isArray(data) ? data : [];
+
+    dom.conversationsLoading.style.display = "none";
+
+    if (!messagesState.conversations.length) {
+      dom.conversationsEmpty.style.display = "block";
       return;
     }
 
-    currentUser = JSON.parse(stored);
-    authToken = token;
+    renderConversationList(messagesState.conversations);
   } catch (err) {
-    console.error('Error reading auth info', err);
-    window.location.href = LOGIN_URL;
-    return;
-  }
-
-  // hide composer until a conversation is opened
-  if (chatComposerEl) {
-    chatComposerEl.classList.add('hidden');
-  }
-
-  setupEventListeners();
-  loadThreads();
-  autoOpenThreadFromQuery();
-});
-
-// ===== EVENT LISTENERS =====
-function setupEventListeners() {
-  if (messageInputEl) {
-    messageInputEl.addEventListener('input', () => {
-      const text = messageInputEl.value || '';
-      const length = text.length;
-
-      if (messageCharCounterEl) {
-        messageCharCounterEl.textContent = `${length}/1000`;
-      }
-      if (sendMessageButtonEl) {
-        sendMessageButtonEl.disabled = text.trim().length === 0;
-      }
-      autoGrowTextarea(messageInputEl);
-    });
-  }
-
-  if (sendMessageButtonEl) {
-    sendMessageButtonEl.addEventListener('click', async () => {
-      await handleSendMessage();
-    });
-  }
-
-  if (conversationSearchEl) {
-    conversationSearchEl.addEventListener('input', () => {
-      renderThreads();
-    });
-  }
-}
-
-function autoGrowTextarea(textarea) {
-  textarea.style.height = 'auto';
-  textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
-}
-
-// ===== API HELPERS =====
-async function apiGet(path) {
-  const res = await fetch(path, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${authToken}`
-    }
-  });
-
-  if (res.status === 401) {
-    window.location.href = LOGIN_URL;
-    throw new Error('Unauthorized');
-  }
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`GET ${path} failed: ${res.status} ${text}`);
-  }
-  return res.json();
-}
-
-async function apiPost(path, body) {
-  const res = await fetch(path, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${authToken}`
-    },
-    body: JSON.stringify(body)
-  });
-
-  if (res.status === 401) {
-    window.location.href = LOGIN_URL;
-    throw new Error('Unauthorized');
-  }
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`POST ${path} failed: ${res.status} ${text}`);
-  }
-  return res.json();
-}
-
-// ===== THREADS =====
-async function loadThreads() {
-  if (!conversationListEl) return;
-
-  conversationsLoadingEl.style.display = 'flex';
-  conversationsEmptyEl.style.display = 'none';
-  conversationListEl.innerHTML = '';
-
-  try {
-    const data = await apiGet('/api/messages/threads');
-    threads = data.threads || [];
-    renderThreads();
-  } catch (err) {
-    console.error('Failed to load threads', err);
-    conversationListEl.innerHTML = `
-      <div class="conversations-empty">
-        Could not load conversations.
-      </div>
-    `;
+    console.error("loadConversations error:", err);
+    dom.conversationsLoading.style.display = "none";
+    dom.conversationsEmpty.style.display = "block";
+    dom.conversationsEmpty.textContent = "Could not load conversations.";
   } finally {
-    conversationsLoadingEl.style.display = 'none';
+    messagesState.loadingConversations = false;
   }
 }
 
-function renderThreads() {
-  if (!conversationListEl) return;
+function renderConversationList(list) {
+  dom.conversationList.innerHTML = "";
 
-  conversationListEl.innerHTML = '';
+  list.forEach((conv) => {
+    const item = document.createElement("button");
+    item.className = "conversation-item";
+    item.type = "button";
+    item.dataset.conversationId = conv.id;
 
-  if (!threads || threads.length === 0) {
-    conversationsEmptyEl.style.display = 'block';
-    return;
-  } else {
-    conversationsEmptyEl.style.display = 'none';
-  }
+    const partner = conv.partner || conv.other_user || {};
+    const avatar = partner.avatar_url || "assets/icons/default-profile.png";
+    const displayName =
+      partner.display_name || partner.username || "Unknown user";
+    const username = partner.username ? `@${partner.username}` : "";
 
-  const term = (conversationSearchEl?.value || '').toLowerCase().trim();
-
-  const sorted = [...threads]
-    .filter(t => {
-      if (!term) return true;
-      const name = (t.recipient?.display_name || '').toLowerCase();
-      const username = (t.recipient?.username || '').toLowerCase();
-      const preview = (t.last_message?.plaintext_preview || '').toLowerCase();
-      return (
-        name.includes(term) ||
-        username.includes(term) ||
-        preview.includes(term)
-      );
-    })
-    .sort((a, b) => {
-      const aTime = new Date(a.updated_at || a.created_at || 0).getTime();
-      const bTime = new Date(b.updated_at || b.created_at || 0).getTime();
-      return bTime - aTime;
-    });
-
-  sorted.forEach(thread => {
-    const item = document.createElement('div');
-    item.className = 'conversation-item';
-    if (thread.id === activeThreadId) item.classList.add('active');
-    item.dataset.threadId = thread.id;
-    item.dataset.recipientId = thread.recipient?.id || '';
-
-    const initials = (thread.recipient?.display_name || thread.recipient?.username || '?')
-      .split(' ')
-      .map(part => part[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
-
-    const avatarUrl = thread.recipient?.avatar_url || '';
+    const lastMessage = conv.last_message || {};
+    const lastSnippet = lastMessage.content || "";
+    const time = lastMessage.created_at
+      ? new Date(lastMessage.created_at).toLocaleTimeString([], {
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : "";
 
     item.innerHTML = `
-      <div class="conversation-avatar">
-        ${avatarUrl ? `<img src="${avatarUrl}" alt="">` : initials}
+      <div class="conversation-avatar-wrapper">
+        <img
+          src="${avatar}"
+          class="conversation-avatar"
+          alt="${escapeHtml(displayName)}"
+          onerror="this.src='assets/icons/default-profile.png'"
+        />
       </div>
       <div class="conversation-main">
         <div class="conversation-top-row">
-          <div class="conversation-name">${escapeHtml(thread.recipient?.display_name || thread.recipient?.username || 'User')}</div>
-          <div class="conversation-time">${formatRelativeTime(thread.updated_at || thread.created_at)}</div>
+          <span class="conversation-name">${escapeHtml(displayName)}</span>
+          <span class="conversation-time">${escapeHtml(time)}</span>
         </div>
-        <div class="conversation-username">@${escapeHtml(thread.recipient?.username || 'user')}</div>
-        <div class="conversation-top-row">
-          <div class="conversation-last-message">
-            ${escapeHtml(thread.last_message?.plaintext_preview || '')}
-          </div>
-          ${thread.unread_count > 0 ? '<div class="conversation-unread-dot"></div>' : ''}
+        <div class="conversation-bottom-row">
+          <span class="conversation-username">${escapeHtml(username)}</span>
+          <span class="conversation-snippet">${escapeHtml(lastSnippet)}</span>
         </div>
       </div>
     `;
 
-    item.addEventListener('click', () => {
-      onConversationClick(thread);
+    item.addEventListener("click", () => {
+      messagesState.activeConversationId = conv.id;
+      messagesState.activePartner = partner;
+      highlightActiveConversation(conv.id);
+      updateChatHeaderForPartner(partner);
+      showComposerEnabled();
+      loadMessages(conv.id);
     });
 
-    conversationListEl.appendChild(item);
+    dom.conversationList.appendChild(item);
   });
 }
 
-function onConversationClick(thread) {
-  activeThreadId = thread.id;
-  activeRecipient = thread.recipient || null;
-
-  renderThreads();
-  openChatHeader();
-  loadMessagesForActiveThread();
-}
-
-// If coming from profile like messages.html?userId=abc
-async function autoOpenThreadFromQuery() {
-  const params = new URLSearchParams(window.location.search);
-  const userId = params.get('userId');
-  if (!userId) return;
-
-  try {
-    const data = await apiPost('/api/messages/start', { recipientId: userId });
-    const t = data.thread;
-    if (!threads.find(th => th.id === t.id)) {
-      threads.push(t);
+function highlightActiveConversation(id) {
+  const buttons = dom.conversationList.querySelectorAll(".conversation-item");
+  buttons.forEach((btn) => {
+    if (btn.dataset.conversationId === String(id)) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
     }
-    renderThreads();
-    onConversationClick(t);
+  });
+}
+
+/* ------------------------- OPEN BY USER ID ------------------------- */
+
+async function openOrStartConversationWithUser(userId) {
+  const token = getAuthTokenSafe();
+  if (!token) return;
+
+  // 1) Check if a conversation already exists with this user
+  const existing = messagesState.conversations.find(
+    (c) =>
+      c.partner?.id === userId ||
+      c.other_user?.id === userId ||
+      String(c.partner_id) === String(userId)
+  );
+
+  if (existing) {
+    messagesState.activeConversationId = existing.id;
+    messagesState.activePartner = existing.partner || existing.other_user || {};
+    highlightActiveConversation(existing.id);
+    updateChatHeaderForPartner(messagesState.activePartner);
+    showComposerEnabled();
+    await loadMessages(existing.id);
+    return;
+  }
+
+  // 2) Otherwise, ask backend to start conversation
+  try {
+    const res = await fetch(`${MESSAGES_API_BASE_URL}/messages/start`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ recipientId: userId }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || "Could not start conversation");
+    }
+
+    // Expect conversation object back
+    const conv = data.conversation || data;
+    if (!conv || !conv.id) return;
+
+    messagesState.conversations.unshift(conv);
+    renderConversationList(messagesState.conversations);
+
+    messagesState.activeConversationId = conv.id;
+    messagesState.activePartner = conv.partner || conv.other_user || {};
+    highlightActiveConversation(conv.id);
+    updateChatHeaderForPartner(messagesState.activePartner);
+    showComposerEnabled();
+    await loadMessages(conv.id);
   } catch (err) {
-    console.error('Failed to start/open thread from query', err);
+    console.error("openOrStartConversationWithUser error:", err);
   }
 }
 
-// ===== CHAT / MESSAGES =====
-function openChatHeader() {
-  if (!activeRecipient) return;
+/* ----------------------------- MESSAGES ----------------------------- */
 
-  chatHeaderAvatarEl.src = activeRecipient.avatar_url || 'assets/icons/default-profile.png';
-  chatHeaderNameEl.textContent = activeRecipient.display_name || activeRecipient.username || 'User';
-  chatHeaderUsernameEl.textContent = `@${activeRecipient.username || 'user'}`;
+async function loadMessages(conversationId) {
+  const token = getAuthTokenSafe();
+  if (!token || !dom.messageList) return;
 
-  // Show encryption pill with full text
-  if (chatEncryptedPillEl) {
-    chatEncryptedPillEl.textContent = '🔒 All messages are encrypted. Only you and the other person can read them.';
-    chatEncryptedPillEl.style.display = 'inline-flex';
-  }
-
-  // show composer once a chat is open
-  if (chatComposerEl) {
-    chatComposerEl.classList.remove('hidden');
-  }
-}
-
-async function loadMessagesForActiveThread() {
-  if (!activeThreadId) return;
-
-  if (messagePollIntervalId) {
-    clearInterval(messagePollIntervalId);
-    messagePollIntervalId = null;
-  }
-
-  await fetchAndRenderMessages();
-  messagePollIntervalId = setInterval(fetchAndRenderMessages, 5000);
-}
-
-async function fetchAndRenderMessages() {
-  if (!activeThreadId) return;
-
-  messagesLoadingEl.style.display = 'flex';
+  messagesState.loadingMessages = true;
+  dom.messageList.innerHTML = "";
+  dom.messagesLoading.style.display = "flex";
+  dom.chatPlaceholder.style.display = "none";
 
   try {
-    const data = await apiGet(`/api/messages/threads/${activeThreadId}`);
-    const messages = data.messages || [];
-
-    messageListEl.innerHTML = '';
-
-    if (chatPlaceholderEl) chatPlaceholderEl.style.display = 'none';
-
-    // Optional system notice (you already have the pill; this is extra)
-    messageListEl.appendChild(
-      systemMessageEl('This chat is end-to-end encrypted. Only you and the other person can read these messages.')
+    const res = await fetch(
+      `${MESSAGES_API_BASE_URL}/messages/${encodeURIComponent(
+        conversationId
+      )}/messages`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
     );
 
-    for (const msg of messages) {
-      const row = await createMessageRow(msg);
-      messageListEl.appendChild(row);
+    const data = await res.json().catch(() => []);
+    if (!res.ok) {
+      throw new Error(data.error || "Failed to load messages");
     }
 
-    messageListEl.scrollTop = messageListEl.scrollHeight;
+    const messages = Array.isArray(data) ? data : [];
+    renderMessages(messages);
   } catch (err) {
-    console.error('Failed to load messages', err);
-    messageListEl.innerHTML = '';
-    messageListEl.appendChild(systemMessageEl('Could not load messages.'));
+    console.error("loadMessages error:", err);
+    dom.messageList.innerHTML = `<div class="chat-error">Could not load messages.</div>`;
   } finally {
-    messagesLoadingEl.style.display = 'none';
+    dom.messagesLoading.style.display = "none";
+    messagesState.loadingMessages = false;
+    scrollMessagesToBottom();
   }
 }
 
-// ===== SEND =====
-async function handleSendMessage() {
-  if (!activeThreadId || !activeRecipient) return;
+function renderMessages(messages) {
+  dom.messageList.innerHTML = "";
 
-  const text = messageInputEl.value.trim();
+  const currentUser = getCurrentUserSafe();
+  const currentId = currentUser ? currentUser.id : null;
+
+  messages.forEach((msg) => {
+    const mine = currentId && String(msg.sender_id) === String(currentId);
+
+    const bubble = document.createElement("div");
+    bubble.className = mine ? "chat-message chat-message-out" : "chat-message";
+
+    const time = msg.created_at
+      ? new Date(msg.created_at).toLocaleTimeString([], {
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : "";
+
+    bubble.innerHTML = `
+      <div class="chat-bubble">
+        <p>${escapeHtml(msg.content || "")}</p>
+        <span class="chat-meta">${escapeHtml(time)}</span>
+      </div>
+    `;
+
+    dom.messageList.appendChild(bubble);
+  });
+}
+
+function scrollMessagesToBottom() {
+  if (!dom.messageList) return;
+  dom.messageList.scrollTop = dom.messageList.scrollHeight;
+}
+
+/* --------------------------- COMPOSER --------------------------- */
+
+function setupComposer() {
+  if (!dom.chatComposer || !dom.messageInput || !dom.sendMessageButton) return;
+
+  // Initially disabled until a conversation is selected
+  showComposerDisabled();
+
+  dom.messageInput.addEventListener("input", () => {
+    const val = dom.messageInput.value || "";
+    dom.messageCharCounter.textContent = `${val.length}/1000`;
+    if (val.trim().length > 0 && messagesState.activeConversationId) {
+      dom.sendMessageButton.disabled = false;
+    } else {
+      dom.sendMessageButton.disabled = true;
+    }
+  });
+
+  dom.messageInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  });
+
+  dom.sendMessageButton.addEventListener("click", handleSendMessage);
+}
+
+function showComposerDisabled() {
+  dom.chatComposer.classList.add("chat-composer-disabled");
+  dom.messageInput.disabled = true;
+  dom.messageInput.placeholder = "Select a conversation to start messaging.";
+  dom.sendMessageButton.disabled = true;
+}
+
+function showComposerEnabled() {
+  dom.chatComposer.classList.remove("chat-composer-disabled");
+  dom.messageInput.disabled = false;
+  dom.messageInput.placeholder = "Message";
+  const val = dom.messageInput.value || "";
+  dom.sendMessageButton.disabled = val.trim().length === 0;
+}
+
+async function handleSendMessage() {
+  if (!messagesState.activeConversationId) return;
+
+  const token = getAuthTokenSafe();
+  if (!token) return;
+
+  const text = (dom.messageInput.value || "").trim();
   if (!text) return;
 
-  sendMessageButtonEl.disabled = true;
-
-  try {
-    const { ciphertextBase64, ivBase64 } = await encryptForThread(activeThreadId, text);
-
-    const payload = {
-      threadId: activeThreadId,
-      recipientId: activeRecipient.id,
-      ciphertext: ciphertextBase64,
-      iv: ivBase64
-    };
-
-    const saved = await apiPost('/api/messages', payload);
-
-    const row = await createMessageRow(saved);
-    messageListEl.appendChild(row);
-    messageListEl.scrollTop = messageListEl.scrollHeight;
-
-    messageInputEl.value = '';
-    messageCharCounterEl.textContent = '0/1000';
-    autoGrowTextarea(messageInputEl);
-  } catch (err) {
-    console.error('Failed to send message', err);
-    alert('Could not send message.');
-  } finally {
-    sendMessageButtonEl.disabled = false;
-  }
-}
-
-async function createMessageRow(msg) {
-  const row = document.createElement('div');
-  const isOwn = msg.sender_id === currentUser.id;
-
-  row.className = `message-row ${isOwn ? 'own' : 'other'}`;
-
-  let plaintext = '';
-  try {
-    plaintext = await decryptForThread(activeThreadId, msg.ciphertext, msg.iv);
-  } catch (err) {
-    console.warn('Decrypt failed for message', msg.id, err);
-    plaintext = '[Unable to decrypt message]';
-  }
-
-  const bubble = document.createElement('div');
-  bubble.className = 'message-bubble';
-  bubble.textContent = plaintext;
-
-  const meta = document.createElement('div');
-  meta.className = 'message-meta';
-  meta.textContent = formatTime(msg.created_at);
-
-  const wrapper = document.createElement('div');
-  wrapper.appendChild(bubble);
-  wrapper.appendChild(meta);
-
-  row.appendChild(wrapper);
-  return row;
-}
-
-function systemMessageEl(text) {
-  const el = document.createElement('div');
-  el.className = 'message-system';
-  el.textContent = text;
-  return el;
-}
-
-// ===== ENCRYPTION (unchanged backend behavior) =====
-async function getThreadKey(threadId) {
-  if (threadKeyCache.has(threadId)) return threadKeyCache.get(threadId);
-
-  const storageKey = `messages_passphrase_${threadId}`;
-  let passphrase = localStorage.getItem(storageKey);
-
-  if (!passphrase) {
-    passphrase = prompt('Set or enter the shared passphrase for this chat (must match on both sides):');
-    if (!passphrase) throw new Error('No passphrase provided');
-    localStorage.setItem(storageKey, passphrase);
-  }
-
-  const key = await deriveAesKeyFromPassphrase(passphrase, threadId);
-  threadKeyCache.set(threadId, key);
-  return key;
-}
-
-async function deriveAesKeyFromPassphrase(passphrase, saltString) {
-  const enc = new TextEncoder();
-  const passphraseKey = await crypto.subtle.importKey(
-    'raw',
-    enc.encode(passphrase),
-    { name: 'PBKDF2' },
-    false,
-    ['deriveKey']
-  );
-
-  return crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt: enc.encode(saltString),
-      iterations: 250000,
-      hash: 'SHA-256'
-    },
-    passphraseKey,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
-  );
-}
-
-async function encryptForThread(threadId, plaintext) {
-  const key = await getThreadKey(threadId);
-  const enc = new TextEncoder();
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-
-  const ciphertextBuffer = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    enc.encode(plaintext)
-  );
-
-  return {
-    ciphertextBase64: arrayBufferToBase64(ciphertextBuffer),
-    ivBase64: arrayBufferToBase64(iv.buffer)
-  };
-}
-
-async function decryptForThread(threadId, ciphertextBase64, ivBase64) {
-  const key = await getThreadKey(threadId);
-  const dec = new TextDecoder();
-
-  const ciphertext = base64ToArrayBuffer(ciphertextBase64);
-  const iv = new Uint8Array(base64ToArrayBuffer(ivBase64));
-
-  const plainBuffer = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    ciphertext
-  );
-
-  return dec.decode(plainBuffer);
-}
-
-// ===== UTIL =====
-function escapeHtml(str) {
-  if (!str) return '';
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-function formatTime(dateString) {
-  if (!dateString) return '';
-  const d = new Date(dateString);
-  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-}
-
-function formatRelativeTime(dateString) {
-  if (!dateString) return '';
-  const d = new Date(dateString);
+  // optimistic append
   const now = new Date();
-  const diffMs = now - d;
-  const diffSec = Math.floor(diffMs / 1000);
-  const diffMin = Math.floor(diffSec / 60);
-  const diffHr = Math.floor(diffMin / 60);
-  const diffDay = Math.floor(diffHr / 24);
+  const currentUser = getCurrentUserSafe();
 
-  if (diffSec < 60) return 'now';
-  if (diffMin < 60) return `${diffMin}m`;
-  if (diffHr < 24) return `${diffHr}h`;
-  if (diffDay < 7) return `${diffDay}d`;
-  return d.toLocaleDateString();
+  const tempMessage = {
+    id: "tmp-" + now.getTime(),
+    sender_id: currentUser ? currentUser.id : null,
+    content: text,
+    created_at: now.toISOString(),
+  };
+
+  const oldScroll = dom.messageList.scrollHeight;
+  const wasAtBottom =
+    dom.messageList.scrollTop + dom.messageList.clientHeight >= oldScroll - 5;
+
+  const existingHtml = dom.messageList.innerHTML;
+  renderMessages([tempMessage]); // or append; here we re-render only this
+  dom.messageList.innerHTML = existingHtml + dom.messageList.innerHTML;
+
+  if (wasAtBottom) scrollMessagesToBottom();
+
+  dom.messageInput.value = "";
+  dom.messageCharCounter.textContent = "0/1000";
+  dom.sendMessageButton.disabled = true;
+
+  try {
+    const res = await fetch(
+      `${MESSAGES_API_BASE_URL}/messages/${encodeURIComponent(
+        messagesState.activeConversationId
+      )}/messages`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ content: text }),
+      }
+    );
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || "Could not send message");
+    }
+
+    // reload messages to sync
+    await loadMessages(messagesState.activeConversationId);
+  } catch (err) {
+    console.error("handleSendMessage error:", err);
+    // show simple error in chat
+    const errDiv = document.createElement("div");
+    errDiv.className = "chat-error";
+    errDiv.textContent = "Failed to send message.";
+    dom.messageList.appendChild(errDiv);
+    scrollMessagesToBottom();
+  }
 }
 
-function arrayBufferToBase64(buffer) {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
+/* --------------------------- SEARCH --------------------------- */
+
+function setupSearch() {
+  if (!dom.conversationSearch) return;
+
+  dom.conversationSearch.addEventListener("input", () => {
+    const q = dom.conversationSearch.value.toLowerCase().trim();
+    if (!q) {
+      renderConversationList(messagesState.conversations);
+      return;
+    }
+
+    const filtered = messagesState.conversations.filter((c) => {
+      const p = c.partner || c.other_user || {};
+      const name = (p.display_name || p.username || "").toLowerCase();
+      const username = (p.username || "").toLowerCase();
+      return name.includes(q) || username.includes(q);
+    });
+
+    renderConversationList(filtered);
+  });
 }
 
-function base64ToArrayBuffer(base64) {
-  const binary = atob(base64);
-  const len = binary.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binary.charCodeAt(i);
+/* ------------------------ CHAT HEADER STATES ------------------------ */
+
+function showNoConversationSelected() {
+  if (dom.chatPlaceholder) dom.chatPlaceholder.style.display = "block";
+  if (dom.messageList) dom.messageList.innerHTML = "";
+  if (dom.messagesLoading) dom.messagesLoading.style.display = "none";
+
+  if (dom.chatHeaderAvatar) {
+    dom.chatHeaderAvatar.src = "assets/icons/default-profile.png";
   }
-  return bytes.buffer;
+  if (dom.chatHeaderName) {
+    dom.chatHeaderName.textContent = "Select a conversation";
+  }
+  if (dom.chatHeaderUsername) {
+    dom.chatHeaderUsername.textContent = "";
+  }
+
+  if (dom.chatHeaderStatus) {
+    dom.chatHeaderStatus.innerHTML =
+      '<span class="chat-encrypted-note">🔒 All messages are end-to-end encrypted. Only you and the other person can read them.</span>';
+  }
+  showComposerDisabled();
+}
+
+function updateChatHeaderForPartner(partner) {
+  if (!partner) return;
+
+  if (dom.chatPlaceholder) dom.chatPlaceholder.style.display = "none";
+
+  if (dom.chatHeaderAvatar) {
+    dom.chatHeaderAvatar.src =
+      partner.avatar_url || "assets/icons/default-profile.png";
+    dom.chatHeaderAvatar.onerror = () => {
+      dom.chatHeaderAvatar.src = "assets/icons/default-profile.png";
+    };
+  }
+
+  if (dom.chatHeaderName) {
+    dom.chatHeaderName.textContent =
+      partner.display_name || partner.username || "User";
+  }
+
+  if (dom.chatHeaderUsername) {
+    dom.chatHeaderUsername.textContent = partner.username
+      ? `@${partner.username}`
+      : "";
+  }
+
+  if (dom.chatHeaderStatus) {
+    dom.chatHeaderStatus.innerHTML =
+      '<span class="chat-encrypted-note">🔒 Encrypted chat · Only you and this user can read these messages.</span>';
+  }
+}
+
+/* ------------------------ UTILS ------------------------ */
+
+function escapeHtml(str = "") {
+  return String(str).replace(/[&<>"']/g, (m) => {
+    switch (m) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      case "'":
+        return "&#039;";
+      default:
+        return m;
+    }
+  });
 }
