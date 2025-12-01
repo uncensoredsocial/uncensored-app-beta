@@ -72,8 +72,9 @@
         <div id="postContainer"></div>
       </section>
 
-      <!-- ===== COMMENT COMPOSER ===== -->
+      <!-- ===== COMMENT COMPOSER / COMMENTS ===== -->
       <section class="comments-section">
+        <!-- Composer -->
         <div class="comment-composer auth-dependent" id="commentComposer">
           <div class="comment-composer-inner">
             <img
@@ -87,7 +88,7 @@
               <textarea
                 id="commentInput"
                 class="comment-input"
-                rows="2"
+                rows="3"
                 maxlength="280"
                 placeholder="Add a comment..."
               ></textarea>
@@ -108,7 +109,7 @@
           </div>
         </div>
 
-        <!-- shown if logged out -->
+        <!-- Guest message -->
         <div class="comments-guest-message" id="commentsGuestMessage">
           <p>Log in to join the conversation.</p>
           <div class="guest-actions">
@@ -117,14 +118,13 @@
           </div>
         </div>
 
-        <!-- ===== COMMENTS LIST ===== -->
+        <!-- Header -->
         <div class="comments-header">
           <h2>Comments</h2>
         </div>
 
-        <div class="comments-list" id="commentsList">
-          <!-- comments rendered here -->
-        </div>
+        <!-- List -->
+        <div class="comments-list" id="commentsList"></div>
 
         <div class="loading-indicator small" id="commentsLoading">
           <div class="loading-spinner"></div>
@@ -141,19 +141,19 @@
   <!-- ================= BOTTOM NAV ================= -->
   <nav class="bottom-nav" id="bottomNav">
     <a href="index.html" class="nav-item">
-      <span class="icon icon-home"></span>
+      <i class="fa-solid fa-house nav-icon"></i>
       <span class="nav-label">Home</span>
     </a>
     <a href="search.html" class="nav-item">
-      <span class="icon icon-search"></span>
+      <i class="fa-solid fa-magnifying-glass nav-icon"></i>
       <span class="nav-label">Search</span>
     </a>
     <a href="notifications.html" class="nav-item">
-      <span class="icon icon-notifications"></span>
+      <i class="fa-regular fa-bell nav-icon"></i>
       <span class="nav-label">Alerts</span>
     </a>
     <a href="dms.html" class="nav-item">
-      <span class="icon icon-messages"></span>
+      <i class="fa-regular fa-envelope nav-icon"></i>
       <span class="nav-label">Messages</span>
     </a>
   </nav>
