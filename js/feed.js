@@ -381,30 +381,25 @@ class FeedManager {
       });
 
       // User profile click
-const userEl = card.querySelector('.post-user');
-if (userEl) {
-  userEl.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const username = userEl.getAttribute('data-username');
+      const userEl = card.querySelector('.post-user');
+      if (userEl) {
+        userEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const username = userEl.getAttribute('data-username');
 
-    if (!username) return;
+          if (!username) return;
 
-    // Get the currently logged-in user (from auth.js)
-    const currentUser =
-      typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+          const currentUser =
+            typeof getCurrentUser === 'function' ? getCurrentUser() : null;
 
-    // If it's *your* username, go to your normal profile page
-    if (currentUser && currentUser.username === username) {
-      // if you use profile.html?user=me, use that instead:
-      // window.location.href = 'profile.html?user=me';
-      window.location.href = 'profile.html';
-    } else {
-      // Otherwise go to the public user view
-      window.location.href =
-        'user.html?user=' + encodeURIComponent(username);
-    }
-  });
-}
+          if (currentUser && currentUser.username === username) {
+            window.location.href = 'profile.html';
+          } else {
+            window.location.href =
+              'user.html?user=' + encodeURIComponent(username);
+          }
+        });
+      }
 
       // Like button
       const likeBtn = card.querySelector('.like-btn');
@@ -462,8 +457,11 @@ if (userEl) {
     if (!this.postInput) return;
 
     const content = (this.postInput.value || '').trim();
-    if (!content && !this.selectedMediaFile) {
-      this.showMessage('Write something or add media first', 'info');
+
+    // NOTE: for now the backend only supports text content via JSON.
+    // So we require some text; media is ignored for the actual POST.
+    if (!content) {
+      this.showMessage('Write something first', 'info');
       return;
     }
 
@@ -477,31 +475,26 @@ if (userEl) {
         return;
       }
 
-      const formData = new FormData();
-      formData.append('content', content);
-      if (this.selectedMediaFile) {
-        formData.append('media', this.selectedMediaFile);
-      }
-
       const res = await fetch(`${FEED_API_BASE_URL}/posts`, {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: formData
+        body: JSON.stringify({ content })
       });
 
-      if (!res.ok) {
-        throw new Error('Failed to create post');
-      }
+      const newPost = await res.json().catch(() => ({}));
 
-      const newPost = await res.json();
+      if (!res.ok) {
+        throw new Error(newPost.error || 'Failed to create post');
+      }
 
       this.posts.unshift(newPost);
       this.renderPosts();
 
       this.postInput.value = '';
-      this.clearMedia();
+      this.clearMedia(); // just clears preview/state
       this.updateCharCount();
 
       this.showMessage('Post created', 'success');
