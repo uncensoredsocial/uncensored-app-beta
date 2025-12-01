@@ -247,8 +247,7 @@ class FeedManager {
       this.charCounter.classList.add("warning");
     }
 
-    // Let the button enable as soon as there's text or media.
-    // Backend will still check auth.
+    // Enable as soon as there's text or media; backend still enforces auth
     const canPost = length > 0 || this.selectedMediaFile;
     if (this.postButton) this.postButton.disabled = !canPost;
   }
@@ -348,11 +347,25 @@ class FeedManager {
     const liked = !!post.is_liked;
     const saved = !!post.is_saved;
 
-    const likeCount =
-      post.like_count ||
-      post.likes ||
-      (Array.isArray(post.likes) ? post.likes.length : 0);
-    const commentCount = post.comment_count || post.comments || 0;
+    // Like count: handle number OR array
+    let likeCount = 0;
+    if (typeof post.like_count === "number") {
+      likeCount = post.like_count;
+    } else if (Array.isArray(post.likes)) {
+      likeCount = post.likes.length;
+    } else if (typeof post.likes === "number") {
+      likeCount = post.likes;
+    }
+
+    // Comment count: handle number OR array
+    let commentCount = 0;
+    if (typeof post.comment_count === "number") {
+      commentCount = post.comment_count;
+    } else if (Array.isArray(post.comments)) {
+      commentCount = post.comments.length;
+    } else if (typeof post.comments === "number") {
+      commentCount = post.comments;
+    }
 
     const mediaUrl =
       post.media_url || post.media || post.image_url || post.video_url || null;
@@ -419,6 +432,7 @@ class FeedManager {
       lower.endsWith(".ogg");
 
     if (isVideo) {
+      // video: playable inside the post
       return `
         <div class="post-media">
           <video controls playsinline preload="metadata">
@@ -429,9 +443,12 @@ class FeedManager {
       `;
     }
 
+    // image: clickable to open full size in new tab
     return `
       <div class="post-media">
-        <img src="${url}" loading="lazy">
+        <a href="${url}" target="_blank" rel="noopener noreferrer">
+          <img src="${url}" loading="lazy">
+        </a>
       </div>
     `;
   }
@@ -510,14 +527,14 @@ class FeedManager {
   }
 
   // ============================================
-  // CREATE POST
+  // CREATE POST (handles media upload)
   // ============================================
 
   async handleCreatePost() {
     const user = this.getCurrentUser();
     if (!user) {
       this.showToast("Please log in to post.", "error");
-      // still allow the request to be blocked by backend if needed
+      // still let backend enforce; we just show message
     }
 
     if (this.isPosting) return;
@@ -538,7 +555,7 @@ class FeedManager {
     const token = this.getAuthToken();
     if (!token) {
       this.showToast("Missing auth token.", "error");
-      // still try; maybe backend lets guests post
+      // still attempt; backend may block
     }
 
     this.isPosting = true;
@@ -563,7 +580,7 @@ class FeedManager {
           body: formData,
         });
       } else {
-        // JSON only — works with your existing text-only backend
+        // JSON only — text-only posts
         const headers = {
           "Content-Type": "application/json",
         };
@@ -600,7 +617,7 @@ class FeedManager {
   }
 
   // ============================================
-  // LIKE / SAVE
+  // LIKE / SAVE (keeps local state in sync)
   // ============================================
 
   async handleLike(postId, btn) {
@@ -626,7 +643,7 @@ class FeedManager {
       icon.classList.replace("fa-regular", "fa-solid");
       newCount++;
     }
-    countEl.textContent = newCount;
+    countEl.textContent = String(Math.max(newCount, 0));
 
     try {
       const res = await fetch(`${FEED_API_BASE_URL}/posts/${postId}/like`, {
@@ -636,10 +653,26 @@ class FeedManager {
 
       const data = await res.json();
 
-      if (!res.ok) throw new Error("Failed to update like");
+      if (!res.ok) throw new Error(data.error || "Failed to update like");
 
-      if (typeof data.likes === "number")
-        countEl.textContent = data.likes.toString();
+      // If backend returns a number, trust it
+      const serverLikes =
+        typeof data.likes === "number"
+          ? data.likes
+          : typeof data.like_count === "number"
+          ? data.like_count
+          : null;
+
+      if (serverLikes !== null) {
+        countEl.textContent = String(serverLikes);
+      }
+
+      // Update local posts array for consistency
+      const post = this.posts.find((p) => p.id === postId);
+      if (post) {
+        post.is_liked = !wasLiked;
+        if (serverLikes !== null) post.like_count = serverLikes;
+      }
     } catch (err) {
       console.error(err);
       this.showToast("Failed to update like", "error");
@@ -666,10 +699,18 @@ class FeedManager {
     }
 
     try {
-      await fetch(`${FEED_API_BASE_URL}/posts/${postId}/save`, {
+      const res = await fetch(`${FEED_API_BASE_URL}/posts/${postId}/save`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update save");
+
+      const post = this.posts.find((p) => p.id === postId);
+      if (post) {
+        post.is_saved = !wasSaved;
+      }
     } catch (err) {
       console.error(err);
       this.showToast("Failed to update save", "error");
