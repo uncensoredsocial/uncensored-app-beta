@@ -28,7 +28,7 @@ class PostPage {
     await this.loadComments();
   }
 
-  // ========= DOM / UTIL =========
+  // ========= DOM & AUTH =========
 
   cacheDom() {
     this.postWrapper = document.getElementById("postWrapper");
@@ -49,7 +49,7 @@ class PostPage {
       document.getElementById("commentCharCounter");
     this.commentButton = document.getElementById("commentButton");
 
-    // header auth bits (reuse from other pages)
+    // header auth bits
     this.profileSection = document.getElementById("profileSection");
     this.authButtons = document.getElementById("authButtons");
     this.headerProfileImg = document.getElementById("headerProfileImg");
@@ -126,7 +126,7 @@ class PostPage {
           : "assets/icons/default-profile.png";
     }
 
-    // header UI
+    // header
     if (this.profileSection && this.authButtons) {
       if (loggedIn) {
         this.profileSection.style.display = "flex";
@@ -148,8 +148,8 @@ class PostPage {
     const length = text.length;
 
     this.commentCharCounter.textContent = `${length}/${this.maxCommentChars}`;
-
     this.commentCharCounter.classList.remove("warning", "error");
+
     if (length > this.maxCommentChars) {
       this.commentCharCounter.classList.add("error");
     } else if (length > this.maxCommentChars - 40) {
@@ -166,7 +166,7 @@ class PostPage {
     this.loadComments();
   }
 
-  // ========= LOAD POST =========
+  // ========= POST LOAD & RENDER =========
 
   async loadPost() {
     if (!this.postId || !this.postContainer) return;
@@ -183,7 +183,10 @@ class PostPage {
 
       if (!res.ok) throw new Error(data.error || "Failed to load post.");
 
-      this.post = data;
+      // some APIs nest: { post, comments }
+      this.post = data.post || data;
+      this.comments = data.comments || this.comments;
+
       this.renderPost();
     } catch (err) {
       console.error("loadPost error:", err);
@@ -208,11 +211,20 @@ class PostPage {
     const liked = !!post.is_liked;
     const saved = !!post.is_saved;
 
+    // FIX: comment count – avoid [object Object]
+    let commentCount = 0;
+    if (typeof post.comment_count === "number") {
+      commentCount = post.comment_count;
+    } else if (Array.isArray(post.comments)) {
+      commentCount = post.comments.length;
+    }
+
     const likeCount =
-      post.like_count ||
-      post.likes ||
-      (Array.isArray(post.likes) ? post.likes.length : 0);
-    const commentCount = post.comment_count || post.comments || 0;
+      typeof post.like_count === "number"
+        ? post.like_count
+        : Array.isArray(post.likes)
+        ? post.likes.length
+        : post.likes || 0;
 
     const mediaUrl =
       post.media_url || post.media || post.image_url || post.video_url || null;
@@ -321,7 +333,7 @@ class PostPage {
     if (shareBtn) {
       shareBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        const url = `${window.location.origin}/post.html?id=${postId}`;
+        const url = `${window.location.origin}${window.location.pathname}?id=${postId}`;
         navigator.clipboard.writeText(url);
         this.showToast("Link copied!", "success");
       });
