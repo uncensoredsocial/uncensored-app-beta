@@ -37,12 +37,12 @@
   <!-- ===== MAIN CONTENT ===== -->
   <div class="content-wrapper">
     <main class="main-content profile-main">
-      <!-- ===== HERO SECTION (banner + avatar + follow) ===== -->
+      <!-- ===== HERO SECTION (banner + avatar + follow/message) ===== -->
       <section class="profile-hero">
         <!-- Banner strip -->
         <div id="viewProfileBanner" class="profile-banner"></div>
 
-        <!-- Avatar + follow button row -->
+        <!-- Avatar + actions row -->
         <div class="profile-hero-inner">
           <div class="profile-avatar-wrapper">
             <img
@@ -54,10 +54,14 @@
             />
           </div>
 
-          <!-- Follow button on the right side -->
-          <button id="followButton" class="btn btn-primary profile-follow-btn">
-            Follow
-          </button>
+          <div class="profile-hero-actions">
+            <button id="messageButton" class="btn btn-secondary profile-message-btn">
+              Message
+            </button>
+            <button id="followButton" class="btn btn-primary profile-follow-btn">
+              Follow
+            </button>
+          </div>
         </div>
 
         <!-- Text info -->
@@ -125,7 +129,7 @@
     </a>
   </nav>
 
-  <!-- (Optional) simple menu for the three-dots button -->
+  <!-- Simple menu for the three-dots button -->
   <div id="userOptionsMenu" class="user-options-menu" style="display:none;">
     <button class="user-options-item" data-action="share">Share profile</button>
     <button class="user-options-item" data-action="block">Block user</button>
