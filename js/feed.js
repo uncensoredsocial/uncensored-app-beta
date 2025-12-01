@@ -1,5 +1,5 @@
 // ============================================
-// feed.js — Stable Version (JSON + Media Ready)
+// feed.js — Updated for media + following tab
 // ============================================
 
 // Prefer global API_BASE_URL from auth.js
@@ -14,7 +14,7 @@ class FeedManager {
     this.posts = [];
     this.isLoading = false;
     this.isPosting = false;
-    this.currentMode = "recent"; // recent | following
+    this.currentMode = "recent"; // "recent" | "following"
     this.hasMore = true;
     this.page = 1;
     this.pageSize = 20;
@@ -29,6 +29,7 @@ class FeedManager {
 
   async init() {
     this.cacheDom();
+    this.setupTabsLabel(); // turn "Popular" into "Following"
     this.bindEvents();
     this.updateAuthUI();
     this.updateCharCounter();
@@ -41,9 +42,23 @@ class FeedManager {
 
   cacheDom() {
     this.feedContainer = document.getElementById("feedContainer");
-    this.postInput = document.getElementById("postInput");
-    this.postButton = document.getElementById("postButton");
-    this.charCounter = document.getElementById("charCounter");
+
+    // Be tolerant of different IDs so your old HTML still works
+    this.postInput =
+      document.getElementById("postInput") ||
+      document.getElementById("postText") ||
+      document.querySelector("[data-role='post-input']");
+
+    this.postButton =
+      document.getElementById("postButton") ||
+      document.getElementById("submitPostBtn") ||
+      document.querySelector("[data-role='post-button']");
+
+    this.charCounter =
+      document.getElementById("charCounter") ||
+      document.getElementById("postCharCounter") ||
+      document.querySelector("[data-role='char-counter']");
+
     this.postCreation = document.getElementById("postCreation");
     this.guestMessage = document.getElementById("guestMessage");
     this.postUserAvatar = document.getElementById("postUserAvatar");
@@ -53,7 +68,7 @@ class FeedManager {
     this.addMediaBtn = document.getElementById("addMediaBtn");
     this.mediaFileName = document.getElementById("mediaFileName");
 
-    // Tabs
+    // Tabs wrapper
     this.feedTabs = document.getElementById("feedTabs");
     this.tabButtons = this.feedTabs
       ? this.feedTabs.querySelectorAll(".feed-tab-btn")
@@ -67,6 +82,19 @@ class FeedManager {
     this.profileSection = document.getElementById("profileSection");
     this.authButtons = document.getElementById("authButtons");
     this.headerProfileImg = document.getElementById("headerProfileImg");
+  }
+
+  // change the Popular tab to Following
+  setupTabsLabel() {
+    if (!this.feedTabs) return;
+
+    const popularBtn = this.feedTabs.querySelector("[data-tab='popular']");
+    if (popularBtn) {
+      popularBtn.dataset.tab = "following";
+      popularBtn.textContent = "Following";
+    }
+    // refresh the NodeList now that we might have changed data-tab
+    this.tabButtons = this.feedTabs.querySelectorAll(".feed-tab-btn");
   }
 
   // ============================================
@@ -112,7 +140,7 @@ class FeedManager {
     if (this.tabButtons.length > 0) {
       this.tabButtons.forEach((btn) => {
         btn.addEventListener("click", () => {
-          const mode = btn.dataset.tab;
+          const mode = btn.dataset.tab; // "recent" or "following"
           if (!mode || mode === this.currentMode) return;
           this.switchMode(mode);
         });
@@ -217,7 +245,7 @@ class FeedManager {
   // ============================================
 
   switchMode(mode) {
-    this.currentMode = mode;
+    this.currentMode = mode; // "recent" or "following"
     this.page = 1;
     this.hasMore = true;
 
@@ -243,7 +271,7 @@ class FeedManager {
 
     try {
       const url = new URL(`${FEED_API_BASE_URL}/posts`);
-      url.searchParams.set("mode", this.currentMode);
+      url.searchParams.set("mode", this.currentMode); // backend should treat "following" specially
       url.searchParams.set("page", this.page);
       url.searchParams.set("pageSize", this.pageSize);
 
@@ -312,7 +340,11 @@ class FeedManager {
       (Array.isArray(post.likes) ? post.likes.length : 0);
     const commentCount = post.comment_count || post.comments || 0;
 
-    const mediaUrl = post.media_url || null;
+    const mediaUrl =
+      post.media_url || post.media || post.image_url || post.video_url || null;
+    const mediaType = post.media_type || "";
+
+    const mediaHtml = mediaUrl ? this.renderMediaHtml(mediaUrl, mediaType) : "";
 
     return `
       <article class="post" data-post-id="${post.id}">
@@ -331,38 +363,62 @@ class FeedManager {
           <div class="post-text">${this.formatPostContent(
             post.content || ""
           )}</div>
-
-          ${
-            mediaUrl
-              ? `<div class="post-media"><img src="${mediaUrl}" loading="lazy"></div>`
-              : ""
-          }
+          ${mediaHtml}
         </div>
 
         <footer class="post-footer">
-          <div class="post-actions">
-
-            <button class="post-action like-btn ${liked ? "liked" : ""}">
+          <div class="post-actions"
+               style="display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;">
+            <button class="post-action like-btn ${liked ? "liked" : ""}"
+                    style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center;">
               <i class="fa-${liked ? "solid" : "regular"} fa-heart"></i>
               <span class="like-count">${likeCount}</span>
             </button>
 
-            <button class="post-action comment-btn">
+            <button class="post-action comment-btn"
+                    style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center;">
               <i class="fa-regular fa-comment"></i>
               <span class="comment-count">${commentCount}</span>
             </button>
 
-            <button class="post-action share-btn">
+            <button class="post-action share-btn"
+                    style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center;">
               <i class="fa-solid fa-arrow-up-from-bracket"></i>
             </button>
 
-            <button class="post-action save-btn ${saved ? "saved" : ""}">
+            <button class="post-action save-btn ${saved ? "saved" : ""}"
+                    style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center;">
               <i class="fa-${saved ? "solid" : "regular"} fa-bookmark"></i>
             </button>
-
           </div>
         </footer>
       </article>
+    `;
+  }
+
+  renderMediaHtml(url, type) {
+    const lower = url.toLowerCase();
+    const isVideo =
+      type.startsWith("video/") ||
+      lower.endsWith(".mp4") ||
+      lower.endsWith(".webm") ||
+      lower.endsWith(".ogg");
+
+    if (isVideo) {
+      return `
+        <div class="post-media">
+          <video controls playsinline preload="metadata">
+            <source src="${url}">
+            Your browser does not support video.
+          </video>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="post-media">
+        <img src="${url}" loading="lazy">
+      </div>
     `;
   }
 
@@ -476,7 +532,7 @@ class FeedManager {
       let res;
 
       if (hasMedia) {
-        // BACKEND MUST ACCEPT multipart/form-data FOR THIS
+        // multipart/form-data — backend must accept this for media uploads
         const formData = new FormData();
         formData.append("content", content);
         formData.append("media", this.selectedMediaFile);
@@ -487,7 +543,7 @@ class FeedManager {
           body: formData,
         });
       } else {
-        // Works with your current JSON backend
+        // JSON only — works with your existing text-only backend
         res = await fetch(endpoint, {
           method: "POST",
           headers: {
@@ -501,7 +557,7 @@ class FeedManager {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not create post.");
 
-      // Prepend new post
+      // Prepend new post to the feed
       this.posts.unshift(data);
       this.renderPosts();
 
