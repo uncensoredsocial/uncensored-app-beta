@@ -1,20 +1,25 @@
 // js/messages.js
 
-// ===== CONSTANTS =====
-const LOGIN_URL = 'login.html'; // GitHub Pages -> /uncensored-app-beta/login.html
+// NOTE: backend routes remain the same:
+// GET /api/messages/threads
+// POST /api/messages/start { recipientId }
+// GET /api/messages/threads/:threadId
+// POST /api/messages { threadId, recipientId, ciphertext, iv }
 
-// ===== STATE =====
-let currentUser = null;          // only used for own-message check
-let authToken = null;            // token if you want; optional
+const LOGIN_URL = 'login.html';
+
+let currentUser = null;
+let authToken = null;
+
 let threads = [];
 let activeThreadId = null;
 let activeRecipient = null;
 let messagePollIntervalId = null;
 
-// cache of CryptoKey objects per thread
+// cache of CryptoKey per thread
 const threadKeyCache = new Map();
 
-// ===== DOM ELEMENTS =====
+// DOM refs
 const conversationSearchEl = document.getElementById('conversationSearch');
 const conversationListEl = document.getElementById('conversationList');
 const conversationsLoadingEl = document.getElementById('conversationsLoading');
@@ -29,20 +34,33 @@ const chatPlaceholderEl = document.getElementById('chatPlaceholder');
 const messageListEl = document.getElementById('messageList');
 const messagesLoadingEl = document.getElementById('messagesLoading');
 
+const chatComposerEl = document.getElementById('chatComposer');
 const messageInputEl = document.getElementById('messageInput');
 const messageCharCounterEl = document.getElementById('messageCharCounter');
 const sendMessageButtonEl = document.getElementById('sendMessageButton');
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', () => {
-  // pull auth info if present (same keys as rest of app)
   try {
     const stored = localStorage.getItem('user');
     const token = localStorage.getItem('token');
-    if (stored) currentUser = JSON.parse(stored);
-    if (token) authToken = token;
+
+    if (!stored || !token) {
+      window.location.href = LOGIN_URL;
+      return;
+    }
+
+    currentUser = JSON.parse(stored);
+    authToken = token;
   } catch (err) {
-    console.warn('Could not parse user/token from localStorage', err);
+    console.error('Error reading auth info', err);
+    window.location.href = LOGIN_URL;
+    return;
+  }
+
+  // hide composer until a conversation is opened
+  if (chatComposerEl) {
+    chatComposerEl.classList.add('hidden');
   }
 
   setupEventListeners();
@@ -80,7 +98,6 @@ function setupEventListeners() {
   }
 }
 
-// auto-resize textarea
 function autoGrowTextarea(textarea) {
   textarea.style.height = 'auto';
   textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
@@ -88,10 +105,12 @@ function autoGrowTextarea(textarea) {
 
 // ===== API HELPERS =====
 async function apiGet(path) {
-  const headers = { 'Content-Type': 'application/json' };
-  if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-
-  const res = await fetch(path, { headers });
+  const res = await fetch(path, {
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`
+    }
+  });
 
   if (res.status === 401) {
     window.location.href = LOGIN_URL;
@@ -106,12 +125,12 @@ async function apiGet(path) {
 }
 
 async function apiPost(path, body) {
-  const headers = { 'Content-Type': 'application/json' };
-  if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-
   const res = await fetch(path, {
     method: 'POST',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`
+    },
     body: JSON.stringify(body)
   });
 
@@ -127,7 +146,7 @@ async function apiPost(path, body) {
   return res.json();
 }
 
-// ===== THREADS / CONVERSATIONS =====
+// ===== THREADS =====
 async function loadThreads() {
   if (!conversationListEl) return;
 
@@ -235,7 +254,7 @@ function onConversationClick(thread) {
   loadMessagesForActiveThread();
 }
 
-// If we come from profile like messages.html?userId=ABC
+// If coming from profile like messages.html?userId=abc
 async function autoOpenThreadFromQuery() {
   const params = new URLSearchParams(window.location.search);
   const userId = params.get('userId');
@@ -254,21 +273,23 @@ async function autoOpenThreadFromQuery() {
   }
 }
 
-// ===== CHAT HEADER / MESSAGES =====
+// ===== CHAT / MESSAGES =====
 function openChatHeader() {
   if (!activeRecipient) return;
 
-  if (chatHeaderAvatarEl) {
-    chatHeaderAvatarEl.src = activeRecipient.avatar_url || 'assets/icons/default-profile.png';
-  }
-  if (chatHeaderNameEl) {
-    chatHeaderNameEl.textContent = activeRecipient.display_name || activeRecipient.username || 'User';
-  }
-  if (chatHeaderUsernameEl) {
-    chatHeaderUsernameEl.textContent = `@${activeRecipient.username || 'user'}`;
-  }
+  chatHeaderAvatarEl.src = activeRecipient.avatar_url || 'assets/icons/default-profile.png';
+  chatHeaderNameEl.textContent = activeRecipient.display_name || activeRecipient.username || 'User';
+  chatHeaderUsernameEl.textContent = `@${activeRecipient.username || 'user'}`;
+
+  // Show encryption pill with full text
   if (chatEncryptedPillEl) {
+    chatEncryptedPillEl.textContent = '🔒 All messages are encrypted. Only you and the other person can read them.';
     chatEncryptedPillEl.style.display = 'inline-flex';
+  }
+
+  // show composer once a chat is open
+  if (chatComposerEl) {
+    chatComposerEl.classList.remove('hidden');
   }
 }
 
@@ -286,7 +307,6 @@ async function loadMessagesForActiveThread() {
 
 async function fetchAndRenderMessages() {
   if (!activeThreadId) return;
-  if (!messageListEl) return;
 
   messagesLoadingEl.style.display = 'flex';
 
@@ -298,8 +318,9 @@ async function fetchAndRenderMessages() {
 
     if (chatPlaceholderEl) chatPlaceholderEl.style.display = 'none';
 
+    // Optional system notice (you already have the pill; this is extra)
     messageListEl.appendChild(
-      systemMessageEl('Messages in this chat are end-to-end encrypted with a shared passphrase (saved only in your browser).')
+      systemMessageEl('This chat is end-to-end encrypted. Only you and the other person can read these messages.')
     );
 
     for (const msg of messages) {
@@ -317,10 +338,9 @@ async function fetchAndRenderMessages() {
   }
 }
 
-// ===== SENDING MESSAGES =====
+// ===== SEND =====
 async function handleSendMessage() {
   if (!activeThreadId || !activeRecipient) return;
-  if (!messageInputEl) return;
 
   const text = messageInputEl.value.trim();
   if (!text) return;
@@ -344,7 +364,7 @@ async function handleSendMessage() {
     messageListEl.scrollTop = messageListEl.scrollHeight;
 
     messageInputEl.value = '';
-    if (messageCharCounterEl) messageCharCounterEl.textContent = '0/1000';
+    messageCharCounterEl.textContent = '0/1000';
     autoGrowTextarea(messageInputEl);
   } catch (err) {
     console.error('Failed to send message', err);
@@ -354,10 +374,9 @@ async function handleSendMessage() {
   }
 }
 
-// Build DOM for a single message
 async function createMessageRow(msg) {
   const row = document.createElement('div');
-  const isOwn = msg.sender_id === currentUser?.id;
+  const isOwn = msg.sender_id === currentUser.id;
 
   row.className = `message-row ${isOwn ? 'own' : 'other'}`;
 
@@ -385,7 +404,6 @@ async function createMessageRow(msg) {
   return row;
 }
 
-// System text row
 function systemMessageEl(text) {
   const el = document.createElement('div');
   el.className = 'message-system';
@@ -393,21 +411,16 @@ function systemMessageEl(text) {
   return el;
 }
 
-// ===== E2EE WITH PER-THREAD PASSPHRASE =====
-
+// ===== ENCRYPTION (unchanged backend behavior) =====
 async function getThreadKey(threadId) {
-  if (threadKeyCache.has(threadId)) {
-    return threadKeyCache.get(threadId);
-  }
+  if (threadKeyCache.has(threadId)) return threadKeyCache.get(threadId);
 
   const storageKey = `messages_passphrase_${threadId}`;
   let passphrase = localStorage.getItem(storageKey);
 
   if (!passphrase) {
     passphrase = prompt('Set or enter the shared passphrase for this chat (must match on both sides):');
-    if (!passphrase) {
-      throw new Error('No passphrase provided');
-    }
+    if (!passphrase) throw new Error('No passphrase provided');
     localStorage.setItem(storageKey, passphrase);
   }
 
@@ -418,7 +431,6 @@ async function getThreadKey(threadId) {
 
 async function deriveAesKeyFromPassphrase(passphrase, saltString) {
   const enc = new TextEncoder();
-
   const passphraseKey = await crypto.subtle.importKey(
     'raw',
     enc.encode(passphrase),
@@ -474,7 +486,7 @@ async function decryptForThread(threadId, ciphertextBase64, ivBase64) {
   return dec.decode(plainBuffer);
 }
 
-// ===== UTILITIES =====
+// ===== UTIL =====
 function escapeHtml(str) {
   if (!str) return '';
   return str
