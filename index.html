@@ -17,12 +17,13 @@
     referrerpolicy="no-referrer"
   />
 
-  <!-- Desktop tweaks: center feed + show bottom nav on large screens -->
+  <!-- Desktop tweaks: center feed, show full composer, and style bottom nav icons -->
   <style>
     @media (min-width: 900px) {
       .content-wrapper {
         max-width: 960px;
         margin: 0 auto;
+        padding-top: 72px; /* push content down so post box isn't cut off */
       }
       .main-content {
         max-width: 700px;
@@ -35,6 +36,20 @@
       .bottom-nav {
         display: flex !important;
       }
+    }
+
+    /* Font Awesome icons above labels in bottom nav */
+    .bottom-nav .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+    }
+
+    .bottom-nav .nav-icon {
+      font-size: 1.1rem;
+      line-height: 1;
     }
   </style>
 </head>
@@ -181,19 +196,19 @@
   <!-- ================= BOTTOM NAV ================= -->
   <nav class="bottom-nav" id="bottomNav">
     <a href="index.html" class="nav-item active">
-      <span class="icon icon-home"></span>
+      <i class="fa-solid fa-house nav-icon"></i>
       <span class="nav-label">Home</span>
     </a>
     <a href="search.html" class="nav-item">
-      <span class="icon icon-search"></span>
+      <i class="fa-solid fa-magnifying-glass nav-icon"></i>
       <span class="nav-label">Search</span>
     </a>
     <a href="notifications.html" class="nav-item">
-      <span class="icon icon-notifications"></span>
+      <i class="fa-regular fa-bell nav-icon"></i>
       <span class="nav-label">Alerts</span>
     </a>
     <a href="dms.html" class="nav-item">
-      <span class="icon icon-messages"></span>
+      <i class="fa-regular fa-envelope nav-icon"></i>
       <span class="nav-label">Messages</span>
     </a>
   </nav>
