@@ -1,4 +1,3 @@
-// js/user.js
 /* ============================================================
    USER PROFILE PAGE (Viewing someone else's profile)
    ------------------------------------------------------------
@@ -7,75 +6,56 @@
    - Loads profile from:   GET /api/users/:username
    - Loads posts from:     GET /api/users/:username/posts
    - Follow/unfollow via:  POST /api/users/:username/follow
-   - Renders posts styled similarly to feed.js
    - Uses auth helpers from auth.js:
        - isLoggedIn()
        - getCurrentUser()
        - getAuthToken()
  ============================================================ */
 
-// Prefer global API_BASE_URL from auth.js; fallback to your prod URL
 const USER_API_BASE_URL =
   typeof API_BASE_URL !== "undefined"
     ? API_BASE_URL
     : "https://uncensored-app-beta-production.up.railway.app/api";
 
-/*
-  Expected layout (user.html):
-
-  <div id="userBanner" class="profile-banner"></div>
-  <img id="userAvatar" class="profile-avatar" />
-
-  <h2 id="userDisplayName"></h2>
-  <p id="userUsername"></p>
-  <p id="userBio"></p>
-  <p id="userJoinDate"></p>
-
-  <span id="userPostsCount"></span>
-  <span id="userFollowersCount"></span>
-  <span id="userFollowingCount"></span>
-
-  <button id="userFollowBtn">Follow</button>
-
-  <div id="userStatusMessage" class="profile-status hidden"></div>
-
-  <div id="userPosts"></div>
-*/
-
 /* =======================================================================
    CLASS: UserProfilePage
-   -----------------------------------------------------------------------
-   Encapsulates all logic for another user's profile page (user.html)
 ======================================================================= */
 
 class UserProfilePage {
   constructor() {
-    // The username we are viewing (from ?user=)
-    this.viewUsername = null;
+    this.viewUsername = null;   // username we are viewing (from ?user=)
+    this.user = null;           // profile data
+    this.posts = [];            // posts array
+    this.isFollowing = false;   // follow state
 
-    // Profile data returned from backend
-    this.user = null;
-
-    // Array of posts for this user
-    this.posts = [];
-
-    // Follow state (we don't get it from backend yet, so we track locally)
-    this.isFollowing = false;
-
-    // DOM references
     this.dom = {
+      // header
+      headerTitle: null,
+
+      // hero
       bannerEl: null,
       avatarEl: null,
       displayNameEl: null,
       usernameEl: null,
       bioEl: null,
-      joinDateEl: null,
+
       postsCountEl: null,
       followersCountEl: null,
       followingCountEl: null,
-      postsContainer: null,
+
+      // posts
+      postsList: null,
+      postsLoading: null,
+      postsEmpty: null,
+      postsError: null,
+
+      // actions
       followBtn: null,
-      statusEl: null
+      messageBtn: null,
+
+      // options menu
+      optionsButton: null,
+      optionsMenu: null
     };
   }
 
@@ -93,7 +73,9 @@ class UserProfilePage {
     this.viewUsername = this.getUsernameFromUrl();
 
     if (!this.viewUsername) {
-      this.showStatus("No username specified in URL.", "error");
+      this.setHeaderTitle("Profile");
+      this.showToast("No username specified in URL.", "error");
+      this.showProfileError();
       return;
     }
 
@@ -101,42 +83,143 @@ class UserProfilePage {
     const currentUser = this.getCurrentUserSafe();
     if (
       this.viewUsername === "me" ||
-      (currentUser && currentUser.username === this.viewUsername)
+      (currentUser && currentUser.username?.toLowerCase() === this.viewUsername)
     ) {
       window.location.href = "profile.html";
       return;
     }
 
+    this.setHeaderTitle("Profile");
+
     // Load profile + posts
-    await this.loadProfileAndPosts();
+    try {
+      await this.loadProfile();
+      await this.loadPosts();
+    } catch (err) {
+      console.error("Error initializing user profile page:", err);
+      this.showProfileError();
+    }
   }
 
   /* ----------------------- DOM / EVENTS ------------------------ */
 
   cacheDom() {
-    this.dom.bannerEl = document.getElementById("userBanner");
-    this.dom.avatarEl = document.getElementById("userAvatar");
+    this.dom.headerTitle    = document.getElementById("viewProfileTitle");
 
-    this.dom.displayNameEl = document.getElementById("userDisplayName");
-    this.dom.usernameEl = document.getElementById("userUsername");
-    this.dom.bioEl = document.getElementById("userBio");
-    this.dom.joinDateEl = document.getElementById("userJoinDate");
+    this.dom.bannerEl       = document.getElementById("viewProfileBanner");
+    this.dom.avatarEl       = document.getElementById("viewProfileAvatar");
+    this.dom.displayNameEl  = document.getElementById("viewProfileName");
+    this.dom.usernameEl     = document.getElementById("viewProfileUsername");
+    this.dom.bioEl          = document.getElementById("viewProfileBio");
 
-    this.dom.postsCountEl = document.getElementById("userPostsCount");
-    this.dom.followersCountEl = document.getElementById("userFollowersCount");
-    this.dom.followingCountEl = document.getElementById("userFollowingCount");
+    this.dom.postsCountEl      = document.getElementById("profilePostsCount");
+    this.dom.followersCountEl  = document.getElementById("profileFollowersCount");
+    this.dom.followingCountEl  = document.getElementById("profileFollowingCount");
 
-    this.dom.postsContainer = document.getElementById("userPosts");
+    this.dom.postsList     = document.getElementById("userPostsList");
+    this.dom.postsLoading  = document.getElementById("userPostsLoading");
+    this.dom.postsEmpty    = document.getElementById("userPostsEmpty");
+    this.dom.postsError    = document.getElementById("userPostsError");
 
-    this.dom.followBtn = document.getElementById("userFollowBtn");
-    this.dom.statusEl = document.getElementById("userStatusMessage");
+    this.dom.followBtn     = document.getElementById("followButton");
+    this.dom.messageBtn    = document.getElementById("messageButton");
+
+    this.dom.optionsButton = document.getElementById("userOptionsButton");
+    this.dom.optionsMenu   = document.getElementById("userOptionsMenu");
   }
 
   bindEvents() {
+    // Follow
     if (this.dom.followBtn) {
-      this.dom.followBtn.addEventListener("click", () =>
-        this.handleFollowClick()
-      );
+      this.dom.followBtn.addEventListener("click", () => this.handleFollowClick());
+    }
+
+    // Message
+    if (this.dom.messageBtn) {
+      this.dom.messageBtn.addEventListener("click", () => this.handleMessageClick());
+    }
+
+    // 3-dots options button
+    if (this.dom.optionsButton && this.dom.optionsMenu) {
+      this.dom.optionsButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.toggleOptionsMenu();
+      });
+
+      // menu item clicks
+      this.dom.optionsMenu.querySelectorAll(".user-options-item")
+        .forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            const action = e.currentTarget.dataset.action;
+            this.handleMenuAction(action);
+            this.hideOptionsMenu();
+          });
+        });
+
+      // click outside to close
+      document.addEventListener("click", (e) => {
+        if (!this.dom.optionsMenu) return;
+        if (
+          e.target === this.dom.optionsMenu ||
+          this.dom.optionsMenu.contains(e.target) ||
+          e.target === this.dom.optionsButton ||
+          this.dom.optionsButton.contains(e.target)
+        ) {
+          return;
+        }
+        this.hideOptionsMenu();
+      });
+    }
+  }
+
+  toggleOptionsMenu() {
+    if (!this.dom.optionsMenu) return;
+    const isVisible = this.dom.optionsMenu.style.display === "block";
+    this.dom.optionsMenu.style.display = isVisible ? "none" : "block";
+  }
+
+  hideOptionsMenu() {
+    if (!this.dom.optionsMenu) return;
+    this.dom.optionsMenu.style.display = "none";
+  }
+
+  handleMenuAction(action) {
+    switch (action) {
+      case "share":
+        this.shareProfile();
+        break;
+      case "block":
+        this.showToast("Block functionality not implemented yet.", "info");
+        break;
+      case "report":
+        this.showToast("Report functionality not implemented yet.", "info");
+        break;
+      default:
+        break;
+    }
+  }
+
+  shareProfile() {
+    if (!this.viewUsername) return;
+    const url = `${window.location.origin}${window.location.pathname}?user=${encodeURIComponent(
+      this.viewUsername
+    )}`;
+
+    if (navigator.share) {
+      navigator
+        .share({
+          title: "Uncensored Social Profile",
+          text: `Check out @${this.viewUsername}`,
+          url
+        })
+        .catch(() => {});
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard
+        .writeText(url)
+        .then(() => this.showToast("Profile link copied!", "success"))
+        .catch(() => this.showToast("Could not copy link.", "error"));
+    } else {
+      alert("Share this link:\n" + url);
     }
   }
 
@@ -177,95 +260,65 @@ class UserProfilePage {
     }
   }
 
-  /* ------------------ LOAD PROFILE + POSTS ------------------- */
-
-  async loadProfileAndPosts() {
-    try {
-      this.showStatus("Loading profile...", "info");
-      await this.fetchUserProfile();
-      this.showStatus(""); // clear
-      await this.fetchUserPosts();
-    } catch (err) {
-      console.error("loadProfileAndPosts error:", err);
-      this.showStatus("Failed to load profile.", "error");
+  setHeaderTitle(text) {
+    if (this.dom.headerTitle) {
+      this.dom.headerTitle.textContent = text || "Profile";
     }
   }
 
-  async fetchUserProfile() {
+  /* ------------------ LOAD PROFILE ------------------- */
+
+  async loadProfile() {
     if (!this.viewUsername) return;
 
     const url = `${USER_API_BASE_URL}/users/${encodeURIComponent(
       this.viewUsername
     )}`;
 
-    const res = await fetch(url);
-    const data = await res.json().catch(() => ({}));
+    let res, data;
+    try {
+      res = await fetch(url);
+      data = await res.json().catch(() => ({}));
+    } catch (err) {
+      console.error("fetch user profile error:", err);
+      this.showToast("Failed to load profile.", "error");
+      throw err;
+    }
 
     if (!res.ok) {
+      console.error("Profile request not ok:", data);
+      this.showToast(data.error || "Profile not found.", "error");
+      this.showProfileError();
       throw new Error(data.error || "Failed to load profile");
     }
 
-    // data: id, username, display_name, avatar_url, banner_url, bio, created_at
-    // plus stats: posts_count, followers_count, following_count
     this.user = data;
     this.renderProfileHeader();
     this.setupFollowButton();
   }
 
-  async fetchUserPosts() {
-    if (!this.viewUsername || !this.dom.postsContainer) return;
-
-    this.dom.postsContainer.innerHTML = `
-      <div class="loading-indicator">
-        <div class="loading-spinner"></div>
-        <span>Loading posts...</span>
-      </div>
-    `;
-
-    const url = `${USER_API_BASE_URL}/users/${encodeURIComponent(
-      this.viewUsername
-    )}/posts`;
-
-    try {
-      const res = await fetch(url);
-      const data = await res.json().catch(() => []);
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to load posts");
-      }
-
-      this.posts = Array.isArray(data) ? data : [];
-
-      if (!this.posts.length) {
-        this.dom.postsContainer.innerHTML = `
-          <div class="empty-state">
-            <h3>No posts yet</h3>
-          </div>
-        `;
-        return;
-      }
-
-      this.renderPosts();
-    } catch (err) {
-      console.error("fetchUserPosts error:", err);
-      this.dom.postsContainer.innerHTML = `
-        <div class="empty-state">
-          <h3>Error loading posts</h3>
-        </div>
-      `;
+  showProfileError() {
+    if (this.dom.displayNameEl) {
+      this.dom.displayNameEl.textContent = "User not found";
     }
+    if (this.dom.usernameEl) {
+      this.dom.usernameEl.textContent = "";
+    }
+    if (this.dom.bioEl) {
+      this.dom.bioEl.textContent = "";
+    }
+    if (this.dom.postsLoading) this.dom.postsLoading.style.display = "none";
+    if (this.dom.postsEmpty) this.dom.postsEmpty.style.display = "none";
+    if (this.dom.postsError) this.dom.postsError.style.display = "block";
   }
-
-  /* ------------------ RENDER PROFILE HEADER ------------------- */
 
   renderProfileHeader() {
     if (!this.user) return;
 
-    const displayName =
-      this.user.display_name || this.user.username || "User";
-    const username = this.user.username || "username";
-    const bio = this.user.bio || "No bio yet.";
-    const createdAt = this.user.created_at;
+    const displayName = this.user.display_name || this.user.username || "User";
+    const username    = this.user.username || this.viewUsername || "user";
+    const bio         = this.user.bio || "";
+    const createdAt   = this.user.created_at;
 
     if (this.dom.displayNameEl) {
       this.dom.displayNameEl.textContent = displayName;
@@ -276,9 +329,9 @@ class UserProfilePage {
     if (this.dom.bioEl) {
       this.dom.bioEl.textContent = bio;
     }
-    if (this.dom.joinDateEl) {
-      this.dom.joinDateEl.textContent = this.formatJoinDate(createdAt);
-    }
+
+    // Title in header
+    this.setHeaderTitle(displayName);
 
     // Avatar
     if (this.dom.avatarEl) {
@@ -295,7 +348,6 @@ class UserProfilePage {
         this.dom.bannerEl.style.backgroundImage = `url("${this.user.banner_url}")`;
         this.dom.bannerEl.classList.add("profile-banner-image");
       } else {
-        // fallback: keep default CSS gradient or solid
         this.dom.bannerEl.style.backgroundImage = "";
         this.dom.bannerEl.classList.remove("profile-banner-image");
       }
@@ -319,6 +371,12 @@ class UserProfilePage {
         this.user.following_count || 0
       );
     }
+
+    // Optional join date (if you want a "Joined" line somewhere later)
+    if (createdAt) {
+      const joinedTxt = this.formatJoinDate(createdAt);
+      console.debug("Joined:", joinedTxt);
+    }
   }
 
   /* ---------------------- FOLLOW BUTTON ---------------------- */
@@ -329,7 +387,7 @@ class UserProfilePage {
     const currentUser = this.getCurrentUserSafe();
     const loggedIn = this.isLoggedInSafe();
 
-    // Not logged in → show disabled Follow (or you can send them to login)
+    // if not logged in -> disabled
     if (!loggedIn || !currentUser) {
       this.dom.followBtn.textContent = "Follow";
       this.dom.followBtn.disabled = true;
@@ -337,14 +395,22 @@ class UserProfilePage {
       return;
     }
 
-    // Viewing yourself → hide follow button
-    if (currentUser.username === this.user.username) {
+    // viewing yourself -> hide follow + message (you can change if you want)
+    if (currentUser.username?.toLowerCase() === this.user.username?.toLowerCase()) {
       this.dom.followBtn.style.display = "none";
+      if (this.dom.messageBtn) {
+        this.dom.messageBtn.style.display = "none";
+      }
       return;
     }
 
-    // We don't have is_following from backend yet, so default to false
-    this.isFollowing = false;
+    // If backend sends is_following, use it
+    if (typeof this.user.is_following === "boolean") {
+      this.isFollowing = this.user.is_following;
+    } else {
+      this.isFollowing = false;
+    }
+
     this.updateFollowButtonUI();
   }
 
@@ -368,20 +434,20 @@ class UserProfilePage {
     if (!this.user || !this.dom.followBtn) return;
 
     if (!this.isLoggedInSafe()) {
-      this.showStatus("Please log in to follow users.", "error");
+      this.showToast("Please log in to follow users.", "error");
       return;
     }
 
     const token = this.getAuthTokenSafe();
     if (!token) {
-      this.showStatus("Missing auth token.", "error");
+      this.showToast("Missing auth token.", "error");
       return;
     }
 
     const prevFollowing = this.isFollowing;
     const newState = !prevFollowing;
 
-    // Optimistic UI
+    // optimistic UI
     this.isFollowing = newState;
     this.updateFollowButtonUI();
 
@@ -402,7 +468,6 @@ class UserProfilePage {
         throw new Error(data.error || "Failed to update follow status");
       }
 
-      // data: { following, posts_count, followers_count, following_count }
       this.isFollowing = !!data.following;
       this.updateFollowButtonUI();
 
@@ -419,7 +484,7 @@ class UserProfilePage {
         this.dom.followingCountEl.textContent = String(data.following_count);
       }
 
-      this.showStatus(
+      this.showToast(
         this.isFollowing ? "You are now following this user." : "Unfollowed.",
         "success"
       );
@@ -428,38 +493,95 @@ class UserProfilePage {
       // revert UI
       this.isFollowing = prevFollowing;
       this.updateFollowButtonUI();
-      this.showStatus(
+      this.showToast(
         err.message || "Failed to update follow status.",
         "error"
       );
     }
   }
 
+  /* ---------------------- MESSAGE BUTTON ---------------------- */
+
+  handleMessageClick() {
+    if (!this.viewUsername) return;
+
+    if (!this.isLoggedInSafe()) {
+      this.showToast("Please log in to send messages.", "error");
+      return;
+    }
+
+    // Go to messages.html with the user pre-selected in query
+    const url = `messages.html?user=${encodeURIComponent(this.viewUsername)}`;
+    window.location.href = url;
+  }
+
   /* ------------------------- POSTS ------------------------- */
 
-  renderPosts() {
-    if (!this.dom.postsContainer) return;
+  async loadPosts() {
+    if (!this.viewUsername || !this.dom.postsList) return;
 
-    this.dom.postsContainer.innerHTML = "";
+    if (this.dom.postsLoading) this.dom.postsLoading.style.display = "block";
+    if (this.dom.postsEmpty) this.dom.postsEmpty.style.display = "none";
+    if (this.dom.postsError) this.dom.postsError.style.display = "none";
+    this.dom.postsList.innerHTML = "";
+
+    const url = `${USER_API_BASE_URL}/users/${encodeURIComponent(
+      this.viewUsername
+    )}/posts`;
+
+    try {
+      const res = await fetch(url);
+      const data = await res.json().catch(() => []);
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to load posts");
+      }
+
+      this.posts = Array.isArray(data) ? data : [];
+
+      if (this.dom.postsLoading) this.dom.postsLoading.style.display = "none";
+
+      if (!this.posts.length) {
+        if (this.dom.postsEmpty) this.dom.postsEmpty.style.display = "block";
+        return;
+      }
+
+      this.renderPosts();
+
+      // update posts count if backend didn't send it
+      if (this.dom.postsCountEl) {
+        this.dom.postsCountEl.textContent = String(this.posts.length);
+      }
+    } catch (err) {
+      console.error("loadPosts error:", err);
+      if (this.dom.postsLoading) this.dom.postsLoading.style.display = "none";
+      if (this.dom.postsError) this.dom.postsError.style.display = "block";
+    }
+  }
+
+  renderPosts() {
+    if (!this.dom.postsList) return;
+
+    this.dom.postsList.innerHTML = "";
 
     this.posts.forEach((post) => {
-      this.dom.postsContainer.appendChild(this.createPostElement(post));
+      this.dom.postsList.appendChild(this.createPostElement(post));
     });
   }
 
   createPostElement(post) {
-    // Posts from /api/users/:username/posts are currently:
-    // { id, content, created_at }
-    // They might not contain likes_count / comments_count yet.
+    // Posts from /api/users/:username/posts are:
+    // { id, content, created_at, likes_count?, comments_count? }
     const article = document.createElement("article");
     article.className = "post";
     article.setAttribute("tabindex", "0");
     article.dataset.postId = post.id;
 
-    const user = this.user || {};
-    const avatar = user.avatar_url || "assets/icons/default-profile.png";
+    const user        = this.user || {};
+    const avatar      = user.avatar_url || "assets/icons/default-profile.png";
     const displayName = user.display_name || user.username || "Unknown";
-    const username = user.username || "user";
+    const username    = user.username || "user";
+
     const createdAt = post.created_at ? new Date(post.created_at) : null;
     const timeLabel = createdAt ? createdAt.toLocaleString() : "";
 
@@ -469,6 +591,7 @@ class UserProfilePage {
         : Array.isArray(post.likes)
         ? post.likes.length
         : 0;
+
     const commentsCount =
       typeof post.comments_count === "number" ? post.comments_count : 0;
 
@@ -515,25 +638,18 @@ class UserProfilePage {
       </footer>
     `;
 
-    // Wire up actions
-    const likeBtn = article.querySelector(".post-like-btn");
+    const likeBtn    = article.querySelector(".post-like-btn");
     const commentBtn = article.querySelector(".post-comment-btn");
-    const shareBtn = article.querySelector(".post-share-btn");
+    const shareBtn   = article.querySelector(".post-share-btn");
 
     if (likeBtn) {
-      likeBtn.addEventListener("click", () =>
-        this.handleLike(post, likeBtn)
-      );
+      likeBtn.addEventListener("click", () => this.handleLike(post, likeBtn));
     }
     if (commentBtn) {
-      commentBtn.addEventListener("click", () =>
-        this.handleCommentClick(post)
-      );
+      commentBtn.addEventListener("click", () => this.handleCommentClick(post));
     }
     if (shareBtn) {
-      shareBtn.addEventListener("click", () =>
-        this.handleShareClick(post)
-      );
+      shareBtn.addEventListener("click", () => this.handleSharePostClick(post));
     }
 
     return article;
@@ -555,13 +671,13 @@ class UserProfilePage {
 
   async handleLike(post, btn) {
     if (!this.isLoggedInSafe()) {
-      this.showStatus("Please log in to like posts.", "error");
+      this.showToast("Please log in to like posts.", "error");
       return;
     }
 
     const token = this.getAuthTokenSafe();
     if (!token) {
-      this.showStatus("Missing auth token.", "error");
+      this.showToast("Missing auth token.", "error");
       return;
     }
 
@@ -595,18 +711,17 @@ class UserProfilePage {
       }
     } catch (err) {
       console.error("handleLike error:", err);
-      this.showStatus(err.message || "Failed to like post", "error");
+      this.showToast(err.message || "Failed to like post", "error");
     } finally {
       btn.disabled = false;
     }
   }
 
-  handleCommentClick(post) {
-    // Later you can navigate to post.html?id=...
-    this.showStatus("Comments coming soon on user page!", "info");
+  handleCommentClick(_post) {
+    this.showToast("Comments coming soon on user page!", "info");
   }
 
-  handleShareClick(post) {
+  handleSharePostClick(post) {
     const url = `${window.location.origin}/index.html#post-${post.id}`;
 
     if (navigator.share) {
@@ -620,9 +735,9 @@ class UserProfilePage {
     } else if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard
         .writeText(url)
-        .then(() => this.showStatus("Post link copied!", "success"))
+        .then(() => this.showToast("Post link copied!", "success"))
         .catch(() =>
-          this.showStatus("Could not copy link to clipboard.", "error")
+          this.showToast("Could not copy link to clipboard.", "error")
         );
     } else {
       alert("Share this link:\n" + url);
@@ -659,20 +774,9 @@ class UserProfilePage {
     });
   }
 
-  showStatus(message, type = "info") {
-    if (this.dom.statusEl) {
-      this.dom.statusEl.textContent = message || "";
-      this.dom.statusEl.className = `profile-status profile-status-${type}`;
-      if (!message) {
-        this.dom.statusEl.classList.add("hidden");
-      } else {
-        this.dom.statusEl.classList.remove("hidden");
-      }
-    }
-
+  showToast(message, type = "info") {
     if (!message) return;
 
-    // Small toast as well
     const div = document.createElement("div");
     div.className = `status-message status-${type}`;
     div.textContent = message;
@@ -686,6 +790,5 @@ class UserProfilePage {
 document.addEventListener("DOMContentLoaded", () => {
   const page = new UserProfilePage();
   page.init();
-  // Expose for debugging in console if you want
-  window.userProfilePage = page;
+  window.userProfilePage = page; // for console debugging
 });
