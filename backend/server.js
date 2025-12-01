@@ -50,7 +50,7 @@ app.use(
   cors({
     origin: [
       'https://spepdb.github.io', // frontend
-      'https://uncensored-app-beta-production.up.railway.app' // backend (for tests / tools)
+      'https://uncensored-app-beta-production.up.railway.app/api' // backend (for tests / tools)
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
