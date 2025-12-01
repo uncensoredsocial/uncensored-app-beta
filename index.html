@@ -16,6 +16,27 @@
     crossorigin="anonymous"
     referrerpolicy="no-referrer"
   />
+
+  <!-- Desktop tweaks: center feed + show bottom nav on large screens -->
+  <style>
+    @media (min-width: 900px) {
+      .content-wrapper {
+        max-width: 960px;
+        margin: 0 auto;
+      }
+      .main-content {
+        max-width: 700px;
+        margin: 0 auto;
+      }
+    }
+
+    /* Force bottom nav to be visible on desktop too */
+    @media (min-width: 768px) {
+      .bottom-nav {
+        display: flex !important;
+      }
+    }
+  </style>
 </head>
 
 <body>
@@ -77,7 +98,7 @@
         <div class="post-media-row">
           <input
             type="file"
-            id="mediaInput"
+            id="postMediaInput"
             accept="image/*,video/*"
             style="display: none"
           />
@@ -86,7 +107,6 @@
             type="button"
             class="btn btn-secondary"
             id="addMediaBtn"
-            onclick="document.getElementById('mediaInput').click()"
           >
             Add image / video
           </button>
@@ -98,7 +118,7 @@
           <div class="post-options">
             <!-- character counter that feed.js updates -->
             <span
-              id="postCharCount"
+              id="charCounter"
               class="char-counter composer-char-count"
             >
               0/280
@@ -129,7 +149,7 @@
         </button>
       </div>
 
-      <!-- ===== Guest Message ===== -->
+      <!-- ===== GUEST MESSAGE ===== -->
       <div class="guest-message" id="guestMessage">
         <div class="guest-content">
           <h2>Join the Conversation</h2>
