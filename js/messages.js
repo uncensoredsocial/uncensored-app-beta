@@ -1,25 +1,20 @@
 // js/messages.js
 
 // ===== CONSTANTS =====
-const LOGIN_URL = 'login.html'; // relative so GitHub Pages -> /uncensored-app-beta/login.html
+const LOGIN_URL = 'login.html'; // GitHub Pages -> /uncensored-app-beta/login.html
 
 // ===== STATE =====
-let currentUser = null;
-let authToken = null;
-
+let currentUser = null;          // only used for own-message check
+let authToken = null;            // token if you want; optional
 let threads = [];
 let activeThreadId = null;
 let activeRecipient = null;
-
 let messagePollIntervalId = null;
 
 // cache of CryptoKey objects per thread
 const threadKeyCache = new Map();
 
 // ===== DOM ELEMENTS =====
-const guestSectionEl = document.getElementById('messagesGuestMessage');
-const messagesLayoutEl = document.getElementById('messagesLayout');
-
 const conversationSearchEl = document.getElementById('conversationSearch');
 const conversationListEl = document.getElementById('conversationList');
 const conversationsLoadingEl = document.getElementById('conversationsLoading');
@@ -40,51 +35,20 @@ const sendMessageButtonEl = document.getElementById('sendMessageButton');
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', () => {
-  // pull from localStorage (same pattern as rest of app)
+  // pull auth info if present (same keys as rest of app)
   try {
     const stored = localStorage.getItem('user');
     const token = localStorage.getItem('token');
-
-    if (!stored || !token) {
-      showGuestView();
-      return;
-    }
-
-    currentUser = JSON.parse(stored);
-    authToken = token;
+    if (stored) currentUser = JSON.parse(stored);
+    if (token) authToken = token;
   } catch (err) {
-    console.error('Failed to read auth info', err);
-    showGuestView();
-    return;
+    console.warn('Could not parse user/token from localStorage', err);
   }
 
-  showAuthedView();
   setupEventListeners();
   loadThreads();
   autoOpenThreadFromQuery();
 });
-
-// ===== VIEW TOGGLES =====
-function showGuestView() {
-  if (guestSectionEl) guestSectionEl.style.display = 'block';
-  if (messagesLayoutEl) messagesLayoutEl.style.display = 'none';
-
-  if (messageInputEl) {
-    messageInputEl.disabled = true;
-  }
-  if (sendMessageButtonEl) {
-    sendMessageButtonEl.disabled = true;
-  }
-}
-
-function showAuthedView() {
-  if (guestSectionEl) guestSectionEl.style.display = 'none';
-  if (messagesLayoutEl) messagesLayoutEl.style.display = 'flex';
-
-  if (messageInputEl) {
-    messageInputEl.disabled = false;
-  }
-}
 
 // ===== EVENT LISTENERS =====
 function setupEventListeners() {
@@ -92,10 +56,13 @@ function setupEventListeners() {
     messageInputEl.addEventListener('input', () => {
       const text = messageInputEl.value || '';
       const length = text.length;
+
       if (messageCharCounterEl) {
         messageCharCounterEl.textContent = `${length}/1000`;
       }
-      sendMessageButtonEl.disabled = text.trim().length === 0;
+      if (sendMessageButtonEl) {
+        sendMessageButtonEl.disabled = text.trim().length === 0;
+      }
       autoGrowTextarea(messageInputEl);
     });
   }
@@ -121,15 +88,12 @@ function autoGrowTextarea(textarea) {
 
 // ===== API HELPERS =====
 async function apiGet(path) {
-  const res = await fetch(path, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${authToken}`
-    }
-  });
+  const headers = { 'Content-Type': 'application/json' };
+  if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+  const res = await fetch(path, { headers });
 
   if (res.status === 401) {
-    // token invalid, send user to correct login path
     window.location.href = LOGIN_URL;
     throw new Error('Unauthorized');
   }
@@ -142,12 +106,12 @@ async function apiGet(path) {
 }
 
 async function apiPost(path, body) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
   const res = await fetch(path, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${authToken}`
-    },
+    headers,
     body: JSON.stringify(body)
   });
 
@@ -266,13 +230,8 @@ function onConversationClick(thread) {
   activeThreadId = thread.id;
   activeRecipient = thread.recipient || null;
 
-  // re-render to update active state
   renderThreads();
-
-  // update header UI
   openChatHeader();
-
-  // show messages
   loadMessagesForActiveThread();
 }
 
@@ -316,16 +275,12 @@ function openChatHeader() {
 async function loadMessagesForActiveThread() {
   if (!activeThreadId) return;
 
-  // clear polling
   if (messagePollIntervalId) {
     clearInterval(messagePollIntervalId);
     messagePollIntervalId = null;
   }
 
-  // fetch once immediately
   await fetchAndRenderMessages();
-
-  // poll
   messagePollIntervalId = setInterval(fetchAndRenderMessages, 5000);
 }
 
@@ -341,11 +296,11 @@ async function fetchAndRenderMessages() {
 
     messageListEl.innerHTML = '';
 
-    // hide placeholder when conversation loaded
     if (chatPlaceholderEl) chatPlaceholderEl.style.display = 'none';
 
-    // system notice about encryption
-    messageListEl.appendChild(systemMessageEl('Messages in this chat are end-to-end encrypted with a shared passphrase (saved only in your browser).'));
+    messageListEl.appendChild(
+      systemMessageEl('Messages in this chat are end-to-end encrypted with a shared passphrase (saved only in your browser).')
+    );
 
     for (const msg of messages) {
       const row = await createMessageRow(msg);
@@ -439,10 +394,6 @@ function systemMessageEl(text) {
 }
 
 // ===== E2EE WITH PER-THREAD PASSPHRASE =====
-// Passphrase is:
-//  - entered once per thread by user
-//  - stored only in localStorage on this device
-//  - never sent to your server
 
 async function getThreadKey(threadId) {
   if (threadKeyCache.has(threadId)) {
