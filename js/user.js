@@ -1,424 +1,243 @@
-// js/user.js
+/* ============================================================
+   USER PROFILE PAGE (Viewing someone else's profile)
+   Loads: banner, avatar, name, username, bio, stats, posts
+   URL formats accepted: ?user=xyz OR ?username=xyz
+=============================================================== */
 
-// If you change your Supabase URL/key, update here to match search.js
-const USER_SUPABASE_URL = 'https://hbbbsreonwhvqfvbszne.supabase.co';
-const USER_SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyOTc5ODYsImV4cCI6MjA3OTg3Mzk4Nn0.LvqmdOqetnMrH8bnkJY6_S-dsGD8gnvpFczSCJPy-Q4';
+const API_BASE =
+  typeof API_BASE_URL !== "undefined"
+    ? API_BASE_URL
+    : "https://uncensored-app-beta-production.up.railway.app/api";
 
-let userSupabase = null;
+/* ---------------------- GET USERNAME ---------------------- */
 
-function initUserSupabase() {
-  // global "supabase" comes from the Supabase CDN script in your project
-  if (!userSupabase && typeof supabase !== 'undefined') {
-    userSupabase = supabase.createClient(USER_SUPABASE_URL, USER_SUPABASE_ANON_KEY);
-  }
+const params = new URLSearchParams(window.location.search);
+const username = params.get("user") || params.get("username");
+
+if (!username) {
+  showError("No username specified.");
+  throw new Error("Missing ?user= in URL");
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  initUserSupabase();
+/* ---------------------- DOM REFS ---------------------- */
 
-  const params = new URLSearchParams(window.location.search);
-  const usernameParam = params.get('user');
+const bannerEl = document.getElementById("userBanner");
+const avatarEl = document.getElementById("userAvatar");
+const nameEl = document.getElementById("userName");
+const usernameEl = document.getElementById("userUsername");
+const bioEl = document.getElementById("userBio");
+const statsPostsEl = document.getElementById("statsPosts");
+const statsFollowersEl = document.getElementById("statsFollowers");
+const statsFollowingEl = document.getElementById("statsFollowing");
+const followBtn = document.getElementById("followBtn");
+const menuBtn = document.getElementById("userMenuBtn");
+const postsContainer = document.getElementById("userPosts");
+const postsError = document.getElementById("postsError");
 
-  if (!usernameParam) {
-    showUserError('Missing user parameter.');
-    return;
-  }
+/* ---------------------- LOAD PROFILE ---------------------- */
 
-  // If user=me or matches current logged in username -> go to own profile
-  const currentUser = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
-  if (
-    usernameParam === 'me' ||
-    (currentUser && currentUser.username && currentUser.username === usernameParam)
-  ) {
-    window.location.href = 'profile.html';
-    return;
-  }
-
-  // Start loading
-  loadUserProfile(usernameParam);
-  loadUserPosts(usernameParam);
-  setupOptionsMenu();
-});
-
-// =============== UI HELPERS ===============
-
-function qs(id) {
-  return document.getElementById(id);
-}
-
-function showUserError(message) {
-  const nameEl = qs('viewProfileName');
-  const userEl = qs('viewProfileUsername');
-  const followBtn = qs('followButton');
-
-  if (nameEl) nameEl.textContent = 'Error';
-  if (userEl) userEl.textContent = message || '@unknown';
-  if (followBtn) followBtn.style.display = 'none';
-
-  const loadingPosts = qs('userPostsLoading');
-  const errorPosts = qs('userPostsError');
-  if (loadingPosts) loadingPosts.style.display = 'none';
-  if (errorPosts) errorPosts.style.display = 'block';
-}
-
-function setBannerAndAvatar(profile) {
-  const bannerEl = qs('viewProfileBanner');
-  const avatarEl = qs('viewProfileAvatar');
-
-  const bannerUrl = profile.banner_url || profile.header_url || profile.banner || null;
-  const avatarUrl = profile.avatar_url || profile.avatar || null;
-
-  if (bannerEl) {
-    if (bannerUrl) {
-      bannerEl.style.backgroundImage = `url("${bannerUrl}")`;
-      bannerEl.classList.add('profile-banner-image');
-    } else {
-      bannerEl.style.backgroundImage = '';
-      bannerEl.classList.remove('profile-banner-image');
-    }
-  }
-
-  if (avatarEl && avatarUrl) {
-    avatarEl.src = avatarUrl;
-  }
-}
-
-// =============== LOAD PROFILE ===============
-
-async function loadUserProfile(username) {
-  const titleEl = qs('viewProfileTitle');
-  const nameEl = qs('viewProfileName');
-  const userEl = qs('viewProfileUsername');
-  const bioEl = qs('viewProfileBio');
-  const postsCountEl = qs('profilePostsCount');
-  const followersCountEl = qs('profileFollowersCount');
-  const followingCountEl = qs('profileFollowingCount');
-  const followBtn = qs('followButton');
-
-  if (nameEl) nameEl.textContent = 'Loading...';
-  if (userEl) userEl.textContent = '@' + username;
-
+async function loadUserProfile() {
   try {
-    if (!userSupabase) {
-      throw new Error('Supabase client not available');
-    }
+    const res = await fetch(`${API_BASE}/users/${encodeURIComponent(username)}`);
+    if (!res.ok) throw new Error("Profile not found");
 
-    // You may need to rename this RPC to match your backend
-    const { data, error } = await userSupabase
-      .rpc('get_user_profile', { query_username: username })
-      .single();
+    const user = await res.json();
 
-    if (error || !data) {
-      console.error('get_user_profile error:', error);
-      showUserError('User not found.');
-      return;
-    }
+    renderProfile(user);
 
-    const profile = data;
-
-    const displayName = profile.display_name || profile.username || username;
-    if (titleEl) titleEl.textContent = displayName;
-    if (nameEl) nameEl.textContent = displayName;
-    if (userEl) userEl.textContent = '@' + (profile.username || username);
-    if (bioEl) bioEl.textContent = profile.bio || '';
-
-    if (postsCountEl) postsCountEl.textContent = profile.posts_count ?? 0;
-    if (followersCountEl) followersCountEl.textContent = profile.followers_count ?? 0;
-    if (followingCountEl) followingCountEl.textContent = profile.following_count ?? 0;
-
-    setBannerAndAvatar(profile);
-
-    setupFollowButton(followBtn, profile);
+    loadUserPosts(user.id);
   } catch (err) {
-    console.error('loadUserProfile error:', err);
-    showUserError('Could not load profile.');
+    console.error(err);
+    showError("Could not load profile.");
   }
 }
 
-// =============== FOLLOW BUTTON ===============
-
-async function setupFollowButton(button, profile) {
-  if (!button) return;
-
-  const currentUser = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
-  if (!currentUser) {
-    // Not logged in – show disabled Follow
-    button.disabled = true;
-    button.textContent = 'Follow';
-    return;
-  }
-
-  // If this is somehow our own profile (should already be redirected, but just in case)
-  if (currentUser.id && profile.id && currentUser.id === profile.id) {
-    button.style.display = 'none';
-    return;
-  }
-
-  let isFollowing = false;
-
-  try {
-    if (!userSupabase) throw new Error('Supabase client not available');
-
-    const { data: followRow } = await userSupabase
-      .from('follows')
-      .select('id')
-      .eq('follower_id', currentUser.id)
-      .eq('following_id', profile.id)
-      .maybeSingle();
-
-    isFollowing = !!followRow;
-  } catch (err) {
-    console.warn('Error checking follow state:', err);
-  }
-
-  applyFollowButtonStyle(button, isFollowing);
-
-  button.onclick = async () => {
-    const currentlyFollowing = isFollowing;
-    const newState = !currentlyFollowing;
-
-    // Optimistic UI
-    applyFollowButtonStyle(button, newState);
-
-    try {
-      if (!userSupabase) throw new Error('Supabase client not available');
-
-      if (newState) {
-        const { error } = await userSupabase
-          .from('follows')
-          .insert({ follower_id: currentUser.id, following_id: profile.id });
-
-        if (error) throw error;
-      } else {
-        const { error } = await userSupabase
-          .from('follows')
-          .delete()
-          .eq('follower_id', currentUser.id)
-          .eq('following_id', profile.id);
-
-        if (error) throw error;
-      }
-
-      isFollowing = newState;
-    } catch (err) {
-      console.error('Follow toggle error:', err);
-      // Revert on error
-      applyFollowButtonStyle(button, currentlyFollowing);
-    }
-  };
-}
-
-function applyFollowButtonStyle(button, isFollowing) {
-  if (!button) return;
-  if (isFollowing) {
-    button.textContent = 'Following';
-    button.classList.remove('btn-primary');
-    button.classList.add('btn-secondary');
+function renderProfile(user) {
+  // Banner
+  if (user.banner_url) {
+    bannerEl.style.backgroundImage = `url('${user.banner_url}')`;
+    bannerEl.classList.add("profile-banner-image");
   } else {
-    button.textContent = 'Follow';
-    button.classList.remove('btn-secondary');
-    button.classList.add('btn-primary');
+    bannerEl.style.background = "#111"; // fallback grey banner
+  }
+
+  // Avatar
+  avatarEl.src = user.avatar_url || "assets/icons/default-profile.png";
+
+  // Name + username
+  nameEl.textContent = user.display_name || user.username;
+  usernameEl.textContent = "@" + user.username;
+
+  // Bio
+  bioEl.textContent = user.bio || "";
+
+  // Stats
+  statsPostsEl.textContent = user.post_count ?? 0;
+  statsFollowersEl.textContent = user.followers ?? 0;
+  statsFollowingEl.textContent = user.following ?? 0;
+
+  setupFollowButton(user);
+}
+
+/* ---------------------- FOLLOW BUTTON ---------------------- */
+
+function setupFollowButton(user) {
+  const currentUser =
+    typeof getCurrentUser === "function" ? getCurrentUser() : null;
+
+  if (!currentUser) {
+    followBtn.textContent = "Follow";
+    followBtn.onclick = () => (window.location.href = "login.html");
+    return;
+  }
+
+  if (currentUser.username === user.username) {
+    // Viewing your own profile → hide follow button
+    followBtn.style.display = "none";
+    return;
+  }
+
+  let isFollowing = user.is_following;
+
+  updateFollowButtonUI();
+
+  followBtn.onclick = async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) return;
+
+      const url = `${API_BASE}/users/${encodeURIComponent(user.username)}/follow`;
+
+      const res = await fetch(url, {
+        method: isFollowing ? "DELETE" : "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) throw new Error("Follow action failed");
+
+      isFollowing = !isFollowing;
+      updateFollowButtonUI();
+    } catch (err) {
+      console.error(err);
+      alert("Could not update follow status.");
+    }
+  };
+
+  function updateFollowButtonUI() {
+    followBtn.textContent = isFollowing ? "Following" : "Follow";
+    followBtn.classList.toggle("following", isFollowing);
   }
 }
 
-// =============== LOAD POSTS ===============
+/* ---------------------- LOAD USER POSTS ---------------------- */
 
-async function loadUserPosts(username) {
-  const listEl = qs('userPostsList');
-  const loadingEl = qs('userPostsLoading');
-  const emptyEl = qs('userPostsEmpty');
-  const errorEl = qs('userPostsError');
-
-  if (!listEl) return;
-
-  if (loadingEl) loadingEl.style.display = 'block';
-  if (emptyEl) emptyEl.style.display = 'none';
-  if (errorEl) errorEl.style.display = 'none';
-  listEl.innerHTML = '';
-
+async function loadUserPosts(userId) {
   try {
-    if (!userSupabase) throw new Error('Supabase client not available');
+    const res = await fetch(
+      `${API_BASE}/posts/user/${encodeURIComponent(userId)}`
+    );
 
-    // You may need to rename this RPC to match your backend
-    const { data: posts, error } = await userSupabase.rpc('get_user_posts', {
-      query_username: username,
-      limit_count: 50
-    });
+    if (!res.ok) throw new Error("Could not load posts");
 
-    if (error) {
-      console.error('get_user_posts error:', error);
-      throw error;
-    }
+    const posts = await res.json();
 
-    if (!posts || posts.length === 0) {
-      if (emptyEl) emptyEl.style.display = 'block';
+    if (!posts.length) {
+      postsContainer.innerHTML = `<p class="empty">No posts yet.</p>`;
       return;
     }
 
-    const html = posts.map(renderUserPostCard).join('');
-    listEl.innerHTML = html;
+    postsContainer.innerHTML = posts.map(renderPostHTML).join("");
 
-    // Attach simple click to go to full post
-    listEl.querySelectorAll('.post-card').forEach(card => {
-      const postId = card.getAttribute('data-post-id');
-      if (!postId) return;
-
-      card.addEventListener('click', e => {
-        // ignore clicks on action buttons
-        if (e.target.closest('.post-actions')) return;
-        window.location.href = 'post.html?id=' + encodeURIComponent(postId);
-      });
-    });
+    attachPostEvents();
   } catch (err) {
-    console.error('loadUserPosts error:', err);
-    if (errorEl) errorEl.style.display = 'block';
-  } finally {
-    if (loadingEl) loadingEl.style.display = 'none';
+    console.error(err);
+    postsError.style.display = "block";
   }
 }
 
-function renderUserPostCard(post) {
-  const user = {
-    username: post.username || post.user_username || '',
-    display_name: post.display_name || post.user_display_name || post.username || '',
-    avatar_url: post.avatar_url || post.user_avatar_url || 'assets/icons/default-profile.png'
-  };
-
-  const createdAt = post.created_at || post.createdAt;
-  const likeCount = post.like_count || post.likes || 0;
-  const commentCount = post.comment_count || post.comments || 0;
+function renderPostHTML(post) {
+  const avatar = post.user?.avatar_url || "assets/icons/default-profile.png";
 
   return `
-    <article class="post-card profile-post-card" data-post-id="${post.id}">
+    <article class="post-card" data-post-id="${post.id}">
       <header class="post-header">
-        <div class="post-user">
-          <img
-            src="${user.avatar_url}"
-            alt="${escapeHtml(user.display_name)}"
-            class="post-user-avatar"
-            onerror="this.src='assets/icons/default-profile.png'"
-          />
-          <div class="post-user-info">
-            <div class="post-display-name">${escapeHtml(user.display_name)}</div>
-            <div class="post-username">@${escapeHtml(user.username)}</div>
+        <div class="post-user" data-username="${post.user.username}">
+          <img src="${avatar}" class="post-user-avatar">
+          <div>
+            <div class="post-display-name">${post.user.display_name}</div>
+            <div class="post-username">@${post.user.username}</div>
           </div>
         </div>
-        <div class="post-meta">
-          <time class="post-time">${formatTime(createdAt)}</time>
-        </div>
+        <time class="post-time">${formatTime(post.created_at)}</time>
       </header>
 
-      <div class="post-body">
-        <div class="post-content">
-          ${formatPostContent(post.content || '')}
-        </div>
-      </div>
+      <div class="post-content">${escapeHtml(post.content)}</div>
 
       <footer class="post-footer">
         <div class="post-actions">
-          <button class="post-action-btn" type="button">
-            <i class="fa-regular fa-heart"></i>
-            <span class="post-action-count">${likeCount}</span>
-          </button>
-          <button class="post-action-btn" type="button">
-            <i class="fa-regular fa-comment"></i>
-            <span class="post-action-count">${commentCount}</span>
-          </button>
-          <button class="post-action-btn" type="button">
-            <i class="fa-solid fa-arrow-up-from-bracket"></i>
-          </button>
+          <span><i class="fa-regular fa-heart"></i> ${post.likes || 0}</span>
+          <span><i class="fa-regular fa-comment"></i> ${post.comments || 0}</span>
+          <span><i class="fa-solid fa-arrow-up-from-bracket"></i></span>
         </div>
       </footer>
     </article>
   `;
 }
 
-// =============== SMALL UTILITIES (same style as feed.js) ===============
+function attachPostEvents() {
+  document.querySelectorAll(".post-card").forEach((card) => {
+    const postId = card.dataset.postId;
 
-function formatTime(timestamp) {
-  if (!timestamp) return '';
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) return '';
-  const now = new Date();
-  const diffMs = now - date;
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
+    // Open full post
+    card.addEventListener("click", () => {
+      window.location.href = `post.html?id=${postId}`;
+    });
 
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins}h` === '0h' ? `${diffMins}m` : `${diffMins}m`;
-  if (diffHours < 24) return `${diffHours}h`;
-  if (diffDays < 7) return `${diffDays}d`;
-  return date.toLocaleDateString();
+    // Open user profile
+    card.querySelector(".post-user").addEventListener("click", (e) => {
+      e.stopPropagation();
+      const uname = e.currentTarget.dataset.username;
+
+      const currentUser =
+        typeof getCurrentUser === "function" ? getCurrentUser() : null;
+
+      if (currentUser && currentUser.username === uname) {
+        window.location.href = "profile.html";
+      } else {
+        window.location.href = `user.html?user=${encodeURIComponent(uname)}`;
+      }
+    });
+  });
 }
 
-function formatPostContent(content) {
-  if (!content) return '';
-  let formatted = escapeHtml(content);
-
-  formatted = formatted.replace(
-    /(https?:\/\/[^\s]+)/g,
-    '<a href="$1" target="_blank" rel="noopener" style="color: var(--primary-color); text-decoration: none;">$1</a>'
-  );
-
-  formatted = formatted.replace(
-    /#(\w+)/g,
-    '<span style="color: var(--primary-color); font-weight: 500;">#$1</span>'
-  );
-
-  formatted = formatted.replace(
-    /@(\w+)/g,
-    '<span style="color: var(--primary-color); font-weight: 500;">@$1</span>'
-  );
-
-  return formatted;
-}
+/* ---------------------- UTILITIES ---------------------- */
 
 function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
-// =============== THREE DOTS MENU ===============
+function formatTime(ts) {
+  const d = new Date(ts);
+  if (isNaN(d)) return "";
 
-function setupOptionsMenu() {
-  const btn = qs('userOptionsButton');
-  const menu = qs('userOptionsMenu');
-  if (!btn || !menu) return;
+  const diff = (Date.now() - d.getTime()) / 1000;
 
-  btn.addEventListener('click', () => {
-    const isVisible = menu.style.display === 'block';
-    menu.style.display = isVisible ? 'none' : 'block';
-  });
+  if (diff < 60) return "just now";
+  if (diff < 3600) return Math.floor(diff / 60) + "m";
+  if (diff < 86400) return Math.floor(diff / 3600) + "h";
 
-  document.addEventListener('click', e => {
-    const menu = qs('userOptionsMenu');
-    const btn = qs('userOptionsButton');
-    if (!menu || !btn) return;
-    if (!menu.contains(e.target) && !btn.contains(e.target)) {
-      menu.style.display = 'none';
-    }
-  });
-
-  menu.addEventListener('click', e => {
-    const item = e.target.closest('.user-options-item');
-    if (!item) return;
-    const action = item.dataset.action;
-    if (action === 'share') {
-      navigator.share?.({
-        title: document.title,
-        url: window.location.href
-      }).catch(() => {});
-    } else if (action === 'block') {
-      alert('Block user – not implemented yet.');
-    } else if (action === 'report') {
-      alert('Report – not implemented yet.');
-    }
-    menu.style.display = 'none';
-  });
+  return d.toLocaleDateString();
 }
+
+function showError(msg) {
+  document.getElementById("profileError").textContent = msg;
+}
+
+/* ---------------------- INIT ---------------------- */
+
+loadUserProfile();
