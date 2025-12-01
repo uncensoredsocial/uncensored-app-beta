@@ -1,87 +1,84 @@
-// js/feed.js
+// ============================================
+// feed.js — Stable Version (Media-ready)
+// ============================================
 
-// Use global API_BASE_URL from auth.js if available
+// Prefer global API_BASE_URL from auth.js
 const FEED_API_BASE_URL =
-  typeof API_BASE_URL !== 'undefined'
+  typeof API_BASE_URL !== "undefined"
     ? API_BASE_URL
-    : 'https://uncensored-app-beta-production.up.railway.app/api';
+    : "https://uncensored-app-beta-production.up.railway.app/api";
 
 class FeedManager {
   constructor() {
-    // feed state
+    // Feed state
     this.posts = [];
     this.isLoading = false;
     this.isPosting = false;
-
-    this.currentMode = 'recent'; // 'recent' | 'following'
+    this.currentMode = "recent"; // recent | following
+    this.hasMore = true;
     this.page = 1;
     this.pageSize = 20;
-    this.hasMore = true;
 
-    // post composer state
+    // Character limit
     this.maxChars = 280;
-    this.selectedMediaFile = null;         // File
-    this.selectedMediaType = null;         // 'image' | 'video' | null
-    this.uploadedMediaUrl = null;          // Supabase URL after upload
+
+    // Media
+    this.selectedMediaFile = null;
+    this.selectedMediaPreviewUrl = null;
   }
 
   async init() {
     this.cacheDom();
     this.bindEvents();
     this.updateAuthUI();
-    this.updateCharCounter(); // initialize 0/280 & button
+    this.updateCharCounter();
     await this.loadPosts(true);
   }
 
-  /* ============================================================
-   * DOM CACHE
-   * ========================================================== */
+  // ============================================
+  // DOM CACHE
+  // ============================================
 
   cacheDom() {
-    // Main feed & composer
-    this.feedContainer = document.getElementById('feedContainer');
-    this.postInput = document.getElementById('postInput');
-    this.postButton = document.getElementById('postButton');
-    this.charCounter = document.getElementById('charCounter');
-    this.postCreation = document.getElementById('postCreation');
-    this.guestMessage = document.getElementById('guestMessage');
-    this.postUserAvatar = document.getElementById('postUserAvatar');
+    this.feedContainer = document.getElementById("feedContainer");
+    this.postInput = document.getElementById("postInput");
+    this.postButton = document.getElementById("postButton");
+    this.charCounter = document.getElementById("charCounter");
+    this.postCreation = document.getElementById("postCreation");
+    this.guestMessage = document.getElementById("guestMessage");
+    this.postUserAvatar = document.getElementById("postUserAvatar");
 
-    // Media controls
-    this.postMediaInput = document.getElementById('postMediaInput'); // <input type="file">
-    this.addMediaBtn = document.getElementById('addMediaBtn');       // "Add image / video" button
-    this.mediaFileName = document.getElementById('mediaFileName');   // span for file name
+    // Original media setup
+    this.postMediaInput = document.getElementById("postMediaInput");
+    this.addMediaBtn = document.getElementById("addMediaBtn");
+    this.mediaFileName = document.getElementById("mediaFileName");
 
-    // Tabs: buttons with class .feed-tab-btn and data-tab="recent"/"following"
-    this.feedTabs = document.getElementById('feedTabs');
+    // Tabs
+    this.feedTabs = document.getElementById("feedTabs");
     this.tabButtons = this.feedTabs
-      ? this.feedTabs.querySelectorAll('.feed-tab-btn')
+      ? this.feedTabs.querySelectorAll(".feed-tab-btn")
       : [];
 
-    // Loading / empty states (optional)
-    this.feedLoading = document.getElementById('feedLoading');
-    this.feedEmpty = document.getElementById('feedEmpty');
+    // Loading / empty
+    this.feedLoading = document.getElementById("feedLoading");
+    this.feedEmpty = document.getElementById("feedEmpty");
 
     // Header auth UI
-    this.profileSection = document.getElementById('profileSection');
-    this.authButtons = document.getElementById('authButtons');
-    this.headerProfileImg = document.getElementById('headerProfileImg');
+    this.profileSection = document.getElementById("profileSection");
+    this.authButtons = document.getElementById("authButtons");
+    this.headerProfileImg = document.getElementById("headerProfileImg");
   }
 
-  /* ============================================================
-   * EVENT BINDING
-   * ========================================================== */
+  // ============================================
+  // EVENTS
+  // ============================================
 
   bindEvents() {
-    // Composer typing
+    // Post Input typing
     if (this.postInput) {
-      this.postInput.addEventListener('input', () => {
-        this.updateCharCounter();
-      });
-
-      // Ctrl+Enter / Cmd+Enter to post
-      this.postInput.addEventListener('keydown', (e) => {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      this.postInput.addEventListener("input", () => this.updateCharCounter());
+      this.postInput.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
           e.preventDefault();
           this.handleCreatePost();
         }
@@ -90,47 +87,49 @@ class FeedManager {
 
     // Post button
     if (this.postButton) {
-      this.postButton.addEventListener('click', () => this.handleCreatePost());
+      this.postButton.addEventListener("click", () => this.handleCreatePost());
     }
 
-    // Media: open file picker
+    // Media picker
     if (this.addMediaBtn && this.postMediaInput) {
-      this.addMediaBtn.addEventListener('click', () => {
+      this.addMediaBtn.addEventListener("click", () => {
         this.postMediaInput.click();
       });
     }
 
-    // Media: when file chosen
     if (this.postMediaInput) {
-      this.postMediaInput.addEventListener('change', () => {
+      this.postMediaInput.addEventListener("change", () => {
         const file = this.postMediaInput.files[0];
-        this.handleMediaSelected(file);
+        this.selectedMediaFile = file || null;
+        if (this.mediaFileName) {
+          this.mediaFileName.textContent = file ? file.name : "";
+        }
         this.updateCharCounter();
       });
     }
 
-    // Tabs: Recent / Following
-    if (this.tabButtons && this.tabButtons.length) {
+    // Tabs
+    if (this.tabButtons.length > 0) {
       this.tabButtons.forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const mode = btn.dataset.tab; // 'recent' or 'following'
+        btn.addEventListener("click", () => {
+          const mode = btn.dataset.tab;
           if (!mode || mode === this.currentMode) return;
           this.switchMode(mode);
         });
       });
     }
 
-    // Infinite scroll
-    window.addEventListener('scroll', () => this.handleScroll());
+    // Infinite scrolling
+    window.addEventListener("scroll", () => this.handleScroll());
   }
 
-  /* ============================================================
-   * AUTH / USER HELPERS
-   * ========================================================== */
+  // ============================================
+  // AUTH
+  // ============================================
 
   isLoggedIn() {
     try {
-      return typeof isLoggedIn === 'function' ? isLoggedIn() : false;
+      return typeof isLoggedIn === "function" ? isLoggedIn() : false;
     } catch {
       return false;
     }
@@ -138,7 +137,7 @@ class FeedManager {
 
   getCurrentUser() {
     try {
-      return typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+      return typeof getCurrentUser === "function" ? getCurrentUser() : null;
     } catch {
       return null;
     }
@@ -146,9 +145,9 @@ class FeedManager {
 
   getAuthToken() {
     try {
-      return typeof getAuthToken === 'function'
+      return typeof getAuthToken === "function"
         ? getAuthToken()
-        : localStorage.getItem('authToken') || null;
+        : localStorage.getItem("authToken");
     } catch {
       return null;
     }
@@ -158,396 +157,270 @@ class FeedManager {
     const user = this.getCurrentUser();
     const loggedIn = !!user;
 
-    // Show/hide composer
-    if (this.postCreation) {
-      this.postCreation.style.display = loggedIn ? 'block' : 'none';
-    }
+    // Composer
+    if (this.postCreation)
+      this.postCreation.style.display = loggedIn ? "block" : "none";
 
     // Guest message
-    if (this.guestMessage) {
-      this.guestMessage.style.display = loggedIn ? 'none' : 'block';
-    }
+    if (this.guestMessage)
+      this.guestMessage.style.display = loggedIn ? "none" : "block";
 
-    // Header left: profile vs auth buttons
+    // Header UI
     if (this.profileSection && this.authButtons) {
       if (loggedIn) {
-        this.profileSection.style.display = 'flex';
-        this.authButtons.style.display = 'none';
+        this.profileSection.style.display = "flex";
+        this.authButtons.style.display = "none";
 
-        if (this.headerProfileImg) {
-          this.headerProfileImg.src =
-            user && user.avatar_url
-              ? user.avatar_url
-              : 'assets/icons/default-profile.png';
+        if (this.headerProfileImg && user.avatar_url) {
+          this.headerProfileImg.src = user.avatar_url;
         }
       } else {
-        this.profileSection.style.display = 'none';
-        this.authButtons.style.display = 'flex';
+        this.profileSection.style.display = "none";
+        this.authButtons.style.display = "flex";
       }
     }
 
-    // Composer avatar (left of "What's happening?")
+    // Composer avatar
     if (this.postUserAvatar) {
       this.postUserAvatar.src =
         user && user.avatar_url
           ? user.avatar_url
-          : 'assets/icons/default-profile.png';
+          : "assets/icons/default-profile.png";
     }
-
-    this.updateCharCounter();
   }
 
-  /* ============================================================
-   * CHARACTER COUNTER / BUTTON ENABLE
-   * ========================================================== */
+  // ============================================
+  // CHARACTER COUNTER
+  // ============================================
 
   updateCharCounter() {
     if (!this.postInput || !this.charCounter) return;
 
-    let text = this.postInput.value || '';
-    if (text.length > this.maxChars) {
-      text = text.slice(0, this.maxChars);
-      this.postInput.value = text;
-    }
+    const text = this.postInput.value || "";
+    const length = text.length;
 
-    const count = text.length;
-    this.charCounter.textContent = `${count}/${this.maxChars}`;
+    this.charCounter.textContent = `${length}/${this.maxChars}`;
 
-    // visual warning if close to limit (optional)
-    this.charCounter.classList.remove('warning', 'error');
-    if (count > this.maxChars) {
-      this.charCounter.classList.add('error');
-    } else if (count > this.maxChars - 40) {
-      this.charCounter.classList.add('warning');
-    }
+    this.charCounter.classList.remove("warning", "error");
+    if (length > this.maxChars) this.charCounter.classList.add("error");
+    else if (length > this.maxChars - 40)
+      this.charCounter.classList.add("warning");
 
-    // enable Post if user logged in & has text OR media
-    const hasText = count > 0;
-    const hasMedia = !!this.selectedMediaFile;
-    const canPost = this.isLoggedIn() && (hasText || hasMedia);
-
-    if (this.postButton) {
-      this.postButton.disabled = !canPost;
-    }
+    const canPost = this.isLoggedIn() && (length > 0 || this.selectedMediaFile);
+    if (this.postButton) this.postButton.disabled = !canPost;
   }
 
-  /* ============================================================
-   * FEED MODE / SCROLL
-   * ========================================================== */
+  // ============================================
+  // TABS
+  // ============================================
 
   switchMode(mode) {
-    if (mode !== 'recent' && mode !== 'following') return;
     this.currentMode = mode;
     this.page = 1;
     this.hasMore = true;
 
-    // Update tab active class
-    if (this.tabButtons && this.tabButtons.length) {
-      this.tabButtons.forEach((btn) => {
-        btn.classList.toggle('active', btn.dataset.tab === mode);
-      });
-    }
+    this.tabButtons.forEach((btn) =>
+      btn.classList.toggle("active", btn.dataset.tab === mode)
+    );
 
     this.loadPosts(true);
   }
 
-  handleScroll() {
-    if (!this.hasMore || this.isLoading) return;
-    const scrollPosition = window.innerHeight + window.scrollY;
-    const threshold = document.body.offsetHeight - 600;
-    if (scrollPosition >= threshold) {
-      this.loadPosts(false);
-    }
-  }
-
-  /* ============================================================
-   * LOAD POSTS
-   * ========================================================== */
+  // ============================================
+  // LOAD POSTS
+  // ============================================
 
   async loadPosts(reset = false) {
     if (this.isLoading || (!this.hasMore && !reset)) return;
-    if (!this.feedContainer) return;
-
     this.isLoading = true;
 
     if (reset) {
-      this.showLoadingState();
+      if (this.feedLoading) this.feedLoading.style.display = "flex";
+      if (this.feedContainer) this.feedContainer.innerHTML = "";
     }
 
     try {
       const url = new URL(`${FEED_API_BASE_URL}/posts`);
-      url.searchParams.set('mode', this.currentMode); // 'recent' | 'following'
-      url.searchParams.set('page', String(this.page));
-      url.searchParams.set('pageSize', String(this.pageSize));
+      url.searchParams.set("mode", this.currentMode);
+      url.searchParams.set("page", this.page);
+      url.searchParams.set("pageSize", this.pageSize);
 
       const token = this.getAuthToken();
       const headers = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const res = await fetch(url.toString(), { headers });
-      if (!res.ok) {
-        throw new Error(`Failed to load posts (${res.status})`);
-      }
-
+      const res = await fetch(url, { headers });
       const data = await res.json();
+
       const posts = Array.isArray(data)
         ? data
         : Array.isArray(data.posts)
         ? data.posts
         : [];
 
-      if (reset) {
-        this.posts = posts;
-      } else {
-        this.posts = this.posts.concat(posts);
-      }
+      if (reset) this.posts = posts;
+      else this.posts = this.posts.concat(posts);
 
-      if (posts.length < this.pageSize) {
-        this.hasMore = false;
-      } else {
-        this.page += 1;
-      }
+      if (posts.length < this.pageSize) this.hasMore = false;
+      else this.page++;
 
       this.renderPosts();
     } catch (err) {
-      console.error('loadPosts error:', err);
-      this.showToast('Failed to load feed', 'error');
-    } finally {
-      this.isLoading = false;
-      this.hideLoadingState();
+      console.error("loadPosts error:", err);
     }
+
+    this.isLoading = false;
+    if (this.feedLoading) this.feedLoading.style.display = "none";
   }
 
-  showLoadingState() {
-    if (this.feedLoading) this.feedLoading.style.display = 'flex';
-    if (this.feedEmpty) this.feedEmpty.style.display = 'none';
-    this.feedContainer.innerHTML = '';
-  }
-
-  hideLoadingState() {
-    if (this.feedLoading) this.feedLoading.style.display = 'none';
-  }
-
-  /* ============================================================
-   * RENDER POSTS
-   * ========================================================== */
+  // ============================================
+  // RENDER POSTS
+  // ============================================
 
   renderPosts() {
     if (!this.feedContainer) return;
 
-    if (!this.posts.length) {
-      this.feedContainer.innerHTML = '';
-      if (this.feedEmpty) this.feedEmpty.style.display = 'block';
+    if (this.posts.length === 0) {
+      this.feedContainer.innerHTML = "";
       return;
-    } else if (this.feedEmpty) {
-      this.feedEmpty.style.display = 'none';
     }
 
     this.feedContainer.innerHTML = this.posts
       .map((post) => this.renderPostHtml(post))
-      .join('');
+      .join("");
 
     this.attachPostEvents();
   }
 
   renderPostHtml(post) {
     const user = post.user || {};
-    const username = user.username || 'unknown';
-    const displayName = user.display_name || user.displayName || username;
-    const avatarUrl =
-      user.avatar_url || user.avatar || 'assets/icons/default-profile.png';
+    const username = user.username || "unknown";
+    const displayName = user.display_name || username;
+    const avatar = user.avatar_url || "assets/icons/default-profile.png";
+
+    const createdAt = post.created_at;
+    const time = this.formatTime(createdAt);
+
+    const liked = !!post.is_liked;
+    const saved = !!post.is_saved;
 
     const likeCount =
-      typeof post.likes_count === 'number'
-        ? post.likes_count
-        : typeof post.like_count === 'number'
-        ? post.like_count
-        : Array.isArray(post.likes)
-        ? post.likes.length
-        : 0;
+      post.like_count || post.likes || (Array.isArray(post.likes) ? post.likes.length : 0);
+    const commentCount = post.comment_count || post.comments || 0;
 
-    const commentsCount =
-      typeof post.comments_count === 'number'
-        ? post.comments_count
-        : typeof post.comment_count === 'number'
-        ? post.comment_count
-        : 0;
-
-    const isLiked = !!post.is_liked;
-    const isSaved = !!post.is_saved;
-
-    const createdAt = post.created_at || post.createdAt;
-    const mediaUrl = post.media_url || post.mediaUrl || null;
-    const mediaType = post.media_type || post.mediaType || null;
-
-    const timeLabel = this.formatTime(createdAt);
-    const postUrl = this.getPostUrl(post.id);
-
-    let mediaHtml = '';
-    if (mediaUrl) {
-      if (mediaType === 'video') {
-        mediaHtml = `
-          <div class="post-media">
-            <video src="${this.escapeHtml(mediaUrl)}" controls playsinline></video>
-          </div>
-        `;
-      } else {
-        mediaHtml = `
-          <div class="post-media">
-            <img src="${this.escapeHtml(
-              mediaUrl
-            )}" alt="Post media" loading="lazy" />
-          </div>
-        `;
-      }
-    }
+    const mediaUrl = post.media_url || null;
 
     return `
-      <article class="post" data-post-id="${this.escapeHtml(post.id)}">
+      <article class="post" data-post-id="${post.id}">
         <header class="post-header">
-          <div class="post-user" data-username="${this.escapeHtml(username)}">
-            <img
-              src="${this.escapeHtml(avatarUrl)}"
-              alt="${this.escapeHtml(displayName)}"
-              class="post-avatar"
-              onerror="this.src='assets/icons/default-profile.png'"
-            />
+          <div class="post-user" data-username="${this.escape(username)}">
+            <img class="post-avatar" src="${avatar}" onerror="this.src='assets/icons/default-profile.png'">
             <div class="post-user-meta">
-              <span class="post-display-name">${this.escapeHtml(
-                displayName
-              )}</span>
-              <span class="post-username">@${this.escapeHtml(username)}</span>
+              <span class="post-display-name">${this.escape(displayName)}</span>
+              <span class="post-username">@${this.escape(username)}</span>
             </div>
           </div>
-          <span class="post-time">${this.escapeHtml(timeLabel)}</span>
+          <span class="post-time">${time}</span>
         </header>
 
         <div class="post-body">
-          <div class="post-text">
-            ${this.formatPostContent(post.content || '')}
-          </div>
-          ${mediaHtml}
+          <div class="post-text">${this.formatPostContent(post.content || "")}</div>
+
+          ${
+            mediaUrl
+              ? `<div class="post-media"><img src="${mediaUrl}" loading="lazy"></div>`
+              : ""
+          }
         </div>
 
         <footer class="post-footer">
           <div class="post-actions">
-            <button
-              class="post-action like-btn ${isLiked ? 'liked' : ''}"
-              type="button"
-            >
-              <span class="post-action-icon">
-                <i class="fa-${isLiked ? 'solid' : 'regular'} fa-heart"></i>
-              </span>
-              <span class="post-action-count like-count">${likeCount}</span>
+
+            <button class="post-action like-btn ${liked ? "liked" : ""}">
+              <i class="fa-${liked ? "solid" : "regular"} fa-heart"></i>
+              <span class="like-count">${likeCount}</span>
             </button>
 
-            <button
-              class="post-action comment-btn"
-              type="button"
-            >
-              <span class="post-action-icon">
-                <i class="fa-regular fa-comment"></i>
-              </span>
-              <span class="post-action-count comment-count">${commentsCount}</span>
+            <button class="post-action comment-btn">
+              <i class="fa-regular fa-comment"></i>
+              <span class="comment-count">${commentCount}</span>
             </button>
 
-            <button
-              class="post-action share-btn"
-              type="button"
-              data-share-url="${this.escapeHtml(postUrl)}"
-            >
-              <span class="post-action-icon">
-                <i class="fa-solid fa-arrow-up-from-bracket"></i>
-              </span>
+            <button class="post-action share-btn">
+              <i class="fa-solid fa-arrow-up-from-bracket"></i>
             </button>
 
-            <button
-              class="post-action save-btn ${isSaved ? 'saved' : ''}"
-              type="button"
-            >
-              <span class="post-action-icon">
-                <i class="fa-${isSaved ? 'solid' : 'regular'} fa-bookmark"></i>
-              </span>
+            <button class="post-action save-btn ${saved ? "saved" : ""}">
+              <i class="fa-${saved ? "solid" : "regular"} fa-bookmark"></i>
             </button>
+
           </div>
         </footer>
       </article>
     `;
   }
 
+  // ============================================
+  // POST EVENTS
+  // ============================================
+
   attachPostEvents() {
-    if (!this.feedContainer) return;
+    const posts = document.querySelectorAll(".post");
 
-    const cards = this.feedContainer.querySelectorAll('.post');
+    posts.forEach((postEl) => {
+      const postId = postEl.dataset.postId;
 
-    cards.forEach((card) => {
-      const postId = card.getAttribute('data-post-id');
-
-      // whole card -> open post (unless clicking actions or user)
-      card.addEventListener('click', (e) => {
-        if (e.target.closest('.post-actions') || e.target.closest('.post-user')) {
-          return;
-        }
-        if (postId) {
-          window.location.href = this.getPostUrl(postId);
-        }
+      // Click post -> open post page
+      postEl.addEventListener("click", (e) => {
+        if (e.target.closest(".post-actions") || e.target.closest(".post-user")) return;
+        window.location.href = `post.html?id=${postId}`;
       });
 
-      // user click -> profile or user page
-      const userEl = card.querySelector('.post-user');
+      // User click
+      const userEl = postEl.querySelector(".post-user");
       if (userEl) {
-        userEl.addEventListener('click', (e) => {
+        userEl.addEventListener("click", (e) => {
           e.stopPropagation();
-          const username = userEl.getAttribute('data-username');
-          if (!username) return;
-
-          const currentUser = this.getCurrentUser();
-          if (currentUser && currentUser.username === username) {
-            window.location.href = 'profile.html';
-          } else {
-            window.location.href = `user.html?user=${encodeURIComponent(
-              username
-            )}`;
-          }
+          const username = userEl.dataset.username;
+          const me = this.getCurrentUser();
+          if (me && me.username === username) window.location.href = "profile.html";
+          else window.location.href = `user.html?user=${encodeURIComponent(username)}`;
         });
       }
 
-      // like
-      const likeBtn = card.querySelector('.like-btn');
+      // Like
+      const likeBtn = postEl.querySelector(".like-btn");
       if (likeBtn) {
-        likeBtn.addEventListener('click', (e) => {
+        likeBtn.addEventListener("click", (e) => {
           e.stopPropagation();
           this.handleLike(postId, likeBtn);
         });
       }
 
-      // comment -> go to post with #comments anchor
-      const commentBtn = card.querySelector('.comment-btn');
+      // Comment
+      const commentBtn = postEl.querySelector(".comment-btn");
       if (commentBtn) {
-        commentBtn.addEventListener('click', (e) => {
+        commentBtn.addEventListener("click", (e) => {
           e.stopPropagation();
-          if (postId) {
-            window.location.href = this.getPostUrl(postId) + '#comments';
-          }
+          window.location.href = `post.html?id=${postId}#comments`;
         });
       }
 
-      // share
-      const shareBtn = card.querySelector('.share-btn');
+      // Share
+      const shareBtn = postEl.querySelector(".share-btn");
       if (shareBtn) {
-        shareBtn.addEventListener('click', (e) => {
+        shareBtn.addEventListener("click", (e) => {
           e.stopPropagation();
-          const url =
-            shareBtn.getAttribute('data-share-url') ||
-            this.getPostUrl(postId);
-          this.handleShare(url);
+          const postUrl = `${window.location.origin}/post.html?id=${postId}`;
+          navigator.clipboard.writeText(postUrl);
+          this.showToast("Link copied!", "success");
         });
       }
 
-      // save
-      const saveBtn = card.querySelector('.save-btn');
+      // Save
+      const saveBtn = postEl.querySelector(".save-btn");
       if (saveBtn) {
-        saveBtn.addEventListener('click', (e) => {
+        saveBtn.addEventListener("click", (e) => {
           e.stopPropagation();
           this.handleSave(postId, saveBtn);
         });
@@ -555,432 +428,214 @@ class FeedManager {
     });
   }
 
-  /* ============================================================
-   * MEDIA UPLOAD HELPERS
-   * ========================================================== */
-
-  handleMediaSelected(file) {
-    this.selectedMediaFile = null;
-    this.selectedMediaType = null;
-    this.uploadedMediaUrl = null;
-
-    if (!file) {
-      if (this.mediaFileName) this.mediaFileName.textContent = '';
-      return;
-    }
-
-    // basic type guard
-    if (!file.type.startsWith('image') && !file.type.startsWith('video')) {
-      this.showToast('Only images or videos are allowed.', 'error');
-      if (this.postMediaInput) this.postMediaInput.value = '';
-      if (this.mediaFileName) this.mediaFileName.textContent = '';
-      return;
-    }
-
-    this.selectedMediaFile = file;
-    this.selectedMediaType = file.type.startsWith('video') ? 'video' : 'image';
-    if (this.mediaFileName) {
-      this.mediaFileName.textContent = file.name;
-    }
-  }
-
-  fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result || '';
-        const parts = String(result).split(',');
-        if (parts.length === 2) {
-          resolve(parts[1]); // base64 only
-        } else {
-          resolve('');
-        }
-      };
-      reader.onerror = (err) => reject(err);
-      reader.readAsDataURL(file);
-    });
-  }
-
-  async uploadMediaIfNeeded() {
-    if (!this.selectedMediaFile) {
-      return { media_url: null, media_type: null };
-    }
-
-    const token = this.getAuthToken();
-    if (!token) {
-      this.showToast('Missing auth token for media upload.', 'error');
-      return { media_url: null, media_type: null };
-    }
-
-    try {
-      const base64 = await this.fileToBase64(this.selectedMediaFile);
-      if (!base64) {
-        this.showToast('Could not read media file.', 'error');
-        return { media_url: null, media_type: null };
-      }
-
-      const res = await fetch(`${FEED_API_BASE_URL}/posts/upload-media`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          mediaData: base64,
-          mediaType: this.selectedMediaType
-        })
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || 'Media upload failed');
-      }
-
-      const media_url = data.url || data.media_url || null;
-      const media_type = data.media_type || this.selectedMediaType || null;
-
-      this.uploadedMediaUrl = media_url;
-      return { media_url, media_type };
-    } catch (err) {
-      console.error('uploadMediaIfNeeded error:', err);
-      this.showToast(err.message || 'Media upload failed', 'error');
-      return { media_url: null, media_type: null };
-    }
-  }
-
-  clearMediaState() {
-    this.selectedMediaFile = null;
-    this.selectedMediaType = null;
-    this.uploadedMediaUrl = null;
-    if (this.postMediaInput) this.postMediaInput.value = '';
-    if (this.mediaFileName) this.mediaFileName.textContent = '';
-  }
-
-  /* ============================================================
-   * CREATE POST
-   * ========================================================== */
+  // ============================================
+  // CREATE POST
+  // ============================================
 
   async handleCreatePost() {
-    if (!this.postInput) return;
     const user = this.getCurrentUser();
-    if (!user) {
-      this.showToast('Please log in to post.', 'error');
-      return;
-    }
+    if (!user) return this.showToast("Please log in to post.", "error");
 
     if (this.isPosting) return;
 
-    let content = (this.postInput.value || '').trim();
-    if (!content && !this.selectedMediaFile) {
-      this.showToast('Write something or add media first.', 'info');
+    const content = (this.postInput.value || "").trim();
+    const hasMedia = !!this.selectedMediaFile;
+
+    if (!content && !hasMedia) {
+      this.showToast("Write something or add media.", "error");
       return;
     }
 
     const token = this.getAuthToken();
     if (!token) {
-      this.showToast('Missing auth token, please log in again.', 'error');
+      this.showToast("Missing auth token.", "error");
       return;
     }
 
     this.isPosting = true;
-    if (this.postButton) this.postButton.disabled = true;
+    this.postButton.disabled = true;
 
     try {
-      // 1) Upload media if selected
-      const { media_url, media_type } = await this.uploadMediaIfNeeded();
+      // FormData — works with your backend
+      const formData = new FormData();
+      formData.append("content", content);
+      if (hasMedia) formData.append("media", this.selectedMediaFile);
 
-      // 2) Create post via JSON
       const res = await fetch(`${FEED_API_BASE_URL}/posts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          content,
-          media_url: media_url || null,
-          media_type: media_type || null
-        })
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
       });
 
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to create post');
-      }
+      const data = await res.json();
 
-      const newPost = data;
+      if (!res.ok) throw new Error(data.error || "Could not create post.");
 
-      // Prepend to local feed
-      this.posts.unshift(newPost);
+      this.posts.unshift(data);
       this.renderPosts();
 
-      // Reset composer
-      this.postInput.value = '';
-      this.clearMediaState();
+      this.postInput.value = "";
+      this.selectedMediaFile = null;
+      if (this.mediaFileName) this.mediaFileName.textContent = "";
       this.updateCharCounter();
 
-      this.showToast('Post created', 'success');
+      this.showToast("Posted!", "success");
     } catch (err) {
-      console.error('handleCreatePost error:', err);
-      this.showToast(err.message || 'Failed to create post', 'error');
-    } finally {
-      this.isPosting = false;
-      if (this.postButton) this.postButton.disabled = false;
+      console.error("Create post failed:", err);
+      this.showToast("Failed to create post.", "error");
     }
+
+    this.isPosting = false;
+    this.postButton.disabled = false;
   }
 
-  /* ============================================================
-   * LIKE / SAVE / SHARE
-   * ========================================================== */
+  // ============================================
+  // LIKE / SAVE
+  // ============================================
 
-  async handleLike(postId, button) {
-    if (!postId) return;
+  async handleLike(postId, btn) {
     const user = this.getCurrentUser();
-    if (!user) {
-      this.showToast('Please log in to like posts.', 'error');
-      return;
-    }
+    if (!user) return this.showToast("Log in to like posts", "error");
 
     const token = this.getAuthToken();
-    if (!token) {
-      this.showToast('Missing auth token, please log in again.', 'error');
-      return;
-    }
+    if (!token) return this.showToast("Missing token", "error");
 
-    const likeCountSpan = button.querySelector('.like-count');
-    const icon = button.querySelector('i');
-    const wasLiked = button.classList.contains('liked');
-    let likeCount = parseInt(likeCountSpan?.textContent || '0', 10);
+    const countEl = btn.querySelector(".like-count");
+    const icon = btn.querySelector("i");
+
+    const wasLiked = btn.classList.contains("liked");
+    let newCount = parseInt(countEl.textContent || "0");
 
     // Optimistic UI
     if (wasLiked) {
-      button.classList.remove('liked');
-      if (icon) {
-        icon.classList.remove('fa-solid');
-        icon.classList.add('fa-regular');
-      }
-      likeCount = Math.max(0, likeCount - 1);
+      btn.classList.remove("liked");
+      icon.classList.replace("fa-solid", "fa-regular");
+      newCount--;
     } else {
-      button.classList.add('liked');
-      if (icon) {
-        icon.classList.remove('fa-regular');
-        icon.classList.add('fa-solid');
-      }
-      likeCount += 1;
+      btn.classList.add("liked");
+      icon.classList.replace("fa-regular", "fa-solid");
+      newCount++;
     }
-    if (likeCountSpan) likeCountSpan.textContent = String(likeCount);
+    countEl.textContent = newCount;
 
     try {
-      const res = await fetch(
-        `${FEED_API_BASE_URL}/posts/${encodeURIComponent(postId)}/like`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
+      const res = await fetch(`${FEED_API_BASE_URL}/posts/${postId}/like`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to update like');
-      }
+      const data = await res.json();
 
-      // Use server count if provided
-      if (typeof data.likes === 'number' && likeCountSpan) {
-        likeCountSpan.textContent = String(data.likes);
-      }
+      if (!res.ok) throw new Error("Failed to update like");
+
+      if (typeof data.likes === "number")
+        countEl.textContent = data.likes.toString();
     } catch (err) {
-      console.error('handleLike error:', err);
-      this.showToast('Failed to update like', 'error');
+      console.error(err);
+      this.showToast("Failed to update like", "error");
     }
   }
 
-  async handleSave(postId, button) {
-    if (!postId) return;
+  async handleSave(postId, btn) {
     const user = this.getCurrentUser();
-    if (!user) {
-      this.showToast('Please log in to save posts.', 'error');
-      return;
-    }
+    if (!user) return this.showToast("Log in to save posts", "error");
 
     const token = this.getAuthToken();
-    if (!token) {
-      this.showToast('Missing auth token, please log in again.', 'error');
-      return;
-    }
+    if (!token) return this.showToast("Missing token", "error");
 
-    const icon = button.querySelector('i');
-    const wasSaved = button.classList.contains('saved');
+    const icon = btn.querySelector("i");
+    const wasSaved = btn.classList.contains("saved");
 
     // Optimistic UI
     if (wasSaved) {
-      button.classList.remove('saved');
-      if (icon) {
-        icon.classList.remove('fa-solid');
-        icon.classList.add('fa-regular');
-      }
+      btn.classList.remove("saved");
+      icon.classList.replace("fa-solid", "fa-regular");
     } else {
-      button.classList.add('saved');
-      if (icon) {
-        icon.classList.remove('fa-regular');
-        icon.classList.add('fa-solid');
-      }
+      btn.classList.add("saved");
+      icon.classList.replace("fa-regular", "fa-solid");
     }
 
     try {
-      const res = await fetch(
-        `${FEED_API_BASE_URL}/posts/${encodeURIComponent(postId)}/save`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to update save');
-      }
+      await fetch(`${FEED_API_BASE_URL}/posts/${postId}/save`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
     } catch (err) {
-      console.error('handleSave error:', err);
-      this.showToast('Failed to update saved post', 'error');
+      console.error(err);
+      this.showToast("Failed to update save", "error");
     }
   }
 
-  async handleShare(url) {
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: 'Uncensored Social Post',
-          url
-        });
-      } else if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(url);
-        this.showToast('Post link copied to clipboard', 'success');
-      } else {
-        alert('Share this link:\n' + url);
-      }
+  // ============================================
+  // UTILITIES
+  // ============================================
 
-      // Optional: ping backend to increment share_count
-      // fetch(`${FEED_API_BASE_URL}/posts/${postId}/share`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-    } catch (err) {
-      console.error('handleShare error:', err);
-      this.showToast('Could not share post', 'error');
-    }
+  handleScroll() {
+    if (!this.hasMore || this.isLoading) return;
+    const scrollY = window.innerHeight + window.scrollY;
+    const threshold = document.body.offsetHeight - 600;
+    if (scrollY >= threshold) this.loadPosts(false);
   }
 
-  /* ============================================================
-   * UTILITIES
-   * ========================================================== */
-
-  getPostUrl(postId) {
-    // relative for GitHub Pages subfolder
-    return `post.html?id=${encodeURIComponent(postId)}`;
+  escape(text) {
+    return String(text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   }
 
-  formatTime(timestamp) {
-    if (!timestamp) return '';
-    const date = new Date(timestamp);
-    if (Number.isNaN(date.getTime())) return '';
-
+  formatTime(ts) {
+    const d = new Date(ts);
+    if (isNaN(d)) return "";
     const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'just now';
-    if (diffMins < 60) return `${diffMins}m`;
-    if (diffHours < 24) return `${diffHours}h`;
-    if (diffDays < 7) return `${diffDays}d`;
-    return date.toLocaleDateString();
+    const diff = (now - d) / 1000;
+    if (diff < 60) return "just now";
+    if (diff < 3600) return Math.floor(diff / 60) + "m";
+    if (diff < 86400) return Math.floor(diff / 3600) + "h";
+    if (diff < 604800) return Math.floor(diff / 86400) + "d";
+    return d.toLocaleDateString();
   }
 
-  formatPostContent(content) {
-    if (!content) return '';
-    let formatted = this.escapeHtml(content);
-
-    // URLs
-    formatted = formatted.replace(
-      /(https?:\/\/[^\s]+)/g,
-      '<a href="$1" target="_blank" rel="noopener" style="color: var(--primary-color); text-decoration: none;">$1</a>'
-    );
-
-    // hashtags
-    formatted = formatted.replace(
-      /#(\w+)/g,
-      '<span class="hashtag">#$1</span>'
-    );
-
-    // mentions
-    formatted = formatted.replace(
-      /@(\w+)/g,
-      '<span class="mention">@$1</span>'
-    );
-
-    return formatted;
+  formatPostContent(text) {
+    let t = this.escape(text);
+    t = t.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>');
+    t = t.replace(/#(\w+)/g, '<span class="hashtag">#$1</span>');
+    t = t.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+    return t;
   }
 
-  escapeHtml(str) {
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  }
+  showToast(message, type = "info") {
+    const old = document.querySelector(".status-message");
+    if (old) old.remove();
 
-  showToast(message, type = 'info') {
-    const existing = document.querySelector('.status-message');
-    if (existing) existing.remove();
+    const d = document.createElement("div");
+    d.className = `status-message status-${type}`;
+    d.textContent = message;
+    d.style.position = "fixed";
+    d.style.top = "70px";
+    d.style.left = "50%";
+    d.style.transform = "translateX(-50%)";
+    d.style.padding = "8px 14px";
+    d.style.borderRadius = "999px";
+    d.style.background = type === "error" ? "#3b0f0f" : type === "success" ? "#0f3b1f" : "#111";
+    d.style.border = "1px solid #333";
+    d.style.color = "#fff";
+    d.style.zIndex = "9999";
 
-    const el = document.createElement('div');
-    el.className = `status-message status-${type}`;
-    el.textContent = message;
-    el.style.cssText = `
-      position: fixed;
-      top: 80px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 10000;
-      max-width: 90%;
-      padding: 8px 14px;
-      border-radius: 999px;
-      font-size: 13px;
-      font-weight: 500;
-      background: ${
-        type === 'error' ? '#3b0f0f' : type === 'success' ? '#0f3b1f' : '#111'
-      };
-      color: #fff;
-      border: 1px solid ${
-        type === 'error' ? '#ff4d4d' : type === 'success' ? '#42ff95' : '#333'
-      };
-    `;
-    document.body.appendChild(el);
-    setTimeout(() => {
-      if (el.parentNode) el.parentNode.removeChild(el);
-    }, 2500);
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 2500);
   }
 }
 
-/* ============================================================
- * INIT
- * ========================================================== */
+// ============================================
+// Initialize
+// ============================================
 
-let feedManager;
-
-document.addEventListener('DOMContentLoaded', () => {
-  const feedEl = document.getElementById('feedContainer');
-  if (!feedEl) return;
-
-  feedManager = new FeedManager();
-  feedManager.init();
-  window.feedManager = feedManager;
+document.addEventListener("DOMContentLoaded", () => {
+  window.feedManager = new FeedManager();
+  window.feedManager.init();
 });
 
-// Optional global refresh() hook for your header refresh button
 window.refreshFeed = function () {
   if (window.feedManager) {
     window.feedManager.page = 1;
