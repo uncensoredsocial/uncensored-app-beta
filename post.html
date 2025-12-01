@@ -5,8 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Post - Uncensored Social</title>
 
+  <!-- Styles -->
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/feed-styles.css" />
+  <link rel="stylesheet" href="css/post-styles.css" />
   <link rel="stylesheet" href="css/icons.css" />
   <link
     rel="stylesheet"
@@ -16,41 +18,127 @@
     referrerpolicy="no-referrer"
   />
 </head>
-<body>
-  <!-- Header -->
-  <header class="header header-centered">
+
+<body class="post-page-body">
+  <!-- ================= HEADER ================= -->
+  <header class="header">
     <div class="header-left">
-      <button class="btn btn-ghost btn-icon" onclick="history.back()">
+      <button
+        class="btn btn-ghost btn-icon back-btn"
+        onclick="history.back()"
+        title="Back"
+      >
         <i class="fa-solid fa-arrow-left"></i>
       </button>
+
+      <div class="profile-section" id="profileSection">
+        <a href="profile.html" class="profile-icon">
+          <img
+            id="headerProfileImg"
+            src="assets/icons/default-profile.png"
+            alt="Profile"
+          />
+        </a>
+      </div>
+
+      <div class="auth-buttons" id="authButtons">
+        <a href="login.html" class="btn btn-sm btn-login">Log In</a>
+        <a href="signup.html" class="btn btn-sm btn-signup">Sign Up</a>
+      </div>
     </div>
+
     <h1 class="logo">Post</h1>
-    <div class="header-actions"></div>
+
+    <div class="header-actions">
+      <button
+        class="btn btn-ghost btn-icon"
+        onclick="window.postPage && window.postPage.reloadAll()"
+        title="Refresh"
+      >
+        <span class="icon icon-refresh"></span>
+      </button>
+    </div>
   </header>
 
+  <!-- ================= MAIN CONTENT ================= -->
   <div class="content-wrapper">
-    <main class="main-content">
-      <div id="postDetailContainer" class="post-detail"></div>
+    <main class="post-main">
+      <!-- ===== SINGLE POST ===== -->
+      <section class="post-wrapper" id="postWrapper">
+        <div class="loading-indicator" id="postLoading">
+          <div class="loading-spinner"></div>
+          <span>Loading post...</span>
+        </div>
+        <div id="postContainer"></div>
+      </section>
 
-      <div id="postDetailLoading" class="loading-indicator">
-        <div class="loading-spinner"></div>
-        <span>Loading post...</span>
-      </div>
-
-      <div id="postDetailError" class="empty-state" style="display:none;">
-        <h3>Post not found</h3>
-        <p>This post may have been deleted or the link is invalid.</p>
-      </div>
-
-      <!-- simple comments placeholder for now -->
+      <!-- ===== COMMENT COMPOSER ===== -->
       <section class="comments-section">
-        <h3>Comments</h3>
-        <p style="opacity:0.7;">Comments feature coming soon.</p>
+        <div class="comment-composer auth-dependent" id="commentComposer">
+          <div class="comment-composer-inner">
+            <img
+              src="assets/icons/default-profile.png"
+              alt="You"
+              class="comment-avatar"
+              id="commentUserAvatar"
+            />
+
+            <div class="comment-input-area">
+              <textarea
+                id="commentInput"
+                class="comment-input"
+                rows="2"
+                maxlength="280"
+                placeholder="Add a comment..."
+              ></textarea>
+
+              <div class="comment-actions-bar">
+                <span id="commentCharCounter" class="char-counter">
+                  0/280
+                </span>
+                <button
+                  class="btn btn-primary btn-sm"
+                  id="commentButton"
+                  disabled
+                >
+                  Comment
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- shown if logged out -->
+        <div class="comments-guest-message" id="commentsGuestMessage">
+          <p>Log in to join the conversation.</p>
+          <div class="guest-actions">
+            <a href="login.html" class="btn btn-secondary btn-sm">Log In</a>
+            <a href="signup.html" class="btn btn-primary btn-sm">Sign Up</a>
+          </div>
+        </div>
+
+        <!-- ===== COMMENTS LIST ===== -->
+        <div class="comments-header">
+          <h2>Comments</h2>
+        </div>
+
+        <div class="comments-list" id="commentsList">
+          <!-- comments rendered here -->
+        </div>
+
+        <div class="loading-indicator small" id="commentsLoading">
+          <div class="loading-spinner"></div>
+          <span>Loading comments...</span>
+        </div>
+
+        <div class="comments-empty" id="commentsEmpty" style="display: none;">
+          <p>No comments yet. Be the first to comment.</p>
+        </div>
       </section>
     </main>
   </div>
 
-  <!-- Bottom nav -->
+  <!-- ================= BOTTOM NAV ================= -->
   <nav class="bottom-nav" id="bottomNav">
     <a href="index.html" class="nav-item">
       <span class="icon icon-home"></span>
@@ -70,7 +158,9 @@
     </a>
   </nav>
 
+  <!-- Scripts -->
   <script src="js/auth.js"></script>
   <script src="js/post.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>
