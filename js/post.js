@@ -126,7 +126,7 @@ class PostPage {
           : "assets/icons/default-profile.png";
     }
 
-    // header
+    // header (profileSection is intentionally missing on this page, so checks guard it)
     if (this.profileSection && this.authButtons) {
       if (loggedIn) {
         this.profileSection.style.display = "flex";
@@ -211,7 +211,7 @@ class PostPage {
     const liked = !!post.is_liked;
     const saved = !!post.is_saved;
 
-    // FIX: comment count – avoid [object Object]
+    // comment count — avoid [object Object]
     let commentCount = 0;
     if (typeof post.comment_count === "number") {
       commentCount = post.comment_count;
@@ -475,6 +475,8 @@ class PostPage {
     this.commentsList.innerHTML = this.comments
       .map((c) => this.renderCommentHtml(c))
       .join("");
+
+    this.attachCommentEvents();
   }
 
   renderCommentHtml(comment) {
@@ -488,8 +490,12 @@ class PostPage {
     const time = this.formatTime(createdAt);
 
     return `
-      <article class="comment" data-comment-id="${comment.id}">
-        <img class="comment-avatar-small" src="${avatar}" onerror="this.src='assets/icons/default-profile.png'">
+      <article class="comment"
+               data-comment-id="${comment.id}"
+               data-username="${this.escape(username)}">
+        <img class="comment-avatar-small"
+             src="${avatar}"
+             onerror="this.src='assets/icons/default-profile.png'">
 
         <div class="comment-body">
           <div class="comment-header">
@@ -507,6 +513,37 @@ class PostPage {
         </div>
       </article>
     `;
+  }
+
+  attachCommentEvents() {
+    if (!this.commentsList) return;
+    const commentEls = this.commentsList.querySelectorAll(".comment");
+
+    commentEls.forEach((el) => {
+      const username = el.dataset.username;
+      if (!username) return;
+
+      const goToProfile = (e) => {
+        e.stopPropagation();
+        const me = this.getCurrentUser();
+        if (me && me.username === username) {
+          window.location.href = "profile.html";
+        } else {
+          window.location.href = `user.html?user=${encodeURIComponent(
+            username
+          )}`;
+        }
+      };
+
+      // Entire comment clickable
+      el.addEventListener("click", goToProfile);
+
+      // Avatar + header explicitly
+      const avatar = el.querySelector(".comment-avatar-small");
+      const header = el.querySelector(".comment-header");
+      if (avatar) avatar.addEventListener("click", goToProfile);
+      if (header) header.addEventListener("click", goToProfile);
+    });
   }
 
   async handleCreateComment() {
