@@ -6,8 +6,6 @@ class ProfilePage {
     constructor() {
         this.user = null;
         this.posts = [];
-        // bind for document click
-        this.handleDocumentClick = this.handleDocumentClick.bind(this);
     }
 
     async init() {
@@ -32,40 +30,40 @@ class ProfilePage {
     }
 
     cacheDom() {
-        this.displayNameEl = document.getElementById('profileDisplayName');
-        this.usernameEl = document.getElementById('profileUsername');
-        this.bioEl = document.getElementById('profileBio');
-        this.joinEl = document.getElementById('profileJoinDate');
-        this.avatarEl = document.getElementById('profileAvatar');
-        this.bannerEl = document.getElementById('profileBanner');
+        this.displayNameEl   = document.getElementById('profileDisplayName');
+        this.usernameEl      = document.getElementById('profileUsername');
+        this.bioEl           = document.getElementById('profileBio');
+        this.joinEl          = document.getElementById('profileJoinDate');
+        this.avatarEl        = document.getElementById('profileAvatar');
+        this.bannerEl        = document.getElementById('profileBanner');
 
-        this.postsCountEl = document.getElementById('postsCount');
-        this.followersCountEl = document.getElementById('followersCount');
-        this.followingCountEl = document.getElementById('followingCount');
+        this.postsCountEl    = document.getElementById('postsCount');
+        this.followersCountEl= document.getElementById('followersCount');
+        this.followingCountEl= document.getElementById('followingCount');
 
-        this.postsContainer = document.getElementById('profilePosts');
+        this.postsContainer  = document.getElementById('profilePosts');
 
-        this.settingsButton = document.getElementById('settingsButton');
-        this.editProfileBtn = document.getElementById('editProfileBtn');
+        this.settingsButton  = document.getElementById('settingsButton');
+        this.editProfileBtn  = document.getElementById('editProfileBtn');
 
         // Modal
-        this.editModal = document.getElementById('editProfileModal');
-        this.editForm = document.getElementById('editProfileForm');
+        this.editModal         = document.getElementById('editProfileModal');
+        this.editForm          = document.getElementById('editProfileForm');
         this.editDisplayNameInput = document.getElementById('editDisplayName');
-        this.editBioInput = document.getElementById('editBio');
-        this.bioCharCounter = document.getElementById('bioCharCounter');
-        this.avatarFileInput = document.getElementById('editAvatarFile');
-        this.bannerFileInput = document.getElementById('editBannerFile');
-        this.editErrorEl = document.getElementById('editProfileError');
-        this.editSuccessEl = document.getElementById('editProfileSuccess');
-        this.closeEditBtn = document.getElementById('closeEditProfileBtn');
-        this.cancelEditBtn = document.getElementById('cancelEditProfileBtn');
-        this.saveProfileBtn = document.getElementById('saveProfileBtn');
+        this.editBioInput      = document.getElementById('editBio');
+        this.bioCharCounter    = document.getElementById('bioCharCounter');
+        this.avatarFileInput   = document.getElementById('editAvatarFile');
+        this.bannerFileInput   = document.getElementById('editBannerFile');
+        this.editErrorEl       = document.getElementById('editProfileError');
+        this.editSuccessEl     = document.getElementById('editProfileSuccess');
+        this.closeEditBtn      = document.getElementById('closeEditProfileBtn');
+        this.cancelEditBtn     = document.getElementById('cancelEditProfileBtn');
+        this.saveProfileBtn    = document.getElementById('saveProfileBtn');
 
         // Tabs
-        this.tabButtons = document.querySelectorAll('.tab-btn');
-        this.postsTabPane = document.getElementById('postsTab');
-        this.likesTabPane = document.getElementById('likesTab');
+        this.tabButtons    = document.querySelectorAll('.tab-btn');
+        this.postsTabPane  = document.getElementById('postsTab');
+        this.likesTabPane  = document.getElementById('likesTab');
     }
 
     bindEvents() {
@@ -113,20 +111,17 @@ class ProfilePage {
             });
         }
 
-        // Global click to close any open post menus
-        document.addEventListener('click', this.handleDocumentClick);
-    }
+        // Close any open post options menu when clicking outside
+        document.addEventListener('click', (e) => {
+            const menu = document.querySelector('.post-options-menu.open');
+            if (!menu) return;
+            const btn = menu.dataset.forButtonId
+                ? document.getElementById(menu.dataset.forButtonId)
+                : null;
 
-    handleDocumentClick(e) {
-        // If click is on options button or inside menu, do nothing here
-        if (e.target.closest('.post-options-btn') || e.target.closest('.post-options-menu')) {
-            return;
-        }
-        this.closeAllPostMenus();
-    }
-
-    closeAllPostMenus() {
-        document.querySelectorAll('.post-options-menu.open').forEach((menu) => {
+            if (menu.contains(e.target) || (btn && btn.contains(e.target))) {
+                return;
+            }
             menu.classList.remove('open');
         });
     }
@@ -200,99 +195,109 @@ class ProfilePage {
         }
     }
 
-    /* ---------------- RENDER POSTS (feed-style + delete menu) ---------------- */
+    /* ---------------- RENDER POSTS (feed-style + delete) ---------------- */
 
     renderPosts() {
         if (!this.postsContainer) return;
         this.postsContainer.innerHTML = '';
 
-        const user = this.user || {};
-        const avatar = user.avatar_url || 'assets/icons/default-profile.png';
+        const user      = this.user || {};
+        const avatar    = user.avatar_url || 'assets/icons/default-profile.png';
         const displayName = user.display_name || user.username || 'User';
-        const username = user.username || 'username';
+        const username  = user.username || 'username';
 
-        this.posts.forEach((post) => {
+        this.posts.forEach((post, index) => {
             const article = document.createElement('article');
             article.className = 'post';
-            article.setAttribute('tabindex', '0');
             article.dataset.postId = post.id;
 
-            const createdAt = post.created_at ? new Date(post.created_at) : null;
-            const timeLabel = createdAt
-                ? createdAt.toLocaleString(undefined, {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit'
-                  })
-                : '';
+            // optional timestamp formatting
+            let timeStr = '';
+            if (post.created_at) {
+                const d = new Date(post.created_at);
+                if (!Number.isNaN(d.getTime())) {
+                    timeStr = d.toLocaleString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit'
+                    });
+                }
+            }
 
-            // Using same layout as feed/user cards
+            const contentHtml = this.formatPostContent(post.content || '');
+
+            const optionsBtnId = `post-options-btn-${post.id}-${index}`;
+
             article.innerHTML = `
                 <header class="post-header">
                     <img
                         src="${avatar}"
-                        alt="${this.escapeHtml(displayName)}"
                         class="post-user-avatar"
+                        alt="${this.escapeHtml(displayName)}"
                         onerror="this.src='assets/icons/default-profile.png'"
                     />
                     <div class="post-user-info">
                         <div class="post-display-name">${this.escapeHtml(displayName)}</div>
                         <div class="post-username">@${this.escapeHtml(username)}</div>
-                    </div>
-
-                    <div class="post-header-right">
                         ${
-                            timeLabel
-                                ? `<div class="post-time">${this.escapeHtml(timeLabel)}</div>`
+                            timeStr
+                                ? `<div class="post-time">${this.escapeHtml(timeStr)}</div>`
                                 : ''
                         }
-                        <button class="post-options-btn" type="button" aria-label="Post options">
-                            <i class="fa-solid fa-ellipsis"></i>
+                    </div>
+
+                    <button
+                        type="button"
+                        class="post-options-btn"
+                        id="${optionsBtnId}"
+                        aria-label="Post options"
+                    >
+                        <i class="fa-solid fa-ellipsis"></i>
+                    </button>
+
+                    <div class="post-options-menu" data-for-button-id="${optionsBtnId}">
+                        <button
+                            type="button"
+                            class="post-options-item"
+                            data-action="delete"
+                        >
+                            Delete post
                         </button>
-                        <div class="post-options-menu">
-                            <button type="button" class="post-options-item post-delete-btn">
-                                Delete post
-                            </button>
-                        </div>
                     </div>
                 </header>
 
                 <div class="post-content">
-                    <p>${this.formatContent(post.content || '')}</p>
+                    <p>${contentHtml}</p>
                 </div>
-
-                <footer class="post-footer">
-                    <div class="post-timestamp">
-                        ${timeLabel ? this.escapeHtml(timeLabel) : ''}
-                    </div>
-                    <div class="post-actions">
-                        <!-- For now these are static; you can wire likes/comments later if you want -->
-                        <button class="post-action-btn" type="button" disabled>
-                            <span class="post-action-icon">♥</span>
-                            <span class="post-action-count">0</span>
-                        </button>
-                        <button class="post-action-btn" type="button" disabled>
-                            <span class="post-action-icon">💬</span>
-                            <span class="post-action-count">0</span>
-                        </button>
-                        <button class="post-action-btn" type="button" disabled>
-                            <span class="post-action-icon">⤴</span>
-                        </button>
-                    </div>
-                </footer>
             `;
 
-            // Hook up options menu + delete
+            // Make whole post clickable to open the single post page (comments etc.)
+            article.addEventListener('click', (e) => {
+                // Ignore clicks on options button or menu
+                if (
+                    e.target.closest('.post-options-btn') ||
+                    e.target.closest('.post-options-menu')
+                ) {
+                    return;
+                }
+                window.location.href = `post.html?id=${encodeURIComponent(post.id)}`;
+            });
+
             const optionsBtn = article.querySelector('.post-options-btn');
             const optionsMenu = article.querySelector('.post-options-menu');
-            const deleteBtn = article.querySelector('.post-delete-btn');
+            const deleteBtn = article.querySelector('[data-action="delete"]');
 
             if (optionsBtn && optionsMenu) {
                 optionsBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    this.closeAllPostMenus();
+                    // Close any other open menu
+                    document
+                        .querySelectorAll('.post-options-menu.open')
+                        .forEach((m) => {
+                            if (m !== optionsMenu) m.classList.remove('open');
+                        });
                     optionsMenu.classList.toggle('open');
                 });
             }
@@ -301,7 +306,7 @@ class ProfilePage {
                 deleteBtn.addEventListener('click', async (e) => {
                     e.stopPropagation();
                     optionsMenu.classList.remove('open');
-                    await this.deletePost(post.id, article);
+                    await this.handleDeletePost(post, article);
                 });
             }
 
@@ -309,37 +314,47 @@ class ProfilePage {
         });
     }
 
-    async deletePost(postId, articleEl) {
-        if (!postId) return;
+    /* ---------------- Delete post ---------------- */
 
+    async handleDeletePost(post, articleEl) {
         const confirmed = window.confirm('Delete this post?');
         if (!confirmed) return;
 
         try {
+            const token = getAuthToken && getAuthToken();
+            if (!token) {
+                alert('You must be logged in to delete posts.');
+                return;
+            }
+
             const res = await fetch(
-                `${PROFILE_API_BASE_URL}/posts/${encodeURIComponent(postId)}`,
+                `${PROFILE_API_BASE_URL}/posts/${encodeURIComponent(post.id)}`,
                 {
                     method: 'DELETE',
                     headers: {
-                        Authorization: `Bearer ${getAuthToken()}`
+                        Authorization: `Bearer ${token}`
                     }
                 }
             );
 
+            const data = await res.json().catch(() => ({}));
+
             if (!res.ok) {
-                const data = await res.json().catch(() => ({}));
                 throw new Error(data.error || 'Failed to delete post');
             }
 
-            // Remove from local list + UI
-            this.posts = this.posts.filter((p) => p.id !== postId);
-            if (articleEl && articleEl.remove) articleEl.remove();
+            // Remove from DOM
+            if (articleEl && articleEl.parentNode) {
+                articleEl.parentNode.removeChild(articleEl);
+            }
 
+            // Update local posts array + count
+            this.posts = this.posts.filter((p) => p.id !== post.id);
             if (this.postsCountEl) {
                 this.postsCountEl.textContent = this.posts.length.toString();
             }
         } catch (err) {
-            console.error('deletePost error:', err);
+            console.error('handleDeletePost error:', err);
             alert(err.message || 'Failed to delete post');
         }
     }
@@ -535,8 +550,9 @@ class ProfilePage {
         return `Joined ${date.toLocaleDateString(undefined, opts)}`;
     }
 
-    formatContent(text) {
-        const safe = this.escapeHtml(text || '');
+    formatPostContent(text = '') {
+        const safe = this.escapeHtml(text);
+
         return safe
             .replace(
                 /(https?:\/\/[^\s]+)/g,
