@@ -1,7 +1,9 @@
 // js/profile.js
 
 const PROFILE_API_BASE_URL =
-  "https://uncensored-app-beta-production.up.railway.app/api";
+  typeof API_BASE_URL !== "undefined"
+    ? API_BASE_URL
+    : "https://uncensored-app-beta-production.up.railway.app/api";
 
 class ProfilePage {
   constructor() {
@@ -75,26 +77,18 @@ class ProfilePage {
     }
 
     if (this.editProfileBtn) {
-      this.editProfileBtn.addEventListener("click", () =>
-        this.openEditModal()
-      );
+      this.editProfileBtn.addEventListener("click", () => this.openEditModal());
     }
 
     if (this.closeEditBtn) {
-      this.closeEditBtn.addEventListener("click", () =>
-        this.closeEditModal()
-      );
+      this.closeEditBtn.addEventListener("click", () => this.closeEditModal());
     }
     if (this.cancelEditBtn) {
-      this.cancelEditBtn.addEventListener("click", () =>
-        this.closeEditModal()
-      );
+      this.cancelEditBtn.addEventListener("click", () => this.closeEditModal());
     }
 
     if (this.editForm) {
-      this.editForm.addEventListener("submit", (e) =>
-        this.handleEditSubmit(e)
-      );
+      this.editForm.addEventListener("submit", (e) => this.handleEditSubmit(e));
     }
 
     if (this.editBioInput && this.bioCharCounter) {
@@ -157,8 +151,8 @@ class ProfilePage {
     if (!this.user || !this.user.username || !this.postsContainer) return;
 
     this.postsContainer.innerHTML = `
-            <div class="loading-indicator">Loading posts...</div>
-        `;
+      <div class="loading-indicator">Loading posts...</div>
+    `;
 
     try {
       const res = await fetch(
@@ -177,10 +171,10 @@ class ProfilePage {
 
       if (!this.posts.length) {
         this.postsContainer.innerHTML = `
-                    <div class="empty-state">
-                        <h3>No posts yet</h3>
-                    </div>
-                `;
+          <div class="empty-state">
+            <h3>No posts yet</h3>
+          </div>
+        `;
         return;
       }
 
@@ -188,265 +182,205 @@ class ProfilePage {
     } catch (err) {
       console.error("fetchUserPosts error:", err);
       this.postsContainer.innerHTML = `
-                <div class="empty-state">
-                    <h3>Error loading posts</h3>
-                </div>
-            `;
+        <div class="empty-state">
+          <h3>Error loading posts</h3>
+        </div>
+      `;
     }
   }
 
-  /* ---------------- RENDER POSTS (feed-style + delete icon) ---------------- */
+  /* ---------------- RENDER POSTS (feed / user-style) ---------------- */
 
   renderPosts() {
     if (!this.postsContainer) return;
     this.postsContainer.innerHTML = "";
 
-    const user = this.user || {};
-    const avatar = user.avatar_url || "assets/icons/default-profile.png";
-    const displayName = user.display_name || user.username || "User";
-    const username = user.username || "username";
-
     this.posts.forEach((post) => {
-      const article = document.createElement("article");
-      article.className = "post";
-      article.dataset.postId = post.id;
-
-      const createdAt = post.created_at ? new Date(post.created_at) : null;
-      const timeLabel = createdAt ? createdAt.toLocaleString() : "";
-
-      const likeCount =
-        typeof post.likes_count === "number"
-          ? post.likes_count
-          : Array.isArray(post.likes)
-          ? post.likes.length
-          : 0;
-
-      const commentsCount =
-        typeof post.comments_count === "number" ? post.comments_count : 0;
-
-      const contentHtml = this.formatPostContent(post.content || "");
-
-      article.innerHTML = `
-        <header class="post-header">
-          <img
-            src="${avatar}"
-            alt="${this.escapeHtml(displayName)}"
-            class="post-user-avatar"
-            onerror="this.src='assets/icons/default-profile.png'"
-          />
-          <div class="post-user-info">
-            <div class="post-display-name">${this.escapeHtml(displayName)}</div>
-            <div class="post-username">@${this.escapeHtml(username)}</div>
-          </div>
-          ${
-            timeLabel
-              ? `<div class="post-time">${this.escapeHtml(timeLabel)}</div>`
-              : ""
-          }
-          <button
-            type="button"
-            class="post-delete-btn"
-            aria-label="Delete post"
-          >
-            <i class="fa-solid fa-trash"></i>
-          </button>
-        </header>
-
-        <div class="post-content">
-          <p>${contentHtml}</p>
-        </div>
-
-        <footer class="post-footer">
-          <div class="post-timestamp">
-            ${timeLabel ? this.escapeHtml(timeLabel) : ""}
-          </div>
-          <div class="post-actions">
-            <button class="post-action-btn post-like-btn" type="button">
-              <span class="post-action-icon">♥</span>
-              <span class="post-action-count like-count">${likeCount}</span>
-            </button>
-            <button class="post-action-btn post-comment-btn" type="button">
-              <span class="post-action-icon">💬</span>
-              <span class="post-action-count comment-count">${commentsCount}</span>
-            </button>
-            <button class="post-action-btn post-share-btn" type="button">
-              <span class="post-action-icon">⤴</span>
-            </button>
-          </div>
-        </footer>
-      `;
-
-      // Whole post click -> open post page (comments)
-      article.addEventListener("click", (e) => {
-        // Ignore clicks on buttons (like/comment/share/delete)
-        if (
-          e.target.closest(".post-action-btn") ||
-          e.target.closest(".post-delete-btn")
-        ) {
-          return;
-        }
-        window.location.href = `post.html?id=${encodeURIComponent(post.id)}`;
-      });
-
-      // Bind buttons
-      const likeBtn = article.querySelector(".post-like-btn");
-      const commentBtn = article.querySelector(".post-comment-btn");
-      const shareBtn = article.querySelector(".post-share-btn");
-      const deleteBtn = article.querySelector(".post-delete-btn");
-
-      if (likeBtn) {
-        likeBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          this.handleLike(post, likeBtn);
-        });
-      }
-
-      if (commentBtn) {
-        commentBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          this.handleCommentClick(post);
-        });
-      }
-
-      if (shareBtn) {
-        shareBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          this.handleSharePostClick(post);
-        });
-      }
-
-      if (deleteBtn) {
-        deleteBtn.addEventListener("click", async (e) => {
-          e.stopPropagation();
-          await this.handleDeletePost(post, article);
-        });
-      }
-
-      this.postsContainer.appendChild(article);
+      const el = this.createPostElement(post);
+      this.postsContainer.appendChild(el);
     });
   }
 
-  /* ---------------- Delete post (trash icon) ---------------- */
+  createPostElement(post) {
+    // Match user.html / feed post styling, but add a delete icon
+    const article = document.createElement("article");
+    article.className = "post";
+    article.dataset.postId = post.id;
+    article.tabIndex = 0;
 
-  async handleDeletePost(post, articleEl) {
-    const confirmed = window.confirm("Delete this post?");
-    if (!confirmed) return;
+    const user = this.user || {};
+    const avatar = user.avatar_url || "assets/icons/default-profile.png";
+    const displayName = user.display_name || user.username || "User";
+    const username = user.username || "user";
 
-    try {
-      const token = getAuthToken && getAuthToken();
-      if (!token) {
-        alert("You must be logged in to delete posts.");
+    const createdAt = post.created_at ? new Date(post.created_at) : null;
+    const timeLabel = createdAt ? createdAt.toLocaleString() : "";
+
+    const likeCount =
+      typeof post.likes_count === "number"
+        ? post.likes_count
+        : Array.isArray(post.likes)
+        ? post.likes.length
+        : 0;
+
+    const commentsCount =
+      typeof post.comments_count === "number" ? post.comments_count : 0;
+
+    article.innerHTML = `
+      <header class="post-header">
+        <img
+          src="${avatar}"
+          alt="${this.escapeHtml(displayName)}"
+          class="post-user-avatar"
+          onerror="this.src='assets/icons/default-profile.png'"
+        />
+        <div class="post-user-info">
+          <div class="post-display-name">${this.escapeHtml(displayName)}</div>
+          <div class="post-username">@${this.escapeHtml(username)}</div>
+        </div>
+        ${
+          timeLabel
+            ? `<div class="post-time">${this.escapeHtml(timeLabel)}</div>`
+            : ""
+        }
+        <button
+          class="post-delete-btn"
+          type="button"
+          aria-label="Delete post"
+        >
+          <i class="fa-solid fa-trash"></i>
+        </button>
+      </header>
+
+      <div class="post-content">
+        <p>${this.formatContent(post.content || "")}</p>
+      </div>
+
+      <footer class="post-footer">
+        <div class="post-timestamp">
+          ${timeLabel ? this.escapeHtml(timeLabel) : ""}
+        </div>
+        <div class="post-actions">
+          <button class="post-action-btn post-like-btn" type="button">
+            <span class="post-action-icon">♥</span>
+            <span class="post-action-count like-count">${likeCount}</span>
+          </button>
+          <button class="post-action-btn post-comment-btn" type="button">
+            <span class="post-action-icon">💬</span>
+            <span class="post-action-count comment-count">${commentsCount}</span>
+          </button>
+          <button class="post-action-btn post-share-btn" type="button">
+            <span class="post-action-icon">⤴</span>
+          </button>
+        </div>
+      </footer>
+    `;
+
+    const likeBtn = article.querySelector(".post-like-btn");
+    const commentBtn = article.querySelector(".post-comment-btn");
+    const shareBtn = article.querySelector(".post-share-btn");
+    const deleteBtn = article.querySelector(".post-delete-btn");
+
+    if (likeBtn) {
+      likeBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.handleLike(post, likeBtn);
+      });
+    }
+    if (commentBtn) {
+      commentBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.goToPost(post);
+      });
+    }
+    if (shareBtn) {
+      shareBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.handleSharePostClick(post);
+      });
+    }
+    if (deleteBtn) {
+      deleteBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.confirmDeletePost(post, article);
+      });
+    }
+
+    // Make whole post (except buttons/links) clickable -> post.html
+    article.addEventListener("click", (e) => {
+      const target = e.target;
+      if (
+        target.closest(".post-action-btn") ||
+        target.closest(".post-delete-btn") ||
+        target.tagName === "A"
+      ) {
         return;
       }
+      this.goToPost(post);
+    });
 
+    return article;
+  }
+
+  goToPost(post) {
+    if (!post || !post.id) return;
+    window.location.href = `post.html?id=${encodeURIComponent(post.id)}`;
+  }
+
+  async confirmDeletePost(post, articleEl) {
+    if (!post || !post.id) return;
+    const ok = window.confirm("Delete this post? This can’t be undone.");
+    if (!ok) return;
+
+    try {
       const res = await fetch(
         `${PROFILE_API_BASE_URL}/posts/${encodeURIComponent(post.id)}`,
         {
           method: "DELETE",
           headers: {
-            Authorization: `Bearer ${token}`
+            Authorization: `Bearer ${getAuthToken()}`
           }
         }
       );
 
-      const data = await res.json().catch(() => ({}));
-
       if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Failed to delete post");
       }
 
-      // Remove from DOM
-      if (articleEl && articleEl.parentNode) {
-        articleEl.parentNode.removeChild(articleEl);
-      }
-
-      // Update local posts array + count
+      // remove from local array and UI
       this.posts = this.posts.filter((p) => p.id !== post.id);
+      if (articleEl && articleEl.parentElement) {
+        articleEl.parentElement.removeChild(articleEl);
+      }
+
       if (this.postsCountEl) {
-        this.postsCountEl.textContent = this.posts.length.toString();
+        this.postsCountEl.textContent = String(this.posts.length);
+      }
+
+      if (!this.posts.length && this.postsContainer) {
+        this.postsContainer.innerHTML = `
+          <div class="empty-state">
+            <h3>No posts yet</h3>
+          </div>
+        `;
       }
     } catch (err) {
-      console.error("handleDeletePost error:", err);
-      alert(err.message || "Failed to delete post");
+      console.error("confirmDeletePost error:", err);
+      alert(err.message || "Could not delete post.");
     }
   }
 
-  /* ---------------- Post actions (like / comment / share) ---------------- */
+  formatContent(text) {
+    const safe = this.escapeHtml(text || "");
 
-  async handleLike(post, btn) {
-    if (!window.isLoggedIn || !isLoggedIn()) {
-      alert("Please log in to like posts.");
-      return;
-    }
-
-    const token = getAuthToken && getAuthToken();
-    if (!token) {
-      alert("Missing auth token.");
-      return;
-    }
-
-    try {
-      btn.disabled = true;
-
-      const res = await fetch(
-        `${PROFILE_API_BASE_URL}/posts/${encodeURIComponent(post.id)}/like`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to like post");
-      }
-
-      const likeCountEl = btn.querySelector(".like-count");
-      if (likeCountEl) {
-        likeCountEl.textContent = data.likes ?? 0;
-      }
-
-      if (data.liked) {
-        btn.classList.add("liked");
-      } else {
-        btn.classList.remove("liked");
-      }
-    } catch (err) {
-      console.error("handleLike error:", err);
-      alert(err.message || "Failed to like post");
-    } finally {
-      btn.disabled = false;
-    }
-  }
-
-  handleCommentClick(post) {
-    // Go to full post view so comments load
-    window.location.href = `post.html?id=${encodeURIComponent(post.id)}`;
-  }
-
-  handleSharePostClick(post) {
-    const url = `${window.location.origin}/post.html?id=${encodeURIComponent(
-      post.id
-    )}`;
-
-    if (navigator.share) {
-      navigator
-        .share({
-          title: "Uncensored Social Post",
-          text: post.content || "",
-          url
-        })
-        .catch(() => {});
-    } else if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard
-        .writeText(url)
-        .then(() => alert("Post link copied!"))
-        .catch(() => alert("Could not copy link to clipboard."));
-    } else {
-      alert("Share this link:\n" + url);
-    }
+    return safe
+      .replace(
+        /(https?:\/\/[^\s]+)/g,
+        '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+      )
+      .replace(/#(\w+)/g, '<span class="hashtag">#$1</span>')
+      .replace(/@(\w+)/g, '<span class="mention">@$1</span>');
   }
 
   /* ---------------- Set user into UI ---------------- */
@@ -454,10 +388,10 @@ class ProfilePage {
   setUser(user) {
     this.user = user || this.user || {};
 
-    const displayName = user.display_name || user.username || "User";
-    const username = user.username || "username";
-    const bio = user.bio || "No bio yet.";
-    const createdAt = user.created_at;
+    const displayName = this.user.display_name || this.user.username || "User";
+    const username = this.user.username || "username";
+    const bio = this.user.bio || "No bio yet.";
+    const createdAt = this.user.created_at;
 
     if (this.displayNameEl) this.displayNameEl.textContent = displayName;
     if (this.usernameEl) this.usernameEl.textContent = `@${username}`;
@@ -466,12 +400,12 @@ class ProfilePage {
 
     if (this.avatarEl) {
       this.avatarEl.src =
-        user.avatar_url || "assets/icons/default-profile.png";
+        this.user.avatar_url || "assets/icons/default-profile.png";
     }
 
     if (this.bannerEl) {
-      if (user.banner_url) {
-        this.bannerEl.style.backgroundImage = `url("${user.banner_url}")`;
+      if (this.user.banner_url) {
+        this.bannerEl.style.backgroundImage = `url("${this.user.banner_url}")`;
         this.bannerEl.classList.add("profile-banner-image");
       } else {
         this.bannerEl.style.backgroundImage = "";
@@ -480,13 +414,17 @@ class ProfilePage {
     }
 
     if (this.postsCountEl) {
-      this.postsCountEl.textContent = (user.posts_count || 0).toString();
+      this.postsCountEl.textContent = (this.user.posts_count || 0).toString();
     }
     if (this.followersCountEl) {
-      this.followersCountEl.textContent = (user.followers_count || 0).toString();
+      this.followersCountEl.textContent = (
+        this.user.followers_count || 0
+      ).toString();
     }
     if (this.followingCountEl) {
-      this.followingCountEl.textContent = (user.following_count || 0).toString();
+      this.followingCountEl.textContent = (
+        this.user.following_count || 0
+      ).toString();
     }
   }
 
@@ -648,20 +586,8 @@ class ProfilePage {
     return `Joined ${date.toLocaleDateString(undefined, opts)}`;
   }
 
-  formatPostContent(text = "") {
-    const safe = this.escapeHtml(text);
-
-    return safe
-      .replace(
-        /(https?:\/\/[^\s]+)/g,
-        '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
-      )
-      .replace(/#(\w+)/g, '<span class="hashtag">#$1</span>')
-      .replace(/@(\w+)/g, '<span class="mention">@$1</span>');
-  }
-
   escapeHtml(str = "") {
-    return str.replace(/[&<>"']/g, (m) => {
+    return String(str).replace(/[&<>"']/g, (m) => {
       return {
         "&": "&amp;",
         "<": "&lt;",
