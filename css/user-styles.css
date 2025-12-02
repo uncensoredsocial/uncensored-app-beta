@@ -244,3 +244,65 @@
 .user-options-item:hover {
   background: #222;
 }
+/* ===== Post header right side (time + options) ===== */
+
+.post-header {
+  position: relative; /* allows the options menu to anchor to header */
+}
+
+.post-header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Small three-dots button on each post */
+.post-options-btn {
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-color, #fff);
+  font-size: 0.9rem;
+}
+
+/* Options menu for a post (Delete) */
+.post-options-menu {
+  position: absolute;
+  right: 8px;
+  top: 40px;
+  background: #111;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #333);
+  padding: 4px 0;
+  z-index: 40;
+  min-width: 140px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+  display: none;
+}
+
+.post-options-menu.open {
+  display: block;
+}
+
+.post-options-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: var(--text-color, #fff);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.post-options-item:hover {
+  background: #222;
+}
