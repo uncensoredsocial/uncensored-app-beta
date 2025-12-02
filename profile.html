@@ -5,13 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Profile - Uncensored Social</title>
 
+    <!-- Global + feed styles -->
     <link rel="stylesheet" href="css/styles.css" />
-    <!-- NEW: use the same post card styles as the feed -->
     <link rel="stylesheet" href="css/feed-styles.css" />
+
+    <!-- Profile-specific styles -->
     <link rel="stylesheet" href="css/profile-styles.css" />
+
+    <!-- Reuse same layout as user.html (centers avatar, header, etc.) -->
+    <link rel="stylesheet" href="css/user-styles.css" />
+
     <link rel="stylesheet" href="css/icons.css" />
 
-    <!-- NEW: Font Awesome for gear icon -->
+    <!-- Font Awesome for gear + post options icon -->
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
@@ -25,7 +31,7 @@
     <header class="profile-header-bar">
         <h1 class="profile-header-title">Profile</h1>
         <button class="profile-header-settings" id="settingsButton" aria-label="Settings">
-            <!-- CHANGED: emoji -> Font Awesome gear -->
+            <!-- Font Awesome gear -->
             <i class="fa-solid fa-gear"></i>
         </button>
     </header>
@@ -82,7 +88,6 @@
         <!-- Tab content -->
         <section class="profile-tab-content">
             <div id="postsTab" class="tab-pane active">
-                <!-- keep the same structure, but feed-styles.css now styles the .post cards -->
                 <div id="profilePosts" class="profile-posts">
                     <div class="loading-indicator">Loading posts...</div>
                 </div>
@@ -143,7 +148,6 @@
                     ></textarea>
                     <div id="bioCharCounter" class="profile-char-counter">0/160</div>
 
-                    <!-- NEW: file inputs instead of URL text boxes -->
                     <label class="profile-form-label" for="editAvatarFile">Profile picture</label>
                     <input
                         type="file"
