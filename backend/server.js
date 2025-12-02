@@ -95,6 +95,21 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+// 🔥 NEW: helper to *optionally* get current user id from Authorization header
+function getUserIdFromAuthHeader(req) {
+  const authHeader = req.headers.authorization || '';
+  if (!authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.slice(7).trim();
+  if (!token) return null;
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    return decoded.id; // signToken uses { id, username, email }
+  } catch {
+    return null;
+  }
+}
+
 // Utility: stats for a single user
 async function getUserStats(userId) {
   const [
@@ -756,6 +771,9 @@ app.get('/api/users/:username', async (req, res) => {
   try {
     const { username } = req.params;
 
+    // who is viewing this profile (may be null if not logged in)
+    const currentUserId = getUserIdFromAuthHeader(req);
+
     const { data: user, error } = await supabase
       .from('users')
       .select(
@@ -769,7 +787,24 @@ app.get('/api/users/:username', async (req, res) => {
     }
 
     const stats = await getUserStats(user.id);
-    res.json({ ...user, ...stats });
+
+    // compute is_following: does currentUserId follow this user?
+    let isFollowing = false;
+    if (currentUserId && currentUserId !== user.id) {
+      const { data: followRow, error: followError } = await supabase
+        .from('follows')
+        .select('id')
+        .eq('follower_id', currentUserId)
+        .eq('followed_id', user.id)
+        .maybeSingle();
+
+      if (followError) {
+        console.error('is_following check error:', followError);
+      }
+      isFollowing = !!followRow;
+    }
+
+    res.json({ ...user, ...stats, is_following: isFollowing });
   } catch (err) {
     console.error('GET /users/:username error:', err);
     res.status(500).json({ error: 'Failed to load profile' });
