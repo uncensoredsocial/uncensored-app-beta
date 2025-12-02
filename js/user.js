@@ -275,9 +275,16 @@ class UserProfilePage {
       this.viewUsername
     )}`;
 
+    // 🔥 NEW: send Authorization header so backend can return `is_following`
+    const headers = {};
+    const token = this.getAuthTokenSafe();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     let res, data;
     try {
-      res = await fetch(url);
+      res = await fetch(url, { headers });
       data = await res.json().catch(() => ({}));
     } catch (err) {
       console.error("fetch user profile error:", err);
