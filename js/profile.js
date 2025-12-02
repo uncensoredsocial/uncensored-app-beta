@@ -6,6 +6,8 @@ class ProfilePage {
     constructor() {
         this.user = null;
         this.posts = [];
+        // bind for document click
+        this.handleDocumentClick = this.handleDocumentClick.bind(this);
     }
 
     async init() {
@@ -110,6 +112,23 @@ class ProfilePage {
                 }
             });
         }
+
+        // Global click to close any open post menus
+        document.addEventListener('click', this.handleDocumentClick);
+    }
+
+    handleDocumentClick(e) {
+        // If click is on options button or inside menu, do nothing here
+        if (e.target.closest('.post-options-btn') || e.target.closest('.post-options-menu')) {
+            return;
+        }
+        this.closeAllPostMenus();
+    }
+
+    closeAllPostMenus() {
+        document.querySelectorAll('.post-options-menu.open').forEach((menu) => {
+            menu.classList.remove('open');
+        });
     }
 
     /* ---------------- Fetch current user ---------------- */
@@ -181,7 +200,7 @@ class ProfilePage {
         }
     }
 
-    /* ---------------- RENDER POSTS (feed-style) ---------------- */
+    /* ---------------- RENDER POSTS (feed-style + delete menu) ---------------- */
 
     renderPosts() {
         if (!this.postsContainer) return;
@@ -193,48 +212,136 @@ class ProfilePage {
         const username = user.username || 'username';
 
         this.posts.forEach((post) => {
-            const div = document.createElement('div');
-            div.className = 'post';
-            div.dataset.postId = post.id;
+            const article = document.createElement('article');
+            article.className = 'post';
+            article.setAttribute('tabindex', '0');
+            article.dataset.postId = post.id;
 
-            // optional timestamp formatting
-            let timeStr = '';
-            if (post.created_at) {
-                const d = new Date(post.created_at);
-                if (!Number.isNaN(d.getTime())) {
-                    timeStr = d.toLocaleString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit'
-                    });
-                }
-            }
+            const createdAt = post.created_at ? new Date(post.created_at) : null;
+            const timeLabel = createdAt
+                ? createdAt.toLocaleString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit'
+                  })
+                : '';
 
-            div.innerHTML = `
-                <div class="post-header">
-                    <img src="${avatar}" class="post-user-avatar" alt="${this.escapeHtml(displayName)}">
+            // Using same layout as feed/user cards
+            article.innerHTML = `
+                <header class="post-header">
+                    <img
+                        src="${avatar}"
+                        alt="${this.escapeHtml(displayName)}"
+                        class="post-user-avatar"
+                        onerror="this.src='assets/icons/default-profile.png'"
+                    />
                     <div class="post-user-info">
                         <div class="post-display-name">${this.escapeHtml(displayName)}</div>
                         <div class="post-username">@${this.escapeHtml(username)}</div>
-                        ${timeStr ? `<div class="post-meta">${this.escapeHtml(timeStr)}</div>` : ''}
                     </div>
-                </div>
+
+                    <div class="post-header-right">
+                        ${
+                            timeLabel
+                                ? `<div class="post-time">${this.escapeHtml(timeLabel)}</div>`
+                                : ''
+                        }
+                        <button class="post-options-btn" type="button" aria-label="Post options">
+                            <i class="fa-solid fa-ellipsis"></i>
+                        </button>
+                        <div class="post-options-menu">
+                            <button type="button" class="post-options-item post-delete-btn">
+                                Delete post
+                            </button>
+                        </div>
+                    </div>
+                </header>
 
                 <div class="post-content">
-                    ${this.escapeHtml(post.content || '')}
+                    <p>${this.formatContent(post.content || '')}</p>
                 </div>
 
-                <div class="post-actions">
-                    <!-- These match the feed markup; you can later wire them to like/comment APIs -->
-                    <span>❤️ 0</span>
-                    <span>💬 0</span>
-                </div>
+                <footer class="post-footer">
+                    <div class="post-timestamp">
+                        ${timeLabel ? this.escapeHtml(timeLabel) : ''}
+                    </div>
+                    <div class="post-actions">
+                        <!-- For now these are static; you can wire likes/comments later if you want -->
+                        <button class="post-action-btn" type="button" disabled>
+                            <span class="post-action-icon">♥</span>
+                            <span class="post-action-count">0</span>
+                        </button>
+                        <button class="post-action-btn" type="button" disabled>
+                            <span class="post-action-icon">💬</span>
+                            <span class="post-action-count">0</span>
+                        </button>
+                        <button class="post-action-btn" type="button" disabled>
+                            <span class="post-action-icon">⤴</span>
+                        </button>
+                    </div>
+                </footer>
             `;
 
-            this.postsContainer.appendChild(div);
+            // Hook up options menu + delete
+            const optionsBtn = article.querySelector('.post-options-btn');
+            const optionsMenu = article.querySelector('.post-options-menu');
+            const deleteBtn = article.querySelector('.post-delete-btn');
+
+            if (optionsBtn && optionsMenu) {
+                optionsBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.closeAllPostMenus();
+                    optionsMenu.classList.toggle('open');
+                });
+            }
+
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    optionsMenu.classList.remove('open');
+                    await this.deletePost(post.id, article);
+                });
+            }
+
+            this.postsContainer.appendChild(article);
         });
+    }
+
+    async deletePost(postId, articleEl) {
+        if (!postId) return;
+
+        const confirmed = window.confirm('Delete this post?');
+        if (!confirmed) return;
+
+        try {
+            const res = await fetch(
+                `${PROFILE_API_BASE_URL}/posts/${encodeURIComponent(postId)}`,
+                {
+                    method: 'DELETE',
+                    headers: {
+                        Authorization: `Bearer ${getAuthToken()}`
+                    }
+                }
+            );
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || 'Failed to delete post');
+            }
+
+            // Remove from local list + UI
+            this.posts = this.posts.filter((p) => p.id !== postId);
+            if (articleEl && articleEl.remove) articleEl.remove();
+
+            if (this.postsCountEl) {
+                this.postsCountEl.textContent = this.posts.length.toString();
+            }
+        } catch (err) {
+            console.error('deletePost error:', err);
+            alert(err.message || 'Failed to delete post');
+        }
     }
 
     /* ---------------- Set user into UI ---------------- */
@@ -426,6 +533,17 @@ class ProfilePage {
 
         const opts = { month: 'long', year: 'numeric' };
         return `Joined ${date.toLocaleDateString(undefined, opts)}`;
+    }
+
+    formatContent(text) {
+        const safe = this.escapeHtml(text || '');
+        return safe
+            .replace(
+                /(https?:\/\/[^\s]+)/g,
+                '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+            )
+            .replace(/#(\w+)/g, '<span class="hashtag">#$1</span>')
+            .replace(/@(\w+)/g, '<span class="mention">@$1</span>');
     }
 
     escapeHtml(str = '') {
