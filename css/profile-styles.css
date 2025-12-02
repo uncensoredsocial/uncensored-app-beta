@@ -200,10 +200,12 @@
 }
 
 /* ===== POSTS LIST ===== */
+/* Match user.html posts section but with delete icon support */
 
 .profile-posts .post {
-    border-bottom: 1px solid var(--border-color, #222);
-    padding: 12px 16px;
+    margin: 8px 16px;          /* same inset as user page */
+    position: relative;        /* for delete icon */
+    cursor: pointer;           /* whole card clickable */
 }
 
 .profile-posts .post:last-child {
@@ -425,7 +427,8 @@
         height: 52px;
     }
 }
-/* User public profile: reuse profile hero styles */
+
+/* ===== USER PUBLIC PROFILE SHARED BITS ===== */
 
 /* Make sure the banner has a neutral grey when there is no custom banner */
 .profile-banner {
@@ -448,7 +451,7 @@
     font-size: 0.9rem;
 }
 
-/* Posts list within user profile */
+/* Posts list within user profile (same base as profile) */
 .profile-posts-list .post {
     border-bottom: 1px solid var(--border-color, #222);
     padding: 12px 16px;
@@ -458,48 +461,35 @@
     border-bottom: none;
 }
 
-/* ===== PROFILE POSTS: reuse feed style, add delete icon ===== */
-
-.profile-posts .post {
-  position: relative;            /* so delete icon can sit in top-right */
-  margin: 0;
-  border-bottom: 1px solid var(--border-color, #222);
-}
-
-/* Make sure header layout still matches feed */
-.profile-posts .post-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
+/* ===== PROFILE POSTS: delete icon & link styling ===== */
 
 /* Red trash icon in the top-right of the post header */
 .profile-posts .post-delete-btn {
-  margin-left: auto;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 999px;
-  color: #ff4a4a;
-  font-size: 0.95rem;
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 999px;
+    color: #ff4a4a;
+    font-size: 0.95rem;
 }
 
 .profile-posts .post-delete-btn:hover {
-  background: rgba(255, 74, 74, 0.15);
+    background: rgba(255, 74, 74, 0.15);
 }
 
 /* Links / tags inside content should still look like feed */
 .profile-posts .post-content a {
-  color: #1d9bf0;
-  text-decoration: none;
+    color: #1d9bf0;
+    text-decoration: none;
 }
 
 .profile-posts .post-content a:hover {
-  text-decoration: underline;
+    text-decoration: underline;
 }
 
 .profile-posts .hashtag,
 .profile-posts .mention {
-  color: #1d9bf0;
+    color: #1d9bf0;
 }
