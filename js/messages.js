@@ -113,7 +113,7 @@ async function initMessagesPage() {
 
   await loadConversations();
 
-  // If user.html sent ?userId=... open / create DM with that user
+  // If profile/user page sent ?userId=... or ?to=... open / create DM with that user
   const userIdFromUrl = getUserIdFromUrl();
   if (userIdFromUrl) {
     await openOrStartConversationWithUser(userIdFromUrl);
@@ -125,7 +125,8 @@ async function initMessagesPage() {
 function getUserIdFromUrl() {
   try {
     const params = new URLSearchParams(window.location.search);
-    const id = params.get("userId");
+    // SUPPORT BOTH: ?userId=<id> and ?to=<id>
+    const id = params.get("userId") || params.get("to");
     return id ? id.trim() : null;
   } catch {
     return null;
