@@ -504,3 +504,9 @@
 .profile-posts .mention {
     color: #1d9bf0;
 }
+
+/* ===== FIX TRASH ICON SPACING ON PROFILE POSTS ===== */
+.profile-posts .post-delete-btn {
+    margin-left: 14px !important; /* add spacing from the timestamp */
+    right: 10px !important; /* slight shift for cleaner alignment */
+}
