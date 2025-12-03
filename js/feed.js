@@ -283,7 +283,7 @@ class FeedManager {
 
     try {
       const url = new URL(`${FEED_API_BASE_URL}/posts`);
-      // backend should treat mode=following as "only posts from people the user follows"
+      // backend currently ignores these but it's fine to send
       url.searchParams.set("mode", this.currentMode);
       url.searchParams.set("page", this.page);
       url.searchParams.set("pageSize", this.pageSize);
@@ -344,22 +344,31 @@ class FeedManager {
     const createdAt = post.created_at;
     const time = this.formatTime(createdAt);
 
-    const liked = !!post.is_liked;
-    const saved = !!post.is_saved;
+    // New backend flags: liked_by_me / saved_by_me
+    const liked =
+      post.liked_by_me === true ||
+      post.is_liked === true ||
+      post.isLiked === true;
+    const saved =
+      post.saved_by_me === true ||
+      post.is_saved === true ||
+      post.isSaved === true;
 
-    // Like count: handle number OR array
+    // Like count – prefer numeric `likes` from backend
     let likeCount = 0;
-    if (typeof post.like_count === "number") {
+    if (typeof post.likes === "number") {
+      likeCount = post.likes;
+    } else if (typeof post.like_count === "number") {
       likeCount = post.like_count;
     } else if (Array.isArray(post.likes)) {
       likeCount = post.likes.length;
-    } else if (typeof post.likes === "number") {
-      likeCount = post.likes;
     }
 
-    // Comment count: handle number OR array
+    // Comment count – new field `comments_count`
     let commentCount = 0;
-    if (typeof post.comment_count === "number") {
+    if (typeof post.comments_count === "number") {
+      commentCount = post.comments_count;
+    } else if (typeof post.comment_count === "number") {
       commentCount = post.comment_count;
     } else if (Array.isArray(post.comments)) {
       commentCount = post.comments.length;
@@ -566,8 +575,7 @@ class FeedManager {
       let res;
 
       if (hasMedia) {
-        // multipart/form-data — send under multiple field names so whatever
-        // your multer config uses ("media", "file", "image") will receive it.
+        // multipart/form-data — relies on your existing backend upload logic
         const formData = new FormData();
         formData.append("content", content);
         formData.append("media", this.selectedMediaFile);
@@ -670,8 +678,13 @@ class FeedManager {
       // Update local posts array for consistency
       const post = this.posts.find((p) => p.id === postId);
       if (post) {
-        post.is_liked = !wasLiked;
-        if (serverLikes !== null) post.like_count = serverLikes;
+        const nowLiked = data.liked === true ? true : !wasLiked;
+        post.liked_by_me = nowLiked;
+        post.is_liked = nowLiked;
+        if (serverLikes !== null) {
+          post.likes = serverLikes;
+          post.like_count = serverLikes;
+        }
       }
     } catch (err) {
       console.error(err);
@@ -709,7 +722,9 @@ class FeedManager {
 
       const post = this.posts.find((p) => p.id === postId);
       if (post) {
-        post.is_saved = !wasSaved;
+        const nowSaved = data.saved === true ? true : !wasSaved;
+        post.saved_by_me = nowSaved;
+        post.is_saved = nowSaved;
       }
     } catch (err) {
       console.error(err);
