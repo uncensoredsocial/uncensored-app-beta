@@ -510,3 +510,13 @@
     margin-left: 14px !important; /* add spacing from the timestamp */
     right: 10px !important; /* slight shift for cleaner alignment */
 }
+/* ===== Extra spacing between time + trash icon on profile posts ===== */
+.profile-posts .post-card-header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;          /* space between time and trash */
+}
+
+.profile-posts .post-card-delete {
+    margin-left: 4px;   /* tiny extra buffer just in case */
+}
