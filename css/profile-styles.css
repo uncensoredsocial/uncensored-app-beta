@@ -472,11 +472,10 @@
     cursor: pointer;      /* whole card is clickable (JS handles navigation) */
 }
 
-/* red trash in the top-right of each post */
+/* Trash icon on profile posts – give it space from the time */
 .profile-posts .post-delete-btn {
-    position: absolute;
-    top: 12px;
-    right: 16px;
+    position: static;      /* no absolute: let it sit in the header row */
+    margin-left: 16px;     /* space between the time and the trash can */
     background: transparent;
     border: none;
     cursor: pointer;
