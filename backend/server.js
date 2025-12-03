@@ -1285,6 +1285,584 @@ app.delete(
 );
 
 // ======================================================
+//                   PROFILE / FOLLOWS
+// ======================================================
+
+// Get user by username
+app.get('/api/users/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    const currentUserId = getUserIdFromAuthHeader(req);
+
+    const { data: user, error } = await supabase
+      .from('users')
+      .select(
+        'id,username,display_name,avatar_url,banner_url,bio,created_at'
+      )
+      .eq('username', username)
+      .single();
+
+    if (error || !user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const stats = await getUserStats(user.id);
+
+    let isFollowing = false;
+    if (currentUserId && currentUserId !== user.id) {
+      const { data: followRow, error: followError } = await supabase
+        .from('follows')
+        .select('id')
+        .eq('follower_id', currentUserId)
+        .eq('followed_id', user.id)
+        .maybeSingle();
+
+      if (followError) {
+        console.error('is_following check error:', followError);
+      }
+      isFollowing = !!followRow;
+    }
+
+    res.json({ ...user, ...stats, is_following: isFollowing });
+  } catch (err) {
+    console.error('GET /users/:username error:', err);
+    res.status(500).json({ error: 'Failed to load profile' });
+  }
+});
+
+// Get posts for a given username – same shape as feed
+app.get('/api/users/:username/posts', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const currentUserId = getUserIdFromAuthHeader(req);
+
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id,username,display_name,avatar_url')
+      .eq('username', username)
+      .single();
+
+    if (userError || !user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const { data: posts, error } = await supabase
+      .from('posts')
+      .select(
+        `
+        id,
+        content,
+        media_url,
+        media_type,
+        created_at,
+        post_likes ( user_id ),
+        post_comments ( id ),
+        post_saves ( user_id )
+      `
+      )
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Get profile posts error:', error);
+      return res.status(500).json({ error: 'Failed to load posts' });
+    }
+
+    const shaped = (posts || []).map((p) => {
+      const likesArr = p.post_likes || [];
+      const commentsArr = p.post_comments || [];
+      const savesArr = p.post_saves || [];
+
+      const likedByMe = currentUserId
+        ? likesArr.some((l) => l.user_id === currentUserId)
+        : false;
+      const savedByMe = currentUserId
+        ? savesArr.some((s) => s.user_id === currentUserId)
+        : false;
+
+      return {
+        id: p.id,
+        content: p.content,
+        media_url: p.media_url || null,
+        media_type: p.media_type || null,
+        created_at: p.created_at,
+        user: {
+          id: user.id,
+          username: username,
+          display_name: user.display_name,
+          avatar_url: user.avatar_url
+        },
+        likes: likesArr.length,
+        comments_count: commentsArr.length,
+        saves_count: savesArr.length,
+        liked_by_me: likedByMe,
+        saved_by_me: savedByMe
+      };
+    });
+
+    res.json(shaped);
+  } catch (err) {
+    console.error('GET /users/:username/posts error:', err);
+    res.status(500).json({ error: 'Failed to load posts' });
+  }
+});
+
+// Get posts that a given user has liked – same shape as feed
+app.get('/api/users/:username/likes', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const currentUserId = getUserIdFromAuthHeader(req);
+
+    // 1) Find the user whose likes we are showing
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id,username,display_name,avatar_url')
+      .eq('username', username)
+      .single();
+
+    if (userError || !user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // 2) Get all post_ids that this user has liked
+    const { data: likedRows, error: likesError } = await supabase
+      .from('post_likes')
+      .select('post_id')
+      .eq('user_id', user.id);
+
+    if (likesError) {
+      console.error('Get liked posts error (likes table):', likesError);
+      return res.status(500).json({ error: 'Failed to load liked posts' });
+    }
+
+    if (!likedRows || likedRows.length === 0) {
+      return res.json([]);
+    }
+
+    const postIds = likedRows.map((row) => row.post_id);
+
+    // 3) Fetch those posts with the same shape as the main feed
+    const { data: posts, error: postsError } = await supabase
+      .from('posts')
+      .select(
+        `
+        id,
+        content,
+        media_url,
+        media_type,
+        created_at,
+        user:users (
+          id,
+          username,
+          display_name,
+          avatar_url
+        ),
+        post_likes ( user_id ),
+        post_comments ( id ),
+        post_saves ( user_id )
+      `
+      )
+      .in('id', postIds)
+      .order('created_at', { ascending: false });
+
+    if (postsError) {
+      console.error('Get liked posts error (posts table):', postsError);
+      return res.status(500).json({ error: 'Failed to load liked posts' });
+    }
+
+    const shaped = (posts || []).map((p) => {
+      const likesArr = p.post_likes || [];
+      const commentsArr = p.post_comments || [];
+      const savesArr = p.post_saves || [];
+
+      const likedByMe = currentUserId
+        ? likesArr.some((l) => l.user_id === currentUserId)
+        : false;
+      const savedByMe = currentUserId
+        ? savesArr.some((s) => s.user_id === currentUserId)
+        : false;
+
+      return {
+        id: p.id,
+        content: p.content,
+        media_url: p.media_url || null,
+        media_type: p.media_type || null,
+        created_at: p.created_at,
+        user: p.user, // author of the post
+        likes: likesArr.length,
+        comments_count: commentsArr.length,
+        saves_count: savesArr.length,
+        liked_by_me: likedByMe,
+        saved_by_me: savedByMe
+      };
+    });
+
+    res.json(shaped);
+  } catch (err) {
+    console.error('GET /users/:username/likes error:', err);
+    res.status(500).json({ error: 'Failed to load liked posts' });
+  }
+});
+
+// Follow / unfollow user
+app.post('/api/users/:username/follow', authMiddleware, async (req, res) => {
+  try {
+    const { username } = req.params;
+    const currentUserId = req.user.id;
+
+    const { data: target, error: targetError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .single();
+
+    if (targetError || !target) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (target.id === currentUserId) {
+      return res.status(400).json({ error: 'You cannot follow yourself' });
+    }
+
+    const { data: existing, error: checkError } = await supabase
+      .from('follows')
+      .select('id')
+      .eq('follower_id', currentUserId)
+      .eq('followed_id', target.id)
+      .maybeSingle();
+
+    if (checkError) {
+      console.error('Follow check error:', checkError);
+      return res.status(500).json({ error: 'Failed to update follow status' });
+    }
+
+    let following;
+
+    if (existing) {
+      const { error: delError } = await supabase
+        .from('follows')
+        .delete()
+        .eq('id', existing.id);
+
+      if (delError) {
+        console.error('Unfollow error:', delError);
+        return res.status(500).json({ error: 'Failed to unfollow' });
+      }
+      following = false;
+    } else {
+      const { error: insError } = await supabase.from('follows').insert({
+        id: uuidv4(),
+        follower_id: currentUserId,
+        followed_id: target.id
+      });
+
+      if (insError) {
+        console.error('Follow error:', insError);
+        return res.status(500).json({ error: 'Failed to follow' });
+      }
+      following = true;
+    }
+
+    const stats = await getUserStats(target.id);
+
+    res.json({
+      following,
+      ...stats
+    });
+  } catch (err) {
+    console.error('POST /users/:username/follow error:', err);
+    res.status(500).json({ error: 'Failed to update follow status' });
+  }
+});
+
+// ======================================================
+//                          SEARCH
+// ======================================================
+
+// Search users + posts + hashtags
+app.get('/api/search', async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    if (!q) {
+      return res.status(400).json({ error: 'Missing search query' });
+    }
+
+    const pattern = `%${q}%`;
+
+    const [
+      { data: users, error: usersError },
+      { data: posts, error: postsError },
+      { data: hashtags, error: tagsError }
+    ] = await Promise.all([
+      supabase
+        .from('users')
+        .select('id,username,display_name,avatar_url,bio')
+        .or(`username.ilike.${pattern},display_name.ilike.${pattern}`)
+        .limit(10),
+      supabase
+        .from('posts')
+        .select(
+          `
+          id,
+          content,
+          created_at,
+          user:users (
+            id,
+            username,
+            display_name,
+            avatar_url
+          )
+        `
+        )
+        .ilike('content', pattern)
+        .order('created_at', { ascending: false })
+        .limit(20),
+      supabase
+        .from('hashtags')
+        .select('id,tag')
+        .ilike('tag', pattern)
+        .limit(10)
+    ]);
+
+    if (usersError || postsError || tagsError) {
+      console.error('Search errors:', {
+        usersError,
+        postsError,
+        tagsError
+      });
+      return res.status(500).json({ error: 'Search failed' });
+    }
+
+    res.json({
+      users: users || [],
+      posts: posts || [],
+      hashtags: hashtags || []
+    });
+  } catch (err) {
+    console.error('GET /search error:', err);
+    res.status(500).json({ error: 'Search failed' });
+  }
+});
+
+// Save search query to history
+app.post('/api/search/history', authMiddleware, async (req, res) => {
+  try {
+    const { query } = req.body;
+    if (!query || !query.trim()) {
+      return res.status(400).json({ error: 'Missing query' });
+    }
+
+    const item = {
+      id: uuidv4(),
+      user_id: req.user.id,
+      query: query.trim(),
+      created_at: new Date().toISOString()
+    };
+
+    const { error } = await supabase.from('search_history').insert(item);
+    if (error) {
+      console.error('Insert search history error:', error);
+      return res.status(500).json({ error: 'Failed to save search history' });
+    }
+
+    res.status(201).json({ success: true });
+  } catch (err) {
+    console.error('POST /search/history error:', err);
+    res.status(500).json({ error: 'Failed to save search history' });
+  }
+});
+
+// Get current user's search history
+app.get('/api/search/history', authMiddleware, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('search_history')
+      .select('id,query,created_at')
+      .eq('user_id', req.user.id)
+      .order('created_at', { ascending: false })
+      .limit(15);
+
+    if (error) {
+      console.error('Get search history error:', error);
+      return res.status(500).json({ error: 'Failed to load search history' });
+    }
+
+    res.json(data || []);
+  } catch (err) {
+    console.error('GET /search/history error:', err);
+    res.status(500).json({ error: 'Failed to load search history' });
+  }
+});
+
+// ======================================================
+//                          ADMIN
+// ======================================================
+
+// Basic stats for admin dashboard
+app.get('/api/admin/stats', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const now = new Date().toISOString();
+
+    const [
+      { count: userCount },
+      { count: postCount },
+      { count: likeCount },
+      { count: followCount },
+      { count: hashtagCount },
+      { count: searchCount },
+      { count: commentCount },
+      { count: savedCount }
+    ] = await Promise.all([
+      supabase.from('users').select('*', { count: 'exact', head: true }),
+      supabase.from('posts').select('*', { count: 'exact', head: true }),
+      supabase.from('post_likes').select('*', { count: 'exact', head: true }),
+      supabase.from('follows').select('*', { count: 'exact', head: true }),
+      supabase.from('hashtags').select('*', { count: 'exact', head: true }),
+      supabase
+        .from('search_history')
+        .select('*', { count: 'exact', head: true }),
+      supabase
+        .from('post_comments')
+        .select('*', { count: 'exact', head: true }),
+      supabase.from('post_saves').select('*', { count: 'exact', head: true })
+    ]);
+
+    res.json({
+      timestamp: now,
+      users: userCount || 0,
+      posts: postCount || 0,
+      likes: likeCount || 0,
+      follows: followCount || 0,
+      hashtags: hashtagCount || 0,
+      searches: searchCount || 0,
+      comments: commentCount || 0,
+      saved_posts: savedCount || 0
+    });
+  } catch (err) {
+    console.error('GET /admin/stats error:', err);
+    res.status(500).json({ error: 'Failed to load stats' });
+  }
+});
+
+// List users (simple)
+app.get('/api/admin/users', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id,username,email,display_name,created_at,last_login_at')
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      console.error('GET /admin/users error:', error);
+      return res.status(500).json({ error: 'Failed to load users' });
+    }
+
+    res.json(data || []);
+  } catch (err) {
+    console.error('GET /admin/users error:', err);
+    res.status(500).json({ error: 'Failed to load users' });
+  }
+});
+
+// List posts (simple)
+app.get('/api/admin/posts', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('posts')
+      .select(
+        `
+        id,
+        content,
+        created_at,
+        user:users (
+          id,
+          username,
+          display_name
+        )
+      `
+      )
+      .order('created_at', { ascending: false })
+      .limit(200);
+
+    if (error) {
+      console.error('GET /admin/posts error:', error);
+      return res.status(500).json({ error: 'Failed to load posts' });
+    }
+
+    res.json(data || []);
+  } catch (err) {
+    console.error('GET /admin/posts error:', err);
+    res.status(500).json({ error: 'Failed to load posts' });
+  }
+});
+
+// Hard delete a post (and related data)
+app.delete(
+  '/api/admin/posts/:id',
+  authMiddleware,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const postId = req.params.id;
+
+      await supabase.from('post_likes').delete().eq('post_id', postId);
+      await supabase.from('post_comments').delete().eq('post_id', postId);
+      await supabase.from('post_saves').delete().eq('post_id', postId);
+
+      const { error } = await supabase.from('posts').delete().eq('id', postId);
+      if (error) {
+        console.error('DELETE /admin/posts/:id error:', error);
+        return res.status(500).json({ error: 'Failed to delete post' });
+      }
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error('DELETE /admin/posts/:id error:', err);
+      res.status(500).json({ error: 'Failed to delete post' });
+    }
+  }
+);
+
+// Hard delete a user (and related data)
+app.delete(
+  '/api/admin/users/:id',
+  authMiddleware,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const userId = req.params.id;
+
+      await supabase.from('post_likes').delete().eq('user_id', userId);
+      await supabase
+        .from('follows')
+        .delete()
+        .or(`follower_id.eq.${userId},followed_id.eq.${userId}`);
+      await supabase.from('search_history').delete().eq('user_id', userId);
+      await supabase.from('post_comments').delete().eq('user_id', userId);
+      await supabase.from('post_saves').delete().eq('user_id', userId);
+      await supabase.from('posts').delete().eq('user_id', userId);
+
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', userId);
+
+      if (error) {
+        console.error('DELETE /admin/users/:id error:', error);
+        return res.status(500).json({ error: 'Failed to delete user' });
+      }
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error('DELETE /admin/users/:id error:', err);
+      res.status(500).json({ error: 'Failed to delete user' });
+    }
+  }
+);
+
+// ======================================================
 //                      START SERVER
 // ======================================================
 
