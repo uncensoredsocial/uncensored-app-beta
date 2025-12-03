@@ -1,5 +1,6 @@
 // ============================================
 // feed.js — Ultra-robust front-end for feed
+// With image & video upload + limits
 // ============================================
 
 // Prefer global API_BASE_URL from auth.js
@@ -25,6 +26,11 @@ class FeedManager {
     // Media
     this.selectedMediaFile = null;
     this.selectedMediaPreviewUrl = null;
+
+    // Media limits
+    this.maxImageSizeMB = 5; // ~5 MB
+    this.maxVideoSizeMB = 50; // ~50 MB
+    this.maxVideoDurationSeconds = 10 * 60; // 10 minutes
   }
 
   async init() {
@@ -137,12 +143,29 @@ class FeedManager {
     }
 
     if (this.postMediaInput) {
-      this.postMediaInput.addEventListener("change", () => {
-        const file = this.postMediaInput.files[0];
-        this.selectedMediaFile = file || null;
-        if (this.mediaFileName) {
-          this.mediaFileName.textContent = file ? file.name : "";
+      this.postMediaInput.addEventListener("change", async () => {
+        const file = this.postMediaInput.files[0] || null;
+
+        if (file) {
+          const ok = await this.validateMediaFile(file);
+          if (!ok) {
+            // reset input if invalid
+            this.postMediaInput.value = "";
+            this.selectedMediaFile = null;
+            if (this.mediaFileName) this.mediaFileName.textContent = "";
+            this.updateCharCounter();
+            return;
+          }
+
+          this.selectedMediaFile = file;
+          if (this.mediaFileName) {
+            this.mediaFileName.textContent = file.name;
+          }
+        } else {
+          this.selectedMediaFile = null;
+          if (this.mediaFileName) this.mediaFileName.textContent = "";
         }
+
         this.updateCharCounter();
       });
     }
@@ -423,7 +446,7 @@ class FeedManager {
             </button>
 
             <button class="post-action save-btn ${saved ? "saved" : ""}"
-                    style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center;">
+                    style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center%;">
               <i class="fa-${saved ? "solid" : "regular"} fa-bookmark"></i>
             </button>
           </div>
@@ -435,7 +458,7 @@ class FeedManager {
   renderMediaHtml(url, type) {
     const lower = url.toLowerCase();
     const isVideo =
-      (type && type.startsWith("video/")) ||
+      (type && (type.startsWith("video/") || type === "video")) ||
       lower.endsWith(".mp4") ||
       lower.endsWith(".webm") ||
       lower.endsWith(".ogg");
@@ -536,8 +559,8 @@ class FeedManager {
   }
 
   // ============================================
-  // CREATE POST (handles media upload)
-  // ============================================
+  // CREATE POST (media upload via /posts/upload-media)
+// ============================================
 
   async handleCreatePost() {
     const user = this.getCurrentUser();
@@ -571,35 +594,33 @@ class FeedManager {
     if (this.postButton) this.postButton.disabled = true;
 
     try {
-      const endpoint = `${FEED_API_BASE_URL}/posts`;
-      let res;
+      let mediaUrl = null;
+      let mediaType = null;
 
       if (hasMedia) {
-        // multipart/form-data — relies on your existing backend upload logic
-        const formData = new FormData();
-        formData.append("content", content);
-        formData.append("media", this.selectedMediaFile);
-        formData.append("file", this.selectedMediaFile);
-        formData.append("image", this.selectedMediaFile);
-
-        res = await fetch(endpoint, {
-          method: "POST",
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-          body: formData,
-        });
-      } else {
-        // JSON only — text-only posts
-        const headers = {
-          "Content-Type": "application/json",
-        };
-        if (token) headers["Authorization"] = `Bearer ${token}`;
-
-        res = await fetch(endpoint, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ content }),
-        });
+        const uploadResult = await this.uploadMediaFile(this.selectedMediaFile);
+        if (!uploadResult) {
+          throw new Error("Media upload failed");
+        }
+        mediaUrl = uploadResult.url;
+        mediaType = uploadResult.media_type; // "image" | "video"
       }
+
+      const endpoint = `${FEED_API_BASE_URL}/posts`;
+      const headers = {
+        "Content-Type": "application/json",
+      };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          content,
+          media_url: mediaUrl,
+          media_type: mediaType,
+        }),
+      });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not create post.");
@@ -622,6 +643,118 @@ class FeedManager {
 
     this.isPosting = false;
     if (this.postButton) this.postButton.disabled = false;
+  }
+
+  // ============================================
+  // MEDIA HELPERS (upload + validation)
+// ============================================
+
+  async fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result || "";
+        const base64 = String(result).split(",")[1] || "";
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async uploadMediaFile(file) {
+    try {
+      const base64 = await this.fileToBase64(file);
+      const token = this.getAuthToken();
+
+      const headers = {
+        "Content-Type": "application/json",
+      };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const res = await fetch(`${FEED_API_BASE_URL}/posts/upload-media`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          mediaData: base64,
+          mimeType: file.type,
+        }),
+      });
+
+      if (!res.ok) {
+        const body = await res.text();
+        console.error("Media upload failed:", body);
+        this.showToast("Failed to upload media.", "error");
+        return null;
+      }
+
+      const json = await res.json();
+      // { url, media_type }
+      return json;
+    } catch (err) {
+      console.error("uploadMediaFile error:", err);
+      this.showToast("Failed to upload media.", "error");
+      return null;
+    }
+  }
+
+  async validateMediaFile(file) {
+    const sizeMB = file.size / (1024 * 1024);
+    const isImage = file.type.startsWith("image/");
+    const isVideo = file.type.startsWith("video/");
+
+    if (!isImage && !isVideo) {
+      this.showToast("Only images and videos are allowed.", "error");
+      return false;
+    }
+
+    if (isImage && sizeMB > this.maxImageSizeMB) {
+      this.showToast(
+        `Image is too large (max ${this.maxImageSizeMB} MB).`,
+        "error"
+      );
+      return false;
+    }
+
+    if (isVideo && sizeMB > this.maxVideoSizeMB) {
+      this.showToast(
+        `Video is too large (max ${this.maxVideoSizeMB} MB).`,
+        "error"
+      );
+      return false;
+    }
+
+    if (isVideo) {
+      // Check duration using a temporary video element
+      const url = URL.createObjectURL(file);
+      const durationOk = await new Promise((resolve) => {
+        const vid = document.createElement("video");
+        vid.preload = "metadata";
+        vid.onloadedmetadata = () => {
+          URL.revokeObjectURL(url);
+          const duration = vid.duration || 0;
+          if (duration > this.maxVideoDurationSeconds) {
+            this.showToast(
+              "Video is longer than 10 minutes. Please upload a shorter clip.",
+              "error"
+            );
+            resolve(false);
+          } else {
+            resolve(true);
+          }
+        };
+        vid.onerror = () => {
+          URL.revokeObjectURL(url);
+          this.showToast("Could not read video metadata.", "error");
+          resolve(false);
+        };
+        vid.src = url;
+      });
+
+      if (!durationOk) return false;
+    }
+
+    return true;
   }
 
   // ============================================
