@@ -9,6 +9,9 @@ class ProfilePage {
   constructor() {
     this.user = null;
     this.posts = [];
+    this.likedPosts = [];
+    this.likesLoaded = false;
+    this.likesContainer = null;
   }
 
   async init() {
@@ -27,9 +30,10 @@ class ProfilePage {
       this.setUser(localUser);
     }
 
-    // Try to refresh from backend
+    // Refresh from backend
     await this.fetchCurrentUser();
     await this.fetchUserPosts();
+    // Likes are lazy-loaded when the Likes tab is opened
   }
 
   cacheDom() {
@@ -145,7 +149,7 @@ class ProfilePage {
     }
   }
 
-  /* ---------------- Fetch user posts ---------------- */
+  /* ---------------- Fetch user posts (own posts tab) ---------------- */
 
   async fetchUserPosts() {
     if (!this.user || !this.user.username || !this.postsContainer) return;
@@ -163,7 +167,13 @@ class ProfilePage {
       if (!res.ok) throw new Error("Failed to load posts");
 
       const posts = await res.json();
-      this.posts = posts || [];
+
+      // Sort newest -> oldest
+      this.posts = (posts || []).slice().sort((a, b) => {
+        const aDate = a.created_at ? new Date(a.created_at) : 0;
+        const bDate = b.created_at ? new Date(b.created_at) : 0;
+        return bDate - aDate;
+      });
 
       if (this.postsCountEl) {
         this.postsCountEl.textContent = this.posts.length.toString();
@@ -189,29 +199,114 @@ class ProfilePage {
     }
   }
 
-  /* ---------------- RENDER POSTS (feed / user-style) ---------------- */
+  /* ---------------- Fetch user liked posts (Likes tab) ---------------- */
+
+  ensureLikesContainer() {
+    if (!this.likesTabPane) return;
+    if (this.likesContainer) return;
+
+    let container = this.likesTabPane.querySelector(".profile-posts");
+    if (!container) {
+      container = document.createElement("div");
+      container.id = "profileLikes";
+      container.className = "profile-posts";
+      this.likesTabPane.innerHTML = "";
+      this.likesTabPane.appendChild(container);
+    }
+
+    this.likesContainer = container;
+  }
+
+  async fetchUserLikedPosts() {
+    if (!this.user || !this.user.username || !this.likesTabPane) return;
+
+    this.ensureLikesContainer();
+    if (!this.likesContainer) return;
+
+    this.likesContainer.innerHTML = `
+      <div class="loading-indicator">Loading likes...</div>
+    `;
+
+    try {
+      // EXPECTED ENDPOINT: adjust on backend if needed
+      const res = await fetch(
+        `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(
+          this.user.username
+        )}/likes`
+      );
+      if (!res.ok) throw new Error("Failed to load liked posts");
+
+      const liked = await res.json();
+
+      // Sort newest -> oldest
+      this.likedPosts = (liked || []).slice().sort((a, b) => {
+        const aDate = a.created_at ? new Date(a.created_at) : 0;
+        const bDate = b.created_at ? new Date(b.created_at) : 0;
+        return bDate - aDate;
+      });
+
+      this.likesLoaded = true;
+
+      if (!this.likedPosts.length) {
+        this.likesContainer.innerHTML = `
+          <div class="empty-state">
+            <h3>No liked posts yet</h3>
+          </div>
+        `;
+        return;
+      }
+
+      this.renderLikedPosts();
+    } catch (err) {
+      console.error("fetchUserLikedPosts error:", err);
+      this.likesContainer.innerHTML = `
+        <div class="empty-state">
+          <h3>Error loading liked posts</h3>
+        </div>
+      `;
+    }
+  }
+
+  /* ---------------- RENDER POSTS (feed-style) ---------------- */
 
   renderPosts() {
     if (!this.postsContainer) return;
     this.postsContainer.innerHTML = "";
 
     this.posts.forEach((post) => {
-      const el = this.createPostElement(post);
+      const el = this.createPostElement(post, { fromLikesTab: false });
       this.postsContainer.appendChild(el);
     });
   }
 
-  createPostElement(post) {
-    // Match user.html / feed post styling, but add a delete icon
+  renderLikedPosts() {
+    if (!this.likesContainer) return;
+    this.likesContainer.innerHTML = "";
+
+    this.likedPosts.forEach((post) => {
+      const el = this.createPostElement(post, { fromLikesTab: true });
+      this.likesContainer.appendChild(el);
+    });
+  }
+
+  /**
+   * Shared renderer for:
+   *  - own Posts tab (with trash icon for own posts)
+   *  - Likes tab (same styling, trash only if it's actually your post)
+   */
+  createPostElement(post, options = {}) {
+    const { fromLikesTab = false } = options;
+
     const article = document.createElement("article");
     article.className = "post";
     article.dataset.postId = post.id;
     article.tabIndex = 0;
 
-    const user = this.user || {};
-    const avatar = user.avatar_url || "assets/icons/default-profile.png";
-    const displayName = user.display_name || user.username || "User";
-    const username = user.username || "user";
+    // Prefer real author data from API if present
+    const author = post.author || post.user || this.user || {};
+    const avatar = author.avatar_url || "assets/icons/default-profile.png";
+    const displayName = author.display_name || author.username || "User";
+    const username = author.username || "user";
 
     const createdAt = post.created_at ? new Date(post.created_at) : null;
     const timeLabel = createdAt ? createdAt.toLocaleString() : "";
@@ -225,6 +320,11 @@ class ProfilePage {
 
     const commentsCount =
       typeof post.comments_count === "number" ? post.comments_count : 0;
+
+    const isOwnPost =
+      this.user && (post.user_id === this.user.id || author.id === this.user.id);
+
+    const isLikedByMe = !!post.liked_by_me;
 
     article.innerHTML = `
       <header class="post-header">
@@ -243,13 +343,18 @@ class ProfilePage {
             ? `<div class="post-time">${this.escapeHtml(timeLabel)}</div>`
             : ""
         }
+        ${
+          isOwnPost && !fromLikesTab
+            ? `
         <button
           class="post-delete-btn"
           type="button"
           aria-label="Delete post"
         >
           <i class="fa-solid fa-trash"></i>
-        </button>
+        </button>`
+            : ""
+        }
       </header>
 
       <div class="post-content">
@@ -261,7 +366,9 @@ class ProfilePage {
           ${timeLabel ? this.escapeHtml(timeLabel) : ""}
         </div>
         <div class="post-actions">
-          <button class="post-action-btn post-like-btn" type="button">
+          <button class="post-action-btn post-like-btn${
+            isLikedByMe ? " liked" : ""
+          }" type="button">
             <span class="post-action-icon">♥</span>
             <span class="post-action-count like-count">${likeCount}</span>
           </button>
@@ -299,7 +406,7 @@ class ProfilePage {
         this.handleSharePostClick(post);
       });
     }
-    if (deleteBtn) {
+    if (deleteBtn && isOwnPost && !fromLikesTab) {
       deleteBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         this.confirmDeletePost(post, article);
@@ -371,6 +478,81 @@ class ProfilePage {
     }
   }
 
+  /* ---------------- Like / Share handlers ---------------- */
+
+  async handleLike(post, likeBtn) {
+    if (!post || !post.id) return;
+    if (!likeBtn) return;
+
+    const countEl = likeBtn.querySelector(".like-count");
+    const iconEl = likeBtn.querySelector(".post-action-icon");
+
+    let currentCount = parseInt(countEl?.textContent || "0", 10);
+    if (Number.isNaN(currentCount)) currentCount = 0;
+
+    const wasLiked = !!post.liked_by_me;
+
+    // Optimistic UI
+    post.liked_by_me = !wasLiked;
+    let newCount = currentCount + (wasLiked ? -1 : 1);
+    if (newCount < 0) newCount = 0;
+
+    if (countEl) countEl.textContent = String(newCount);
+    likeBtn.classList.toggle("liked", post.liked_by_me);
+
+    try {
+      const method = wasLiked ? "DELETE" : "POST";
+      const res = await fetch(
+        `${PROFILE_API_BASE_URL}/posts/${encodeURIComponent(post.id)}/like`,
+        {
+          method,
+          headers: {
+            Authorization: `Bearer ${getAuthToken()}`
+          }
+        }
+      );
+
+      if (!res.ok) {
+        throw new Error("Failed to update like");
+      }
+    } catch (err) {
+      console.error("handleLike error:", err);
+      // revert UI on failure
+      post.liked_by_me = wasLiked;
+      if (countEl) countEl.textContent = String(currentCount);
+      likeBtn.classList.toggle("liked", wasLiked);
+      if (!wasLiked) {
+        alert("Could not like this post.");
+      }
+    }
+  }
+
+  handleSharePostClick(post) {
+    if (!post || !post.id) return;
+
+    const url = `${window.location.origin}/post.html?id=${encodeURIComponent(
+      post.id
+    )}`;
+
+    if (navigator.share) {
+      navigator
+        .share({
+          title: "Check out this post",
+          url
+        })
+        .catch(() => {});
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard
+        .writeText(url)
+        .then(() => alert("Post link copied to clipboard"))
+        .catch(() => alert("Post link: " + url));
+    } else {
+      alert("Post link: " + url);
+    }
+  }
+
+  /* ---------------- Helpers ---------------- */
+
   formatContent(text) {
     const safe = this.escapeHtml(text || "");
 
@@ -382,8 +564,6 @@ class ProfilePage {
       .replace(/#(\w+)/g, '<span class="hashtag">#$1</span>')
       .replace(/@(\w+)/g, '<span class="mention">@$1</span>');
   }
-
-  /* ---------------- Set user into UI ---------------- */
 
   setUser(user) {
     this.user = user || this.user || {};
@@ -427,8 +607,6 @@ class ProfilePage {
       ).toString();
     }
   }
-
-  /* ---------------- Edit Profile Modal ---------------- */
 
   openEditModal() {
     if (!this.editModal || !this.user) return;
@@ -563,7 +741,8 @@ class ProfilePage {
         if (commaIndex === -1) return resolve(result);
         resolve(result.slice(commaIndex + 1));
       };
-      reader.onerror = () => reject(reader.error || new Error("File read error"));
+      reader.onerror = () =>
+        reject(reader.error || new Error("File read error"));
       reader.readAsDataURL(file);
     });
   }
@@ -575,6 +754,10 @@ class ProfilePage {
 
     this.postsTabPane.classList.toggle("active", tabName === "posts");
     this.likesTabPane.classList.toggle("active", tabName === "likes");
+
+    if (tabName === "likes" && !this.likesLoaded) {
+      this.fetchUserLikedPosts();
+    }
   }
 
   formatJoinDate(dateString) {
