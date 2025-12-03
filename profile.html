@@ -7,6 +7,8 @@
 
     <!-- Base styles -->
     <link rel="stylesheet" href="css/styles.css" />
+    <!-- Reuse feed styling so posts look like the home feed -->
+    <link rel="stylesheet" href="css/feed-styles.css" />
     <link rel="stylesheet" href="css/profile-styles.css" />
     <link rel="stylesheet" href="css/icons.css" />
 
@@ -120,8 +122,8 @@
             </div>
 
             <div id="likesTab" class="tab-pane">
-                <div class="empty-state">
-                    <h3>No liked posts yet</h3>
+                <div id="profileLikes" class="profile-posts">
+                    <div class="loading-indicator">Loading likes...</div>
                 </div>
             </div>
         </section>
