@@ -95,7 +95,7 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// 🔥 NEW: helper to *optionally* get current user id from Authorization header
+// Helper to *optionally* get current user id from Authorization header
 function getUserIdFromAuthHeader(req) {
   const authHeader = req.headers.authorization || '';
   if (!authHeader.startsWith('Bearer ')) return null;
@@ -388,7 +388,7 @@ app.post('/api/profile/upload-image', authMiddleware, async (req, res) => {
     const folder = kind === 'avatar' ? 'avatars' : 'banners';
     const fileName = `${folder}/${req.user.id}-${Date.now()}.jpg`;
 
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from(USER_MEDIA_BUCKET)
       .upload(fileName, buffer, {
         contentType: 'image/jpeg',
@@ -420,16 +420,16 @@ app.post('/api/profile/upload-image', authMiddleware, async (req, res) => {
 //                          POSTS
 // ======================================================
 
-// Global feed
+// Global feed – includes like/comment/save counts + liked/saved by me
 app.get('/api/posts', async (req, res) => {
   try {
-    // optional: ?sort=popular or ?sort=recent (default)
     const sort = (req.query.sort || 'recent').toLowerCase();
-
     const orderOptions =
       sort === 'popular'
-        ? { column: 'created_at', ascending: false } // later change to likes sorting
+        ? { column: 'created_at', ascending: false } // later could use likes
         : { column: 'created_at', ascending: false };
+
+    const currentUserId = getUserIdFromAuthHeader(req);
 
     const { data, error } = await supabase
       .from('posts')
@@ -447,7 +447,8 @@ app.get('/api/posts', async (req, res) => {
           avatar_url
         ),
         post_likes ( user_id ),
-        comments ( id )
+        post_comments ( id ),
+        post_saves ( user_id )
       `
       )
       .order(orderOptions.column, { ascending: orderOptions.ascending })
@@ -458,17 +459,32 @@ app.get('/api/posts', async (req, res) => {
       return res.status(500).json({ error: 'Failed to load posts' });
     }
 
-    // Shape final payload for frontend
-    const shaped = (data || []).map((p) => ({
-      id: p.id,
-      content: p.content,
-      media_url: p.media_url || null,
-      media_type: p.media_type || null,
-      created_at: p.created_at,
-      user: p.user,
-      likes: (p.post_likes || []).length,
-      comments_count: (p.comments || []).length
-    }));
+    const shaped = (data || []).map((p) => {
+      const likesArr = p.post_likes || [];
+      const commentsArr = p.post_comments || [];
+      const savesArr = p.post_saves || [];
+
+      const likedByMe = currentUserId
+        ? likesArr.some((l) => l.user_id === currentUserId)
+        : false;
+      const savedByMe = currentUserId
+        ? savesArr.some((s) => s.user_id === currentUserId)
+        : false;
+
+      return {
+        id: p.id,
+        content: p.content,
+        media_url: p.media_url || null,
+        media_type: p.media_type || null,
+        created_at: p.created_at,
+        user: p.user,
+        likes: likesArr.length,
+        comments_count: commentsArr.length,
+        saves_count: savesArr.length,
+        liked_by_me: likedByMe,
+        saved_by_me: savedByMe
+      };
+    });
 
     res.json(shaped);
   } catch (err) {
@@ -476,12 +492,12 @@ app.get('/api/posts', async (req, res) => {
     res.status(500).json({ error: 'Failed to load posts' });
   }
 });
+
 // Create post
 app.post('/api/posts', authMiddleware, async (req, res) => {
   try {
     const { content, media_url, media_type } = req.body;
 
-    // Allow: text only, media only, or both.
     const hasText = content && content.trim().length > 0;
     const hasMedia = !!media_url;
 
@@ -517,7 +533,6 @@ app.post('/api/posts', authMiddleware, async (req, res) => {
       return res.status(500).json({ error: 'Failed to create post' });
     }
 
-    // Attach user object for frontend
     const { data: user } = await supabase
       .from('users')
       .select('id,username,display_name,avatar_url')
@@ -534,10 +549,11 @@ app.post('/api/posts', authMiddleware, async (req, res) => {
   }
 });
 
-// Single post with user + likes + comments
+// Single post with user + likes + comments + save status
 app.get('/api/posts/:id', async (req, res) => {
   try {
     const postId = req.params.id;
+    const currentUserId = getUserIdFromAuthHeader(req);
 
     const { data, error } = await supabase
       .from('posts')
@@ -545,6 +561,8 @@ app.get('/api/posts/:id', async (req, res) => {
         `
         id,
         content,
+        media_url,
+        media_type,
         created_at,
         user:users (
           id,
@@ -553,7 +571,8 @@ app.get('/api/posts/:id', async (req, res) => {
           avatar_url
         ),
         post_likes ( user_id ),
-        comments (
+        post_saves ( user_id ),
+        post_comments (
           id,
           content,
           created_at,
@@ -573,7 +592,31 @@ app.get('/api/posts/:id', async (req, res) => {
       return res.status(404).json({ error: 'Post not found' });
     }
 
-    res.json(data);
+    const likesArr = data.post_likes || [];
+    const savesArr = data.post_saves || [];
+    const commentsArr = data.post_comments || [];
+
+    const likedByMe = currentUserId
+      ? likesArr.some((l) => l.user_id === currentUserId)
+      : false;
+    const savedByMe = currentUserId
+      ? savesArr.some((s) => s.user_id === currentUserId)
+      : false;
+
+    res.json({
+      id: data.id,
+      content: data.content,
+      media_url: data.media_url,
+      media_type: data.media_type,
+      created_at: data.created_at,
+      user: data.user,
+      likes: likesArr.length,
+      saves_count: savesArr.length,
+      comments_count: commentsArr.length,
+      liked_by_me: likedByMe,
+      saved_by_me: savedByMe,
+      comments: commentsArr
+    });
   } catch (err) {
     console.error('GET /posts/:id error:', err);
     res.status(500).json({ error: 'Failed to load post' });
@@ -659,7 +702,7 @@ app.post('/api/posts/:id/comments', authMiddleware, async (req, res) => {
     };
 
     const { data: inserted, error } = await supabase
-      .from('comments')
+      .from('post_comments')
       .insert(newComment)
       .select(
         `
@@ -694,7 +737,7 @@ app.get('/api/posts/:id/comments', async (req, res) => {
     const postId = req.params.id;
 
     const { data, error } = await supabase
-      .from('comments')
+      .from('post_comments')
       .select(
         `
         id,
@@ -730,7 +773,7 @@ app.post('/api/posts/:id/save', authMiddleware, async (req, res) => {
     const userId = req.user.id;
 
     const { data: existing, error: checkError } = await supabase
-      .from('saved_posts')
+      .from('post_saves')
       .select('id')
       .eq('post_id', postId)
       .eq('user_id', userId)
@@ -744,10 +787,10 @@ app.post('/api/posts/:id/save', authMiddleware, async (req, res) => {
     let saved;
 
     if (existing) {
-      await supabase.from('saved_posts').delete().eq('id', existing.id);
+      await supabase.from('post_saves').delete().eq('id', existing.id);
       saved = false;
     } else {
-      await supabase.from('saved_posts').insert({
+      await supabase.from('post_saves').insert({
         id: uuidv4(),
         post_id: postId,
         user_id: userId
@@ -761,7 +804,6 @@ app.post('/api/posts/:id/save', authMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Failed to update save status' });
   }
 });
-
 // ======================================================
 //                   PROFILE / FOLLOWS
 // ======================================================
@@ -771,7 +813,6 @@ app.get('/api/users/:username', async (req, res) => {
   try {
     const { username } = req.params;
 
-    // who is viewing this profile (may be null if not logged in)
     const currentUserId = getUserIdFromAuthHeader(req);
 
     const { data: user, error } = await supabase
@@ -788,7 +829,6 @@ app.get('/api/users/:username', async (req, res) => {
 
     const stats = await getUserStats(user.id);
 
-    // compute is_following: does currentUserId follow this user?
     let isFollowing = false;
     if (currentUserId && currentUserId !== user.id) {
       const { data: followRow, error: followError } = await supabase
@@ -811,14 +851,15 @@ app.get('/api/users/:username', async (req, res) => {
   }
 });
 
-// Get posts for a given username
+// Get posts for a given username – same shape as feed
 app.get('/api/users/:username/posts', async (req, res) => {
   try {
     const { username } = req.params;
+    const currentUserId = getUserIdFromAuthHeader(req);
 
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('id')
+      .select('id,username,display_name,avatar_url')
       .eq('username', username)
       .single();
 
@@ -828,7 +869,18 @@ app.get('/api/users/:username/posts', async (req, res) => {
 
     const { data: posts, error } = await supabase
       .from('posts')
-      .select('id,content,created_at')
+      .select(
+        `
+        id,
+        content,
+        media_url,
+        media_type,
+        created_at,
+        post_likes ( user_id ),
+        post_comments ( id ),
+        post_saves ( user_id )
+      `
+      )
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
@@ -837,7 +889,39 @@ app.get('/api/users/:username/posts', async (req, res) => {
       return res.status(500).json({ error: 'Failed to load posts' });
     }
 
-    res.json(posts || []);
+    const shaped = (posts || []).map((p) => {
+      const likesArr = p.post_likes || [];
+      const commentsArr = p.post_comments || [];
+      const savesArr = p.post_saves || [];
+
+      const likedByMe = currentUserId
+        ? likesArr.some((l) => l.user_id === currentUserId)
+        : false;
+      const savedByMe = currentUserId
+        ? savesArr.some((s) => s.user_id === currentUserId)
+        : false;
+
+      return {
+        id: p.id,
+        content: p.content,
+        media_url: p.media_url || null,
+        media_type: p.media_type || null,
+        created_at: p.created_at,
+        user: {
+          id: user.id,
+          username: username,
+          display_name: user.display_name,
+          avatar_url: user.avatar_url
+        },
+        likes: likesArr.length,
+        comments_count: commentsArr.length,
+        saves_count: savesArr.length,
+        liked_by_me: likedByMe,
+        saved_by_me: savedByMe
+      };
+    });
+
+    res.json(shaped);
   } catch (err) {
     console.error('GET /users/:username/posts error:', err);
     res.status(500).json({ error: 'Failed to load posts' });
@@ -1033,7 +1117,6 @@ app.get('/api/search/history', authMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Failed to load search history' });
   }
 });
-
 // ======================================================
 //                          ADMIN
 // ======================================================
@@ -1061,8 +1144,10 @@ app.get('/api/admin/stats', authMiddleware, requireAdmin, async (req, res) => {
       supabase
         .from('search_history')
         .select('*', { count: 'exact', head: true }),
-      supabase.from('comments').select('*', { count: 'exact', head: true }),
-      supabase.from('saved_posts').select('*', { count: 'exact', head: true })
+      supabase
+        .from('post_comments')
+        .select('*', { count: 'exact', head: true }),
+      supabase.from('post_saves').select('*', { count: 'exact', head: true })
     ]);
 
     res.json({
@@ -1145,8 +1230,8 @@ app.delete(
       const postId = req.params.id;
 
       await supabase.from('post_likes').delete().eq('post_id', postId);
-      await supabase.from('comments').delete().eq('post_id', postId);
-      await supabase.from('saved_posts').delete().eq('post_id', postId);
+      await supabase.from('post_comments').delete().eq('post_id', postId);
+      await supabase.from('post_saves').delete().eq('post_id', postId);
 
       const { error } = await supabase.from('posts').delete().eq('id', postId);
       if (error) {
@@ -1172,11 +1257,13 @@ app.delete(
       const userId = req.params.id;
 
       await supabase.from('post_likes').delete().eq('user_id', userId);
-      await supabase.from('follows').delete()
+      await supabase
+        .from('follows')
+        .delete()
         .or(`follower_id.eq.${userId},followed_id.eq.${userId}`);
       await supabase.from('search_history').delete().eq('user_id', userId);
-      await supabase.from('comments').delete().eq('user_id', userId);
-      await supabase.from('saved_posts').delete().eq('user_id', userId);
+      await supabase.from('post_comments').delete().eq('user_id', userId);
+      await supabase.from('post_saves').delete().eq('user_id', userId);
       await supabase.from('posts').delete().eq('user_id', userId);
 
       const { error } = await supabase
