@@ -33,7 +33,7 @@ class ProfilePage {
     // Refresh from backend
     await this.fetchCurrentUser();
     await this.fetchUserPosts();
-    // Likes are lazy-loaded when the Likes tab is opened
+    // Likes are lazy-loaded when Likes tab is opened
   }
 
   cacheDom() {
@@ -159,17 +159,10 @@ class ProfilePage {
     `;
 
     try {
-      const headers = {};
-      const token = getAuthToken && getAuthToken();
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
       const res = await fetch(
         `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(
           this.user.username
-        )}/posts`,
-        { headers }
+        )}/posts`
       );
       if (!res.ok) throw new Error("Failed to load posts");
 
@@ -235,17 +228,10 @@ class ProfilePage {
     `;
 
     try {
-      const headers = {};
-      const token = getAuthToken && getAuthToken();
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
       const res = await fetch(
         `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(
           this.user.username
-        )}/likes`,
-        { headers }
+        )}/likes`
       );
       if (!res.ok) throw new Error("Failed to load liked posts");
 
@@ -307,123 +293,132 @@ class ProfilePage {
    *  - own Posts tab
    *  - Likes tab
    *
-   * Uses the same style of icons as the home feed and includes
-   * likes, comments, shares, and saves.
+   * Layout + icons intentionally match feed.js
+   * Only difference: red trash icon on your own posts in Posts tab.
    */
   createPostElement(post, options = {}) {
     const { fromLikesTab = false } = options;
 
-    // If a global shared renderer exists (post-ui.js), use it so UI matches exactly
-    if (window.createPostElement && typeof window.createPostElement === "function") {
-      return window.createPostElement(post);
-    }
-
     const article = document.createElement("article");
-    article.className = "post-card";
+    article.className = "post";
     article.dataset.postId = post.id;
     article.tabIndex = 0;
 
     // Prefer real author data from API if present
-    const author = post.author || post.user || this.user || {};
+    const author = post.user || post.author || this.user || {};
     const avatar = author.avatar_url || "assets/icons/default-profile.png";
-    const displayName = author.display_name || author.username || "User";
-    const username = author.username || "user";
+    const username = author.username || "unknown";
+    const displayName = author.display_name || username;
 
-    const createdAt = post.created_at ? new Date(post.created_at) : null;
-    const timeLabel = createdAt ? createdAt.toLocaleString() : "";
+    const createdAt = post.created_at;
+    const time = createdAt ? this.formatTime(createdAt) : "";
 
-    const likeCount =
-      typeof post.likes === "number"
-        ? post.likes
-        : typeof post.likes_count === "number"
-        ? post.likes_count
-        : 0;
-
-    const commentsCount =
-      typeof post.comments_count === "number" ? post.comments_count : 0;
-
-    const savesCount =
-      typeof post.saves_count === "number" ? post.saves_count : 0;
-
+    // is this my own post?
     const isOwnPost =
       this.user && (post.user_id === this.user.id || author.id === this.user.id);
 
-    const isLikedByMe = !!post.liked_by_me;
-    const isSavedByMe = !!post.saved_by_me;
+    // like / save flags same as feed.js
+    const liked =
+      post.liked_by_me === true ||
+      post.is_liked === true ||
+      post.isLiked === true;
+    const saved =
+      post.saved_by_me === true ||
+      post.is_saved === true ||
+      post.isSaved === true;
+
+    // like count
+    let likeCount = 0;
+    if (typeof post.likes === "number") {
+      likeCount = post.likes;
+    } else if (typeof post.like_count === "number") {
+      likeCount = post.like_count;
+    } else if (Array.isArray(post.likes)) {
+      likeCount = post.likes.length;
+    }
+
+    // comment count
+    let commentCount = 0;
+    if (typeof post.comments_count === "number") {
+      commentCount = post.comments_count;
+    } else if (typeof post.comment_count === "number") {
+      commentCount = post.comment_count;
+    } else if (Array.isArray(post.comments)) {
+      commentCount = post.comments.length;
+    } else if (typeof post.comments === "number") {
+      commentCount = post.comments;
+    }
+
+    // media (image / video)
+    const mediaUrl =
+      post.media_url || post.media || post.image_url || post.video_url || null;
+    const mediaType = post.media_type || "";
+    const mediaHtml = mediaUrl ? this.renderMediaHtml(mediaUrl, mediaType) : "";
 
     article.innerHTML = `
       <header class="post-header">
-        <img
-          src="${avatar}"
-          alt="${this.escapeHtml(displayName)}"
-          class="post-avatar"
-          onerror="this.src='assets/icons/default-profile.png'"
-        />
-        <div class="post-header-main">
-          <div class="post-name-row">
+        <div class="post-user" data-username="${this.escapeHtml(username)}">
+          <img class="post-avatar" src="${avatar}" onerror="this.src='assets/icons/default-profile.png'">
+          <div class="post-user-meta">
             <span class="post-display-name">${this.escapeHtml(displayName)}</span>
-            <span class="post-handle">@${this.escapeHtml(username)}</span>
+            <span class="post-username">@${this.escapeHtml(username)}</span>
           </div>
-          ${
-            timeLabel
-              ? `<span class="post-time">${this.escapeHtml(timeLabel)}</span>`
-              : ""
-          }
         </div>
+        <span class="post-time">${this.escapeHtml(time)}</span>
         ${
           isOwnPost && !fromLikesTab
-            ? `
-        <button
-          class="post-delete-btn"
-          type="button"
-          aria-label="Delete post"
-        >
-          <i class="fa-solid fa-trash"></i>
-        </button>`
+            ? `<button class="post-delete-btn" type="button" aria-label="Delete post">
+                 <i class="fa-solid fa-trash"></i>
+               </button>`
             : ""
         }
       </header>
 
       <div class="post-body">
-        ${
-          (post.content || "").trim()
-            ? `<p class="post-text">${this.formatContent(post.content || "")}</p>`
-            : ""
-        }
+        <div class="post-text">${this.formatContent(post.content || "")}</div>
+        ${mediaHtml}
       </div>
 
       <footer class="post-footer">
-        <button class="post-action-btn post-like-btn${
-          isLikedByMe ? " liked active" : ""
-        }" type="button">
-          <i class="fa-regular fa-heart action-icon"></i>
-          <span class="action-count like-count">${likeCount}</span>
-        </button>
+        <div class="post-actions"
+             style="display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;">
+          <button class="post-action like-btn ${liked ? "liked" : ""}"
+                  type="button"
+                  style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center;">
+            <i class="fa-${liked ? "solid" : "regular"} fa-heart"></i>
+            <span class="like-count">${likeCount}</span>
+          </button>
 
-        <button class="post-action-btn post-comment-btn" type="button">
-          <i class="fa-regular fa-comment action-icon"></i>
-          <span class="action-count comment-count">${commentsCount}</span>
-        </button>
+          <button class="post-action comment-btn"
+                  type="button"
+                  style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center;">
+            <i class="fa-regular fa-comment"></i>
+            <span class="comment-count">${commentCount}</span>
+          </button>
 
-        <button class="post-action-btn post-share-btn" type="button">
-          <i class="fa-solid fa-arrow-up-from-bracket action-icon"></i>
-          <span class="action-label">Share</span>
-        </button>
+          <button class="post-action share-btn"
+                  type="button"
+                  style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center;">
+            <i class="fa-solid fa-arrow-up-from-bracket"></i>
+          </button>
 
-        <button class="post-action-btn post-save-btn${
-          isSavedByMe ? " saved active" : ""
-        }" type="button">
-          <i class="fa-regular fa-bookmark action-icon"></i>
-          <span class="action-count save-count">${savesCount}</span>
-        </button>
+          <button class="post-action save-btn ${saved ? "saved" : ""}"
+                  type="button"
+                  style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center;">
+            <i class="fa-${saved ? "solid" : "regular"} fa-bookmark"></i>
+          </button>
+        </div>
       </footer>
     `;
 
-    const likeBtn = article.querySelector(".post-like-btn");
-    const commentBtn = article.querySelector(".post-comment-btn");
-    const shareBtn = article.querySelector(".post-share-btn");
-    const saveBtn = article.querySelector(".post-save-btn");
+    // --- Event hooks (same behaviour as feed.js) ---
+
+    const likeBtn = article.querySelector(".like-btn");
+    const commentBtn = article.querySelector(".comment-btn");
+    const shareBtn = article.querySelector(".share-btn");
+    const saveBtn = article.querySelector(".save-btn");
     const deleteBtn = article.querySelector(".post-delete-btn");
+    const userEl = article.querySelector(".post-user");
 
     if (likeBtn) {
       likeBtn.addEventListener("click", (e) => {
@@ -431,24 +426,28 @@ class ProfilePage {
         this.handleLike(post, likeBtn);
       });
     }
+
     if (saveBtn) {
       saveBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         this.handleSave(post, saveBtn);
       });
     }
+
     if (commentBtn) {
       commentBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         this.goToPost(post);
       });
     }
+
     if (shareBtn) {
       shareBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         this.handleSharePostClick(post);
       });
     }
+
     if (deleteBtn && isOwnPost && !fromLikesTab) {
       deleteBtn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -456,12 +455,25 @@ class ProfilePage {
       });
     }
 
-    // Make whole post (except buttons/links) clickable -> post.html
+    if (userEl) {
+      userEl.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const uname = userEl.dataset.username;
+        if (this.user && this.user.username === uname) {
+          window.location.href = "profile.html";
+        } else {
+          window.location.href = `user.html?user=${encodeURIComponent(uname)}`;
+        }
+      });
+    }
+
+    // Whole card -> post.html (but ignore buttons/links)
     article.addEventListener("click", (e) => {
       const target = e.target;
       if (
-        target.closest(".post-action-btn") ||
+        target.closest(".post-actions") ||
         target.closest(".post-delete-btn") ||
+        target.closest(".post-user") ||
         target.tagName === "A"
       ) {
         return;
@@ -470,6 +482,34 @@ class ProfilePage {
     });
 
     return article;
+  }
+
+  renderMediaHtml(url, type) {
+    const lower = url.toLowerCase();
+    const isVideo =
+      (type && (type.startsWith("video/") || type === "video")) ||
+      lower.endsWith(".mp4") ||
+      lower.endsWith(".webm") ||
+      lower.endsWith(".ogg");
+
+    if (isVideo) {
+      return `
+        <div class="post-media">
+          <video controls playsinline preload="metadata">
+            <source src="${url}">
+            Your browser does not support video.
+          </video>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="post-media">
+        <a href="${url}" target="_blank" rel="noopener noreferrer">
+          <img src="${url}" loading="lazy">
+        </a>
+      </div>
+    `;
   }
 
   goToPost(post) {
@@ -498,8 +538,10 @@ class ProfilePage {
         throw new Error(data.error || "Failed to delete post");
       }
 
-      // remove from local array and UI
+      // remove from local arrays and UI
       this.posts = this.posts.filter((p) => p.id !== post.id);
+      this.likedPosts = this.likedPosts.filter((p) => p.id !== post.id);
+
       if (articleEl && articleEl.parentElement) {
         articleEl.parentElement.removeChild(articleEl);
       }
@@ -523,129 +565,145 @@ class ProfilePage {
 
   /* ---------------- Like / Save / Share handlers ---------------- */
 
-  async handleLike(post, likeBtn) {
-    if (!post || !post.id || !likeBtn) return;
+  async handleLike(post, btn) {
+    if (!post || !post.id || !btn) return;
 
-    const token = getAuthToken && getAuthToken();
+    const token = getAuthToken();
     if (!token) {
-      window.location.href = "login.html";
+      alert("Please log in to like posts.");
       return;
     }
 
-    const countEl = likeBtn.querySelector(".like-count");
+    const countEl = btn.querySelector(".like-count");
+    const icon = btn.querySelector("i");
 
     let currentCount = parseInt(countEl?.textContent || "0", 10);
     if (Number.isNaN(currentCount)) currentCount = 0;
 
-    const wasLiked = !!post.liked_by_me;
+    const wasLiked =
+      btn.classList.contains("liked") ||
+      post.liked_by_me === true ||
+      post.is_liked === true;
 
-    // Optimistic UI
-    post.liked_by_me = !wasLiked;
+    // optimistic UI
     let newCount = currentCount + (wasLiked ? -1 : 1);
     if (newCount < 0) newCount = 0;
 
+    btn.classList.toggle("liked", !wasLiked);
+    if (icon) {
+      icon.classList.remove(wasLiked ? "fa-solid" : "fa-regular");
+      icon.classList.add(wasLiked ? "fa-regular" : "fa-solid");
+    }
     if (countEl) countEl.textContent = String(newCount);
-    likeBtn.classList.toggle("liked", post.liked_by_me);
-    likeBtn.classList.toggle("active", post.liked_by_me);
 
     try {
       const res = await fetch(
         `${PROFILE_API_BASE_URL}/posts/${encodeURIComponent(post.id)}/like`,
         {
-          method: "POST", // toggle
+          method: "POST",
           headers: {
-            "Content-Type": "application/json",
             Authorization: `Bearer ${token}`
           }
         }
       );
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to update like");
+      if (!res.ok) throw new Error(data.error || "Failed to update like");
+
+      // trust server count if provided
+      const serverLikes =
+        typeof data.likes === "number"
+          ? data.likes
+          : typeof data.like_count === "number"
+          ? data.like_count
+          : null;
+
+      const nowLiked = data.liked === true ? true : !wasLiked;
+
+      if (serverLikes !== null && countEl) {
+        countEl.textContent = String(serverLikes);
       }
 
-      if (typeof data.likes === "number" && countEl) {
-        countEl.textContent = String(data.likes);
-      }
-      if (typeof data.liked === "boolean") {
-        post.liked_by_me = data.liked;
-        likeBtn.classList.toggle("liked", data.liked);
-        likeBtn.classList.toggle("active", data.liked);
-      }
+      this.updateLocalPostState(post.id, {
+        liked_by_me: nowLiked,
+        is_liked: nowLiked,
+        likes:
+          serverLikes !== null
+            ? serverLikes
+            : newCount,
+        like_count:
+          serverLikes !== null
+            ? serverLikes
+            : newCount
+      });
     } catch (err) {
       console.error("handleLike error:", err);
-      // revert UI on failure
-      post.liked_by_me = wasLiked;
-      if (countEl) countEl.textContent = String(currentCount);
-      likeBtn.classList.toggle("liked", wasLiked);
-      likeBtn.classList.toggle("active", wasLiked);
-      if (!wasLiked) {
-        alert("Could not like this post.");
+
+      // revert UI
+      btn.classList.toggle("liked", wasLiked);
+      if (icon) {
+        icon.classList.remove(wasLiked ? "fa-regular" : "fa-solid");
+        icon.classList.add(wasLiked ? "fa-solid" : "fa-regular");
       }
+      if (countEl) countEl.textContent = String(currentCount);
+
+      alert(err.message || "Could not update like.");
     }
   }
 
-  async handleSave(post, saveBtn) {
-    if (!post || !post.id || !saveBtn) return;
+  async handleSave(post, btn) {
+    if (!post || !post.id || !btn) return;
 
-    const token = getAuthToken && getAuthToken();
+    const token = getAuthToken();
     if (!token) {
-      window.location.href = "login.html";
+      alert("Please log in to save posts.");
       return;
     }
 
-    const countEl = saveBtn.querySelector(".save-count");
+    const icon = btn.querySelector("i");
+    const wasSaved =
+      btn.classList.contains("saved") ||
+      post.saved_by_me === true ||
+      post.is_saved === true;
 
-    let currentCount = parseInt(countEl?.textContent || "0", 10);
-    if (Number.isNaN(currentCount)) currentCount = 0;
-
-    const wasSaved = !!post.saved_by_me;
-
-    // Optimistic UI
-    post.saved_by_me = !wasSaved;
-    let newCount = currentCount + (wasSaved ? -1 : 1);
-    if (newCount < 0) newCount = 0;
-
-    if (countEl) countEl.textContent = String(newCount);
-    saveBtn.classList.toggle("saved", post.saved_by_me);
-    saveBtn.classList.toggle("active", post.saved_by_me);
+    // optimistic UI
+    btn.classList.toggle("saved", !wasSaved);
+    if (icon) {
+      icon.classList.remove(wasSaved ? "fa-solid" : "fa-regular");
+      icon.classList.add(wasSaved ? "fa-regular" : "fa-solid");
+    }
 
     try {
       const res = await fetch(
         `${PROFILE_API_BASE_URL}/posts/${encodeURIComponent(post.id)}/save`,
         {
-          method: "POST", // toggle
+          method: "POST",
           headers: {
-            "Content-Type": "application/json",
             Authorization: `Bearer ${token}`
           }
         }
       );
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to update save");
-      }
+      if (!res.ok) throw new Error(data.error || "Failed to update save");
 
-      if (typeof data.saves === "number" && countEl) {
-        countEl.textContent = String(data.saves);
-      }
-      if (typeof data.saved === "boolean") {
-        post.saved_by_me = data.saved;
-        saveBtn.classList.toggle("saved", data.saved);
-        saveBtn.classList.toggle("active", data.saved);
-      }
+      const nowSaved = data.saved === true ? true : !wasSaved;
+
+      this.updateLocalPostState(post.id, {
+        saved_by_me: nowSaved,
+        is_saved: nowSaved
+      });
     } catch (err) {
       console.error("handleSave error:", err);
-      // revert UI on failure
-      post.saved_by_me = wasSaved;
-      if (countEl) countEl.textContent = String(currentCount);
-      saveBtn.classList.toggle("saved", wasSaved);
-      saveBtn.classList.toggle("active", wasSaved);
-      if (!wasSaved) {
-        alert("Could not save this post.");
+
+      // revert
+      btn.classList.toggle("saved", wasSaved);
+      if (icon) {
+        icon.classList.remove(wasSaved ? "fa-regular" : "fa-solid");
+        icon.classList.add(wasSaved ? "fa-solid" : "fa-regular");
       }
+
+      alert(err.message || "Could not update save.");
     }
   }
 
@@ -674,6 +732,17 @@ class ProfilePage {
   }
 
   /* ---------------- Helpers ---------------- */
+
+  updateLocalPostState(postId, changes) {
+    const apply = (arr) => {
+      const idx = arr.findIndex((p) => p.id === postId);
+      if (idx !== -1) {
+        arr[idx] = { ...arr[idx], ...changes };
+      }
+    };
+    apply(this.posts);
+    apply(this.likedPosts);
+  }
 
   formatContent(text) {
     const safe = this.escapeHtml(text || "");
@@ -889,6 +958,19 @@ class ProfilePage {
 
     const opts = { month: "long", year: "numeric" };
     return `Joined ${date.toLocaleDateString(undefined, opts)}`;
+  }
+
+  // same relative time logic as feed.js
+  formatTime(ts) {
+    const d = new Date(ts);
+    if (isNaN(d)) return "";
+    const now = new Date();
+    const diff = (now - d) / 1000;
+    if (diff < 60) return "just now";
+    if (diff < 3600) return Math.floor(diff / 60) + "m";
+    if (diff < 86400) return Math.floor(diff / 3600) + "h";
+    if (diff < 604800) return Math.floor(diff / 86400) + "d";
+    return d.toLocaleDateString();
   }
 
   escapeHtml(str = "") {
