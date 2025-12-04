@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="css/styles.css" />
     <link rel="stylesheet" href="css/auth-styles.css" />
 
-    <!-- Font Awesome for bottom nav icons -->
+    <!-- Font Awesome (same as index.html) -->
     <link
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
@@ -19,7 +19,8 @@
     />
 </head>
 <body class="auth-page">
-    <!-- SIMPLE HEADER – logo perfectly centered -->
+
+    <!-- SIMPLE HEADER – perfectly centered title -->
     <header class="header auth-header">
         <h1 class="logo">Uncensored<span>Social</span></h1>
     </header>
@@ -51,7 +52,6 @@
                     />
                 </div>
 
-                <!-- Messages used by auth.js -->
                 <div id="errorMessage" class="auth-message auth-error hidden"></div>
                 <div id="successMessage" class="auth-message auth-success hidden"></div>
 
@@ -67,35 +67,27 @@
         </section>
     </main>
 
-    <!-- Bottom nav (same structure / classes as rest of site, using icons) -->
-    <nav class="bottom-nav">
-        <a href="index.html" class="nav-item" data-nav="home">
-            <span class="icon">
-                <i class="fa-solid fa-house"></i>
-            </span>
+    <!-- ================= EXACT SAME BOTTOM NAV AS index.html ================= -->
+    <nav class="bottom-nav" id="bottomNav">
+        <a href="index.html" class="nav-item active">
+            <i class="fa-solid fa-house nav-icon"></i>
             <span class="nav-label">Home</span>
         </a>
-        <a href="search.html" class="nav-item" data-nav="search">
-            <span class="icon">
-                <i class="fa-solid fa-magnifying-glass"></i>
-            </span>
+        <a href="search.html" class="nav-item">
+            <i class="fa-solid fa-magnifying-glass nav-icon"></i>
             <span class="nav-label">Search</span>
         </a>
-        <a href="notifications.html" class="nav-item" data-nav="alerts">
-            <span class="icon">
-                <i class="fa-regular fa-bell"></i>
-            </span>
+        <a href="notifications.html" class="nav-item">
+            <i class="fa-regular fa-bell nav-icon"></i>
             <span class="nav-label">Alerts</span>
         </a>
-        <a href="dms.html" class="nav-item" data-nav="messages">
-            <span class="icon">
-                <i class="fa-solid fa-envelope"></i>
-            </span>
+        <a href="messages.html" class="nav-item">
+            <i class="fa-regular fa-envelope nav-icon"></i>
             <span class="nav-label">Messages</span>
         </a>
     </nav>
+    <!-- ======================================================================= -->
 
-    <!-- Auth logic -->
     <script src="js/auth.js"></script>
 </body>
 </html>
