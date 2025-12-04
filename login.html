@@ -8,8 +8,7 @@
     <!-- Global + auth styles -->
     <link rel="stylesheet" href="css/styles.css" />
     <link rel="stylesheet" href="css/auth-styles.css" />
-
-    <!-- Font Awesome (same as index.html) -->
+    <link rel="stylesheet" href="css/icons.css" />
     <link
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
@@ -17,12 +16,51 @@
         crossorigin="anonymous"
         referrerpolicy="no-referrer"
     />
+
+    <!-- Same desktop tweaks + bottom nav icon styling as index.html -->
+    <style>
+        @media (min-width: 900px) {
+            .content-wrapper {
+                max-width: 960px;
+                margin: 0 auto;
+                padding-top: 72px;
+            }
+            .main-content {
+                max-width: 700px;
+                margin: 0 auto;
+            }
+        }
+
+        /* Force bottom nav to be visible on desktop too (same as index) */
+        @media (min-width: 768px) {
+            .bottom-nav {
+                display: flex !important;
+            }
+        }
+
+        /* Font Awesome icons above labels in bottom nav (same as index) */
+        .bottom-nav .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+        }
+
+        .bottom-nav .nav-icon {
+            font-size: 1.1rem;
+            line-height: 1;
+        }
+    </style>
 </head>
 <body class="auth-page">
-
-    <!-- SIMPLE HEADER – perfectly centered title -->
+    <!-- SIMPLE HEADER (no profile image) -->
     <header class="header auth-header">
+        <div class="header-left"></div>
+
         <h1 class="logo">Uncensored<span>Social</span></h1>
+
+        <div class="header-actions"></div>
     </header>
 
     <!-- Centered auth content -->
@@ -67,7 +105,7 @@
         </section>
     </main>
 
-    <!-- ================= EXACT SAME BOTTOM NAV AS index.html ================= -->
+    <!-- Bottom nav: EXACT same markup as index.html -->
     <nav class="bottom-nav" id="bottomNav">
         <a href="index.html" class="nav-item active">
             <i class="fa-solid fa-house nav-icon"></i>
@@ -86,8 +124,8 @@
             <span class="nav-label">Messages</span>
         </a>
     </nav>
-    <!-- ======================================================================= -->
 
+    <!-- Auth logic -->
     <script src="js/auth.js"></script>
 </body>
 </html>
