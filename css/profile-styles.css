@@ -211,10 +211,15 @@
     font-weight: 600;
 }
 
+/* Wrapper so top/bottom spacing is consistent */
+.profile-posts {
+    padding: 4px 0 8px;
+}
+
 /* Card container */
 .profile-posts .post {
-    margin: 8px 16px;
-    padding: 12px 16px;
+    margin: 8px 12px;
+    padding: 10px 14px;
     border-radius: var(--radius-lg);
     background: var(--bg-secondary);
     border: 1px solid var(--border-light);
