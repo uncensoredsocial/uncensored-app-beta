@@ -3,25 +3,19 @@
 
 const POST_API_BASE = 'https://uncensored-app-beta-production.up.railway.app/api';
 
-// You already have these globals from auth.js
+// These come from auth.js
 const getToken = window.getAuthToken || (() => null);
 const getUser = window.getCurrentUser || (() => null);
 
 /**
- * Create a post card DOM element.
- * post: {
- *   id, content, media_url, media_type, created_at,
- *   user: { id, username, display_name, avatar_url },
- *   likes, comments_count, saves_count,
- *   liked_by_me, saved_by_me
- * }
+ * Create a post card DOM element (same shape as /api/posts + /api/users/:username/posts)
  */
 window.createPostElement = function createPostElement(post) {
   const el = document.createElement('article');
   el.className = 'post-card';
   el.dataset.postId = post.id;
 
-  // --- header
+  // === HEADER ===
   const header = document.createElement('div');
   header.className = 'post-header';
 
@@ -57,7 +51,7 @@ window.createPostElement = function createPostElement(post) {
   header.appendChild(avatar);
   header.appendChild(headerMain);
 
-  // --- content
+  // === BODY ===
   const body = document.createElement('div');
   body.className = 'post-body';
 
@@ -87,7 +81,7 @@ window.createPostElement = function createPostElement(post) {
     body.appendChild(mediaWrapper);
   }
 
-  // --- footer actions (LIKE / COMMENT / SHARE / SAVE)
+  // === FOOTER ACTIONS (LIKE / COMMENT / SHARE / SAVE) ===
   const footer = document.createElement('div');
   footer.className = 'post-footer';
 
@@ -117,13 +111,13 @@ window.createPostElement = function createPostElement(post) {
   el.appendChild(body);
   el.appendChild(footer);
 
-  // Attach listeners for like / save here so they work
+  // Hook up like/save behavior
   attachPostActionHandlers(el);
 
   return el;
 };
 
-// Small helper to attach like/save behavior to a single card
+// ====== BUTTON HANDLERS ======
 function attachPostActionHandlers(cardEl) {
   const postId = cardEl.dataset.postId;
   if (!postId) return;
@@ -145,8 +139,6 @@ function attachPostActionHandlers(cardEl) {
     });
   }
 }
-
-// ====== network actions ======
 
 async function handleLikeToggle(postId, cardEl, btn) {
   if (!getToken()) {
@@ -197,8 +189,6 @@ async function handleSaveToggle(postId, cardEl, btn) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to update save');
 
-    const countEl = cardEl.querySelector('.save-count');
-    // If your /save endpoint doesn’t return saves_count, we just toggle active
     btn.classList.toggle('active', data.saved === true);
   } catch (err) {
     console.error('Save toggle error:', err);
@@ -207,7 +197,7 @@ async function handleSaveToggle(postId, cardEl, btn) {
   }
 }
 
-// Simple relative time (same kind of feel as home feed)
+// ====== UTIL ======
 function formatRelativeTime(iso) {
   if (!iso) return '';
   const then = new Date(iso);
