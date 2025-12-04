@@ -60,14 +60,7 @@
         .auth-card h2 {
             text-align: center;
             font-size: 28px;
-            margin-bottom: 6px;
-        }
-
-        .auth-subtitle {
-            text-align: center;
-            opacity: 0.75;
             margin-bottom: 16px;
-            font-size: 14px;
         }
 
         /* Benefits list */
@@ -75,11 +68,13 @@
             list-style: none;
             padding: 0;
             margin: 0 0 20px;
+            text-align: center;
         }
 
         .benefit-item {
             display: flex;
-            align-items: flex-start;
+            align-items: center;
+            justify-content: center;
             gap: 10px;
             margin-bottom: 8px;
             font-size: 14px;
@@ -88,7 +83,7 @@
 
         .benefit-item i {
             color: #1d9bf0;
-            margin-top: 2px;
+            margin-top: 0;
             min-width: 16px;
         }
 
@@ -201,6 +196,18 @@
         .hidden {
             display: none;
         }
+
+        /* MOBILE TWEAKS – more spacing from the sides */
+        @media (max-width: 480px) {
+            .auth-page {
+                padding: 20px 12px;
+            }
+
+            .auth-card {
+                margin: 0 6px;           /* extra space from left/right edges */
+                padding: 28px 20px;      /* slightly tighter padding so it feels balanced */
+            }
+        }
     </style>
 </head>
 
@@ -213,9 +220,8 @@
         <!-- Signup Card -->
         <div class="auth-card">
             <h2>Join the Uncensored Network</h2>
-            <p class="auth-subtitle">Built for privacy, free speech, and zero creepiness.</p>
 
-            <!-- Benefit bullets -->
+            <!-- Centered benefits -->
             <ul class="benefits-list">
                 <li class="benefit-item">
                     <i class="fa-solid fa-circle-check"></i>
@@ -227,7 +233,7 @@
                 </li>
                 <li class="benefit-item">
                     <i class="fa-solid fa-circle-check"></i>
-                    <span>No data harvesting & no selling your info.</span>
+                    <span>No data harvesting &amp; no selling your info.</span>
                 </li>
             </ul>
 
@@ -265,9 +271,9 @@
                     <input type="checkbox" id="agree" required>
                     <label for="agree">
                         I agree to the
-                        <a href="privacy-policy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+                        <a href="privacy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
                         &
-                        <a href="terms-of-service.html" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+                        <a href="terms.html" target="_blank" rel="noopener noreferrer">Terms of Service</a>
                     </label>
                 </div>
 
