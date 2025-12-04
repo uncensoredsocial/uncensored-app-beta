@@ -159,10 +159,17 @@ class ProfilePage {
     `;
 
     try {
+      const headers = {};
+      const token = getAuthToken && getAuthToken();
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const res = await fetch(
         `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(
           this.user.username
-        )}/posts`
+        )}/posts`,
+        { headers }
       );
       if (!res.ok) throw new Error("Failed to load posts");
 
@@ -228,11 +235,17 @@ class ProfilePage {
     `;
 
     try {
-      // EXPECTED ENDPOINT: adjust on backend if needed
+      const headers = {};
+      const token = getAuthToken && getAuthToken();
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const res = await fetch(
         `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(
           this.user.username
-        )}/likes`
+        )}/likes`,
+        { headers }
       );
       if (!res.ok) throw new Error("Failed to load liked posts");
 
@@ -291,14 +304,22 @@ class ProfilePage {
 
   /**
    * Shared renderer for:
-   *  - own Posts tab (with trash icon for own posts)
-   *  - Likes tab (same styling, trash only if it's actually your post)
+   *  - own Posts tab
+   *  - Likes tab
+   *
+   * Uses the same style of icons as the home feed and includes
+   * likes, comments, shares, and saves.
    */
   createPostElement(post, options = {}) {
     const { fromLikesTab = false } = options;
 
+    // If a global shared renderer exists (post-ui.js), use it so UI matches exactly
+    if (window.createPostElement && typeof window.createPostElement === "function") {
+      return window.createPostElement(post);
+    }
+
     const article = document.createElement("article");
-    article.className = "post";
+    article.className = "post-card";
     article.dataset.postId = post.id;
     article.tabIndex = 0;
 
@@ -312,37 +333,43 @@ class ProfilePage {
     const timeLabel = createdAt ? createdAt.toLocaleString() : "";
 
     const likeCount =
-      typeof post.likes_count === "number"
+      typeof post.likes === "number"
+        ? post.likes
+        : typeof post.likes_count === "number"
         ? post.likes_count
-        : Array.isArray(post.likes)
-        ? post.likes.length
         : 0;
 
     const commentsCount =
       typeof post.comments_count === "number" ? post.comments_count : 0;
 
+    const savesCount =
+      typeof post.saves_count === "number" ? post.saves_count : 0;
+
     const isOwnPost =
       this.user && (post.user_id === this.user.id || author.id === this.user.id);
 
     const isLikedByMe = !!post.liked_by_me;
+    const isSavedByMe = !!post.saved_by_me;
 
     article.innerHTML = `
       <header class="post-header">
         <img
           src="${avatar}"
           alt="${this.escapeHtml(displayName)}"
-          class="post-user-avatar"
+          class="post-avatar"
           onerror="this.src='assets/icons/default-profile.png'"
         />
-        <div class="post-user-info">
-          <div class="post-display-name">${this.escapeHtml(displayName)}</div>
-          <div class="post-username">@${this.escapeHtml(username)}</div>
+        <div class="post-header-main">
+          <div class="post-name-row">
+            <span class="post-display-name">${this.escapeHtml(displayName)}</span>
+            <span class="post-handle">@${this.escapeHtml(username)}</span>
+          </div>
+          ${
+            timeLabel
+              ? `<span class="post-time">${this.escapeHtml(timeLabel)}</span>`
+              : ""
+          }
         </div>
-        ${
-          timeLabel
-            ? `<div class="post-time">${this.escapeHtml(timeLabel)}</div>`
-            : ""
-        }
         ${
           isOwnPost && !fromLikesTab
             ? `
@@ -357,41 +384,57 @@ class ProfilePage {
         }
       </header>
 
-      <div class="post-content">
-        <p>${this.formatContent(post.content || "")}</p>
+      <div class="post-body">
+        ${
+          (post.content || "").trim()
+            ? `<p class="post-text">${this.formatContent(post.content || "")}</p>`
+            : ""
+        }
       </div>
 
       <footer class="post-footer">
-        <div class="post-timestamp">
-          ${timeLabel ? this.escapeHtml(timeLabel) : ""}
-        </div>
-        <div class="post-actions">
-          <button class="post-action-btn post-like-btn${
-            isLikedByMe ? " liked" : ""
-          }" type="button">
-            <span class="post-action-icon">♥</span>
-            <span class="post-action-count like-count">${likeCount}</span>
-          </button>
-          <button class="post-action-btn post-comment-btn" type="button">
-            <span class="post-action-icon">💬</span>
-            <span class="post-action-count comment-count">${commentsCount}</span>
-          </button>
-          <button class="post-action-btn post-share-btn" type="button">
-            <span class="post-action-icon">⤴</span>
-          </button>
-        </div>
+        <button class="post-action-btn post-like-btn${
+          isLikedByMe ? " liked active" : ""
+        }" type="button">
+          <i class="fa-regular fa-heart action-icon"></i>
+          <span class="action-count like-count">${likeCount}</span>
+        </button>
+
+        <button class="post-action-btn post-comment-btn" type="button">
+          <i class="fa-regular fa-comment action-icon"></i>
+          <span class="action-count comment-count">${commentsCount}</span>
+        </button>
+
+        <button class="post-action-btn post-share-btn" type="button">
+          <i class="fa-solid fa-arrow-up-from-bracket action-icon"></i>
+          <span class="action-label">Share</span>
+        </button>
+
+        <button class="post-action-btn post-save-btn${
+          isSavedByMe ? " saved active" : ""
+        }" type="button">
+          <i class="fa-regular fa-bookmark action-icon"></i>
+          <span class="action-count save-count">${savesCount}</span>
+        </button>
       </footer>
     `;
 
     const likeBtn = article.querySelector(".post-like-btn");
     const commentBtn = article.querySelector(".post-comment-btn");
     const shareBtn = article.querySelector(".post-share-btn");
+    const saveBtn = article.querySelector(".post-save-btn");
     const deleteBtn = article.querySelector(".post-delete-btn");
 
     if (likeBtn) {
       likeBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         this.handleLike(post, likeBtn);
+      });
+    }
+    if (saveBtn) {
+      saveBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.handleSave(post, saveBtn);
       });
     }
     if (commentBtn) {
@@ -478,14 +521,18 @@ class ProfilePage {
     }
   }
 
-  /* ---------------- Like / Share handlers ---------------- */
+  /* ---------------- Like / Save / Share handlers ---------------- */
 
   async handleLike(post, likeBtn) {
-    if (!post || !post.id) return;
-    if (!likeBtn) return;
+    if (!post || !post.id || !likeBtn) return;
+
+    const token = getAuthToken && getAuthToken();
+    if (!token) {
+      window.location.href = "login.html";
+      return;
+    }
 
     const countEl = likeBtn.querySelector(".like-count");
-    const iconEl = likeBtn.querySelector(".post-action-icon");
 
     let currentCount = parseInt(countEl?.textContent || "0", 10);
     if (Number.isNaN(currentCount)) currentCount = 0;
@@ -499,21 +546,32 @@ class ProfilePage {
 
     if (countEl) countEl.textContent = String(newCount);
     likeBtn.classList.toggle("liked", post.liked_by_me);
+    likeBtn.classList.toggle("active", post.liked_by_me);
 
     try {
-      const method = wasLiked ? "DELETE" : "POST";
       const res = await fetch(
         `${PROFILE_API_BASE_URL}/posts/${encodeURIComponent(post.id)}/like`,
         {
-          method,
+          method: "POST", // toggle
           headers: {
-            Authorization: `Bearer ${getAuthToken()}`
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
           }
         }
       );
 
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error("Failed to update like");
+        throw new Error(data.error || "Failed to update like");
+      }
+
+      if (typeof data.likes === "number" && countEl) {
+        countEl.textContent = String(data.likes);
+      }
+      if (typeof data.liked === "boolean") {
+        post.liked_by_me = data.liked;
+        likeBtn.classList.toggle("liked", data.liked);
+        likeBtn.classList.toggle("active", data.liked);
       }
     } catch (err) {
       console.error("handleLike error:", err);
@@ -521,8 +579,72 @@ class ProfilePage {
       post.liked_by_me = wasLiked;
       if (countEl) countEl.textContent = String(currentCount);
       likeBtn.classList.toggle("liked", wasLiked);
+      likeBtn.classList.toggle("active", wasLiked);
       if (!wasLiked) {
         alert("Could not like this post.");
+      }
+    }
+  }
+
+  async handleSave(post, saveBtn) {
+    if (!post || !post.id || !saveBtn) return;
+
+    const token = getAuthToken && getAuthToken();
+    if (!token) {
+      window.location.href = "login.html";
+      return;
+    }
+
+    const countEl = saveBtn.querySelector(".save-count");
+
+    let currentCount = parseInt(countEl?.textContent || "0", 10);
+    if (Number.isNaN(currentCount)) currentCount = 0;
+
+    const wasSaved = !!post.saved_by_me;
+
+    // Optimistic UI
+    post.saved_by_me = !wasSaved;
+    let newCount = currentCount + (wasSaved ? -1 : 1);
+    if (newCount < 0) newCount = 0;
+
+    if (countEl) countEl.textContent = String(newCount);
+    saveBtn.classList.toggle("saved", post.saved_by_me);
+    saveBtn.classList.toggle("active", post.saved_by_me);
+
+    try {
+      const res = await fetch(
+        `${PROFILE_API_BASE_URL}/posts/${encodeURIComponent(post.id)}/save`,
+        {
+          method: "POST", // toggle
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update save");
+      }
+
+      if (typeof data.saves === "number" && countEl) {
+        countEl.textContent = String(data.saves);
+      }
+      if (typeof data.saved === "boolean") {
+        post.saved_by_me = data.saved;
+        saveBtn.classList.toggle("saved", data.saved);
+        saveBtn.classList.toggle("active", data.saved);
+      }
+    } catch (err) {
+      console.error("handleSave error:", err);
+      // revert UI on failure
+      post.saved_by_me = wasSaved;
+      if (countEl) countEl.textContent = String(currentCount);
+      saveBtn.classList.toggle("saved", wasSaved);
+      saveBtn.classList.toggle("active", wasSaved);
+      if (!wasSaved) {
+        alert("Could not save this post.");
       }
     }
   }
