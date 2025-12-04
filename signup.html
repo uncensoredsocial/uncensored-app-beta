@@ -3,9 +3,19 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Join Social</title>
+    <title>Join the Uncensored Network</title>
 
+    <!-- Auth styles -->
     <link rel="stylesheet" href="css/auth-styles.css" />
+
+    <!-- Font Awesome for icons -->
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+        integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+        crossorigin="anonymous"
+        referrerpolicy="no-referrer"
+    />
 
     <style>
         body {
@@ -55,8 +65,31 @@
 
         .auth-subtitle {
             text-align: center;
-            opacity: 0.7;
-            margin-bottom: 24px;
+            opacity: 0.75;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+
+        /* Benefits list */
+        .benefits-list {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 20px;
+        }
+
+        .benefit-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .benefit-item i {
+            color: #1d9bf0;
+            margin-top: 2px;
+            min-width: 16px;
         }
 
         .input-group {
@@ -100,6 +133,15 @@
             height: 18px;
         }
 
+        .checkbox-group a {
+            color: #1d9bf0;
+            text-decoration: none;
+        }
+
+        .checkbox-group a:hover {
+            text-decoration: underline;
+        }
+
         .auth-btn {
             width: 100%;
             padding: 14px;
@@ -135,6 +177,30 @@
         .auth-switch a:hover {
             text-decoration: underline;
         }
+
+        /* Messages (used by auth.js) */
+        .auth-message {
+            font-size: 14px;
+            margin-bottom: 12px;
+            padding: 8px 10px;
+            border-radius: 10px;
+        }
+
+        .auth-error {
+            background-color: rgba(255, 68, 68, 0.12);
+            border: 1px solid #ff4444;
+            color: #ff7878;
+        }
+
+        .auth-success {
+            background-color: rgba(0, 200, 81, 0.12);
+            border: 1px solid #00c851;
+            color: #8df5b3;
+        }
+
+        .hidden {
+            display: none;
+        }
     </style>
 </head>
 
@@ -146,47 +212,70 @@
 
         <!-- Signup Card -->
         <div class="auth-card">
-            <h2>Join Social</h2>
-            <p class="auth-subtitle">Create your private account</p>
+            <h2>Join the Uncensored Network</h2>
+            <p class="auth-subtitle">Built for privacy, free speech, and zero creepiness.</p>
+
+            <!-- Benefit bullets -->
+            <ul class="benefits-list">
+                <li class="benefit-item">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span>Fully uncensored free-speech community.</span>
+                </li>
+                <li class="benefit-item">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span>No IP tracking or ad-based profiling.</span>
+                </li>
+                <li class="benefit-item">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span>No data harvesting & no selling your info.</span>
+                </li>
+            </ul>
+
+            <!-- Messages for auth.js -->
+            <div id="errorMessage" class="auth-message auth-error hidden"></div>
+            <div id="successMessage" class="auth-message auth-success hidden"></div>
 
             <form id="signupForm">
-                
                 <div class="input-group">
-                    <label>Display Name</label>
+                    <label for="displayName">Display Name</label>
                     <input type="text" id="displayName" placeholder="How people will see you" required>
                 </div>
 
                 <div class="input-group">
-                    <label>Username</label>
+                    <label for="username">Username</label>
                     <input type="text" id="username" placeholder="Your unique handle" required>
                 </div>
 
                 <div class="input-group">
-                    <label>Email</label>
+                    <label for="email">Email</label>
                     <input type="email" id="email" placeholder="your@email.com" required>
                 </div>
 
                 <div class="input-group">
-                    <label>Password</label>
+                    <label for="password">Password</label>
                     <input type="password" id="password" placeholder="At least 6 characters" required>
                 </div>
 
                 <div class="input-group">
-                    <label>Confirm Password</label>
+                    <label for="confirmPassword">Confirm Password</label>
                     <input type="password" id="confirmPassword" placeholder="Enter password again" required>
                 </div>
 
                 <div class="checkbox-group">
                     <input type="checkbox" id="agree" required>
-                    <label for="agree">I agree to the <a href="#">Privacy Policy</a> & <a href="#">Terms of Service</a></label>
+                    <label for="agree">
+                        I agree to the
+                        <a href="privacy-policy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+                        &
+                        <a href="terms-of-service.html" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+                    </label>
                 </div>
 
-                <button type="submit" class="auth-btn">Create Account</button>
-
+                <button type="submit" id="signupBtn" class="auth-btn">Create Account</button>
             </form>
 
             <p class="auth-switch">
-                Already have an account? <a href="login.html">Log in</a>
+                Already have an account?<a href="login.html">Log in</a>
             </p>
         </div>
     </div>
