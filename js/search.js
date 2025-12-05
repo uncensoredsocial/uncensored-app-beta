@@ -18,6 +18,9 @@ class SearchManager {
     this.recentSearches = [];
     this.recentVisibleCount = 5;
 
+    // keep last results so we can update them if needed
+    this.lastResults = { users: [], posts: [], hashtags: [] };
+
     this.init();
   }
 
@@ -44,7 +47,6 @@ class SearchManager {
     const searchButton = document.getElementById("searchButton");
     const seeMoreBtn = document.getElementById("recentSeeMore");
 
-    // Input / Enter
     if (searchInput) {
       searchInput.addEventListener("input", (e) => {
         this.handleSearchInput(e.target.value);
@@ -57,7 +59,6 @@ class SearchManager {
       });
     }
 
-    // Main search button
     if (searchButton) {
       searchButton.addEventListener("click", () => {
         const value = searchInput ? searchInput.value.trim() : "";
@@ -65,53 +66,37 @@ class SearchManager {
       });
     }
 
-    // Clear X
     if (clearSearch) {
       clearSearch.addEventListener("click", () => this.clearSearch());
     }
 
-    // Tabs: All / Users / Posts / Hashtags
     filterTabs.forEach((tab) => {
-      tab.addEventListener("click", () => {
-        const filter = tab.dataset.filter;
-        this.handleFilterChange(filter);
-      });
+      tab.addEventListener("click", (e) =>
+        this.handleFilterChange(e.target.dataset.filter)
+      );
     });
 
-    // Recent searches: single tap on mobile (touchstart) + click fallback
+    // recent searches: click anywhere on the row to search, X to remove
     if (recentList) {
-      const handler = (target) => {
-        const clearBtn = target.closest(".clear-recent");
-
+      recentList.addEventListener("click", (e) => {
+        const clearBtn = e.target.closest(".clear-recent");
         if (clearBtn) {
           const item = clearBtn.closest(".recent-item");
           if (item) this.removeRecentSearch(item.dataset.query);
           return;
         }
 
-        const item = target.closest(".recent-item");
-        if (item && item.dataset.query) {
-          const query = item.dataset.query;
+        const item = e.target.closest(".recent-item");
+        if (item) {
+          const query = item.dataset.query || "";
           const input = document.getElementById("searchInput");
-          if (input) {
-            input.blur();
-            input.value = query;
-          }
+          if (input) input.value = query;
           this.performSearch(query);
         }
-      };
-
-      // touchstart helps with iOS where first tap just dismisses keyboard
-      recentList.addEventListener("touchstart", (e) => {
-        handler(e.target);
-      });
-
-      recentList.addEventListener("click", (e) => {
-        handler(e.target);
       });
     }
 
-    // “See more” for recents
+    // See more button
     if (seeMoreBtn) {
       seeMoreBtn.addEventListener("click", () => {
         this.recentVisibleCount += 5;
@@ -119,8 +104,6 @@ class SearchManager {
       });
     }
   }
-
-  /* ---------- CORE SEARCH ---------- */
 
   handleSearchInput(query) {
     this.currentQuery = query.trim();
@@ -160,6 +143,7 @@ class SearchManager {
         this.currentFilter
       );
 
+      this.lastResults = results;
       this.displaySearchResults(results, query);
     } catch (err) {
       console.error("Search error:", err);
@@ -170,15 +154,9 @@ class SearchManager {
   }
 
   handleFilterChange(filter) {
-    if (!filter) return;
+    if (!filter || filter === this.currentFilter) return;
     this.currentFilter = filter;
 
-    // Tab active state
-    document.querySelectorAll(".filter-tab").forEach((tab) => {
-      tab.classList.toggle("active", tab.dataset.filter === filter);
-    });
-
-    // Re-run search with new filter
     if (this.currentQuery && this.currentQuery.length >= 2) {
       this.performSearch(this.currentQuery);
     }
@@ -189,7 +167,7 @@ class SearchManager {
     const currentUser =
       typeof getCurrentUser === "function" ? getCurrentUser() : null;
 
-    /* ----- USERS ----- */
+    // USERS
     if (filter === "all" || filter === "users") {
       const { data: users, error } = await this.supabase.rpc("search_users", {
         search_query: query,
@@ -229,7 +207,7 @@ class SearchManager {
       }
     }
 
-    /* ----- POSTS ----- */
+    // POSTS
     if (filter === "all" || filter === "posts") {
       const { data: posts, error } = await this.supabase.rpc("search_posts", {
         search_query: query,
@@ -237,72 +215,43 @@ class SearchManager {
       });
 
       if (!error && posts) {
-        // Map basic fields
-        let mapped = posts.map((post) => ({
+        results.posts = posts.map((post) => ({
+          // keep original row in case you want it later
+          raw: post,
           id: post.id,
           userId: post.user_id,
           content: post.content,
           createdAt: post.created_at,
           likes:
-            post.like_count != null
-              ? post.like_count
-              : post.likes_count != null
-              ? post.likes_count
-              : 0,
+            typeof post.likes === "number"
+              ? post.likes
+              : post.like_count || post.likes_count || 0,
           comments:
-            post.comment_count != null
-              ? post.comment_count
-              : post.comments_count != null
-              ? post.comments_count
-              : 0,
+            typeof post.comments === "number"
+              ? post.comments
+              : post.comment_count || post.comments_count || 0,
           media_url: post.media_url,
           media_type: post.media_type,
+          liked_by_me:
+            post.liked_by_me === true ||
+            post.is_liked === true ||
+            post.isLiked === true,
+          saved_by_me:
+            post.saved_by_me === true ||
+            post.is_saved === true ||
+            post.isSaved === true,
           user: {
             username: post.username,
             displayName: post.display_name || post.username,
             avatar: post.avatar_url || "assets/icons/default-profile.png",
           },
-          liked_by_me: false,
-          saved_by_me: false,
         }));
-
-        // Add liked/saved state from post_likes / post_saves
-        if (currentUser && mapped.length) {
-          const ids = mapped.map((p) => p.id);
-
-          const { data: likedRows } = await this.supabase
-            .from("post_likes")
-            .select("post_id")
-            .eq("user_id", currentUser.id)
-            .in("post_id", ids);
-
-          const { data: savedRows } = await this.supabase
-            .from("post_saves")
-            .select("post_id")
-            .eq("user_id", currentUser.id)
-            .in("post_id", ids);
-
-          const likedSet = new Set(
-            (likedRows || []).map((row) => row.post_id)
-          );
-          const savedSet = new Set(
-            (savedRows || []).map((row) => row.post_id)
-          );
-
-          mapped = mapped.map((p) => ({
-            ...p,
-            liked_by_me: likedSet.has(p.id),
-            saved_by_me: savedSet.has(p.id),
-          }));
-        }
-
-        results.posts = mapped;
       } else {
         console.error("Error searching posts:", error);
       }
     }
 
-    /* ----- HASHTAGS ----- */
+    // HASHTAGS
     if (filter === "all" || filter === "hashtags") {
       const { data: hashtags, error } = await this.supabase.rpc(
         "search_hashtags",
@@ -323,7 +272,7 @@ class SearchManager {
       }
     }
 
-    // Optional logging
+    // optional logging
     if (currentUser) {
       const totalResults = Object.values(results).reduce(
         (total, section) => total + section.length,
@@ -403,7 +352,7 @@ class SearchManager {
             user.isFollowing ? "btn-secondary" : "btn-primary"
           } follow-btn"
           onclick="searchManager.handleFollow('${user.id}', this)"
-          ${typeof getCurrentUser !== "function" ? "disabled" : ""}
+          ${!getCurrentUser ? "disabled" : ""}
         >
           ${user.isFollowing ? "Following" : "Follow"}
         </button>
@@ -412,7 +361,7 @@ class SearchManager {
       )
       .join("");
 
-    // Clicking card -> profile
+    // Clicking card -> go to user.html/profile
     list.querySelectorAll(".user-card").forEach((card) => {
       card.addEventListener("click", (e) => {
         if (e.target.closest(".follow-btn")) return;
@@ -443,37 +392,39 @@ class SearchManager {
     }
 
     section.style.display = "block";
+    list.innerHTML = posts
+      .map((post) => {
+        const avatar = post.user.avatar || "assets/icons/default-profile.png";
+        const username = post.user.username || "unknown";
+        const displayName = post.user.displayName || username;
+        const time = this.formatTime(post.createdAt);
+        const liked =
+          post.liked_by_me === true ||
+          post.is_liked === true ||
+          post.isLiked === true;
+        const saved =
+          post.saved_by_me === true ||
+          post.is_saved === true ||
+          post.isSaved === true;
 
-    list.innerHTML = posts.map((post) => this.renderFeedStylePost(post)).join(
-      ""
-    );
+        const likeCount =
+          typeof post.likes === "number" ? post.likes : post.likes || 0;
+        const commentCount =
+          typeof post.comments === "number"
+            ? post.comments
+            : post.comments || 0;
 
-    this.attachPostEvents();
-  }
+        const mediaHtml = this.renderMediaHtml(
+          post.media_url,
+          post.media_type
+        );
 
-  // This matches FeedManager.renderPostHtml() layout/icons
-  renderFeedStylePost(post) {
-    const user = post.user || {};
-    const username = user.username || "unknown";
-    const displayName = user.displayName || username;
-    const avatar = user.avatar || "assets/icons/default-profile.png";
-
-    const time = this.formatTime(post.createdAt);
-
-    const liked = !!post.liked_by_me;
-    const saved = !!post.saved_by_me;
-
-    const likeCount = typeof post.likes === "number" ? post.likes : 0;
-    const commentCount =
-      typeof post.comments === "number" ? post.comments : 0;
-
-    const mediaHtml = this.renderMediaHtml(post.media_url, post.media_type);
-
-    return `
+        return `
       <article class="post" data-post-id="${post.id}">
         <header class="post-header">
           <div class="post-user" data-username="${this.escapeHtml(username)}">
-            <img class="post-avatar" src="${avatar}" onerror="this.src='assets/icons/default-profile.png'">
+            <img class="post-avatar" src="${avatar}"
+              onerror="this.src='assets/icons/default-profile.png'">
             <div class="post-user-meta">
               <span class="post-display-name">${this.escapeHtml(
                 displayName
@@ -485,9 +436,9 @@ class SearchManager {
         </header>
 
         <div class="post-body">
-          <div class="post-text">${this.formatPostContent(
-            post.content || ""
-          )}</div>
+          <div class="post-text">
+            ${this.formatPostContent(post.content)}
+          </div>
           ${mediaHtml}
         </div>
 
@@ -519,6 +470,10 @@ class SearchManager {
         </footer>
       </article>
     `;
+      })
+      .join("");
+
+    this.attachPostEvents();
   }
 
   renderMediaHtml(url, type) {
@@ -555,7 +510,7 @@ class SearchManager {
     posts.forEach((postEl) => {
       const postId = postEl.dataset.postId;
 
-      // whole card -> post page (except actions / user)
+      // click whole card -> post page (unless clicking actions / user)
       postEl.addEventListener("click", (e) => {
         if (
           e.target.closest(".post-actions") ||
@@ -722,15 +677,16 @@ class SearchManager {
 
     const wasLiked = btn.classList.contains("liked");
     let newCount = parseInt(countEl.textContent || "0", 10);
+    if (Number.isNaN(newCount)) newCount = 0;
 
     // Optimistic UI
     if (wasLiked) {
       btn.classList.remove("liked");
-      icon.classList.replace("fa-solid", "fa-regular");
+      if (icon) icon.classList.replace("fa-solid", "fa-regular");
       newCount--;
     } else {
       btn.classList.add("liked");
-      icon.classList.replace("fa-regular", "fa-solid");
+      if (icon) icon.classList.replace("fa-regular", "fa-solid");
       newCount++;
     }
     countEl.textContent = String(Math.max(newCount, 0));
@@ -775,10 +731,10 @@ class SearchManager {
     // Optimistic UI
     if (wasSaved) {
       btn.classList.remove("saved");
-      icon.classList.replace("fa-solid", "fa-regular");
+      if (icon) icon.classList.replace("fa-solid", "fa-regular");
     } else {
       btn.classList.add("saved");
-      icon.classList.replace("fa-regular", "fa-solid");
+      if (icon) icon.classList.replace("fa-regular", "fa-solid");
     }
 
     try {
@@ -897,7 +853,7 @@ class SearchManager {
     let recent = JSON.parse(localStorage.getItem("recentSearches") || "[]");
     recent = recent.filter((q) => q !== query);
     recent.unshift(query);
-    recent = recent.slice(0, 50); // keep history but not infinite
+    recent = recent.slice(0, 50);
     localStorage.setItem("recentSearches", JSON.stringify(recent));
 
     this.recentSearches = recent;
@@ -981,8 +937,9 @@ class SearchManager {
 
   searchHashtag(tag) {
     const input = document.getElementById("searchInput");
-    if (input) input.value = `#${tag}`;
-    this.performSearch(`#${tag}`);
+    const q = `#${tag}`;
+    if (input) input.value = q;
+    this.performSearch(q);
   }
 
   /* ---------- UTIL ---------- */
@@ -1052,28 +1009,7 @@ class SearchManager {
   }
 
   updateUI() {
-    // Mirror auth header behaviour from feed.js using same DOM ids
-    const user =
-      typeof getCurrentUser === "function" ? getCurrentUser() : null;
-    const loggedIn = !!user;
-
-    const profileSection = document.getElementById("profileSection");
-    const authButtons = document.getElementById("authButtons");
-    const headerProfileImg = document.getElementById("headerProfileImg");
-
-    if (profileSection && authButtons) {
-      if (loggedIn) {
-        profileSection.style.display = "flex";
-        authButtons.style.display = "none";
-
-        if (headerProfileImg && user.avatar_url) {
-          headerProfileImg.src = user.avatar_url;
-        }
-      } else {
-        profileSection.style.display = "none";
-        authButtons.style.display = "flex";
-      }
-    }
+    // header on search page is centered logo only, so nothing special to do now
   }
 }
 
