@@ -2,577 +2,426 @@
 
 /* Search Header */
 .search-header {
-    padding: var(--space-4);
-    border-bottom: 1px solid var(--border-light);
-    background-color: var(--bg-color);
-    position: sticky;
-    top: 60px;
-    z-index: 90;
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border-light);
+  background-color: var(--bg-color);
+  position: sticky;
+  top: 60px;
+  z-index: 90;
 }
 
 .search-container {
-    max-width: 100%;
+  max-width: 100%;
 }
 
 .search-input-wrapper {
-    position: relative;
-    display: flex;
-    align-items: center;
-    background-color: var(--bg-secondary);
-    border-radius: var(--radius-xl);
-    padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--border-light);
-    transition: all var(--transition-fast);
+  position: relative;
+  display: flex;
+  align-items: center;
+  background-color: var(--bg-secondary);
+  border-radius: var(--radius-xl);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-light);
+  transition: all var(--transition-fast);
 }
 
 .search-input-wrapper:focus-within {
-    border-color: var(--primary-color);
-    background-color: var(--bg-color);
-}
-
-.search-icon {
-    width: 20px;
-    height: 20px;
-    margin-right: var(--space-2);
-    opacity: 0.7;
+  border-color: var(--primary-color);
+  background-color: var(--bg-color);
 }
 
 .search-input {
-    flex: 1;
-    background: transparent;
-    border: none;
-    color: var(--text-color);
-    font-size: var(--font-size-base);
-    padding: var(--space-2) 0;
-    outline: none;
-    font-family: inherit;
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-color);
+  font-size: var(--font-size-base);
+  padding: var(--space-2) 0;
+  outline: none;
+  font-family: inherit;
 }
 
 .search-input::placeholder {
-    color: var(--text-muted);
+  color: var(--text-muted);
 }
 
 .clear-search {
-    padding: var(--space-1);
-    margin-left: var(--space-2);
+  padding: var(--space-1);
+  margin-left: var(--space-2);
+}
+
+.search-button {
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  height: 36px;
+  border-radius: 999px;
+  cursor: pointer;
 }
 
 /* Search Filters */
 .search-filters {
-    padding: var(--space-3) var(--space-4);
-    border-bottom: 1px solid var(--border-light);
-    background-color: var(--bg-color);
-    position: sticky;
-    top: 120px;
-    z-index: 90;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-light);
+  background-color: var(--bg-color);
+  position: sticky;
+  top: 120px;
+  z-index: 90;
 }
 
 .filter-tabs {
-    display: flex;
-    gap: var(--space-4);
-    overflow-x: auto;
-    padding-bottom: 2px;
+  display: flex;
+  gap: var(--space-4);
+  overflow-x: auto;
+  padding-bottom: 2px;
 }
 
 .filter-tabs::-webkit-scrollbar {
-    display: none;
+  display: none;
 }
 
 .filter-tab {
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    padding: var(--space-2) var(--space-3);
-    font-size: var(--font-size-base);
-    font-weight: 500;
-    cursor: pointer;
-    white-space: nowrap;
-    border-radius: var(--radius-lg);
-    transition: all var(--transition-fast);
-    position: relative;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-fast);
+  position: relative;
 }
 
 .filter-tab:hover {
-    color: var(--text-color);
-    background-color: var(--hover-color);
+  color: var(--text-color);
+  background-color: var(--hover-color);
 }
 
 .filter-tab.active {
-    color: var(--primary-color);
-    font-weight: 600;
+  color: var(--primary-color);
+  font-weight: 600;
 }
 
 .filter-tab.active::after {
-    content: '';
-    position: absolute;
-    bottom: -10px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 4px;
-    height: 4px;
-    background-color: var(--primary-color);
-    border-radius: 50%;
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background-color: var(--primary-color);
+  border-radius: 50%;
 }
 
 /* Search Results */
 .search-results {
-    min-height: 60vh;
+  min-height: 60vh;
 }
 
 /* Default State */
 .search-default-state {
-    padding: var(--space-6) var(--space-4);
+  padding: var(--space-6) var(--space-4);
 }
 
 .trending-section,
 .recent-searches {
-    margin-bottom: var(--space-6);
+  margin-bottom: var(--space-6);
 }
 
 .trending-section h3,
 .recent-searches h3 {
-    margin-bottom: var(--space-4);
-    color: var(--text-color);
-    font-size: var(--font-size-lg);
+  margin-bottom: var(--space-4);
+  color: var(--text-color);
+  font-size: var(--font-size-lg);
 }
 
 .trending-list,
 .recent-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .trending-item,
 .recent-item {
-    display: flex;
-    align-items: center;
-    padding: var(--space-3);
-    border-radius: var(--radius-lg);
-    transition: background-color var(--transition-fast);
-    cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  transition: background-color var(--transition-fast);
+  cursor: pointer;
 }
 
 .trending-item:hover,
 .recent-item:hover {
-    background-color: var(--hover-color);
+  background-color: var(--hover-color);
 }
 
 .trending-rank {
-    font-weight: 700;
-    font-size: var(--font-size-lg);
-    color: var(--primary-color);
-    min-width: 30px;
+  font-weight: 700;
+  font-size: var(--font-size-lg);
+  color: var(--primary-color);
+  min-width: 30px;
 }
 
 .trending-content {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .trending-tag {
-    font-weight: 600;
-    color: var(--text-color);
+  font-weight: 600;
+  color: var(--text-color);
 }
 
 .trending-count {
-    font-size: var(--font-size-sm);
-    color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
 }
 
 .recent-item {
-    justify-content: space-between;
-    align-items: center;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .recent-query {
-    font-weight: 500;
-    color: var(--text-color);
+  font-weight: 500;
+  color: var(--text-color);
 }
 
 .clear-recent {
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    padding: var(--space-1);
-    border-radius: var(--radius-sm);
-    opacity: 0;
-    transition: all var(--transition-fast);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  transition: all var(--transition-fast);
 }
 
 .recent-item:hover .clear-recent {
-    opacity: 1;
+  opacity: 1;
 }
 
 .clear-recent:hover {
-    color: var(--error-color);
-    background-color: var(--hover-color);
+  color: var(--error-color);
+  background-color: var(--hover-color);
 }
 
 /* Results State */
 .search-results-state {
-    padding: var(--space-4);
+  padding: var(--space-4);
 }
 
 .results-header {
-    display: flex;
-    justify-content: between;
-    align-items: center;
-    margin-bottom: var(--space-4);
-    padding-bottom: var(--space-3);
-    border-bottom: 1px solid var(--border-light);
+  display: flex;
+  justify-content: space-between; /* FIX: was "between" */
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border-light);
 }
 
 .results-header h3 {
-    margin: 0;
-    color: var(--text-color);
+  margin: 0;
+  color: var(--text-color);
 }
 
 .results-count {
-    color: var(--text-muted);
-    font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
 }
 
 .results-section {
-    margin-bottom: var(--space-6);
+  margin-bottom: var(--space-6);
 }
 
 .results-section h4 {
-    margin-bottom: var(--space-3);
-    color: var(--text-color);
-    font-size: var(--font-size-lg);
+  margin-bottom: var(--space-3);
+  color: var(--text-color);
+  font-size: var(--font-size-lg);
 }
 
 /* Users Results */
 .users-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .user-card {
-    display: flex;
-    align-items: center;
-    padding: var(--space-3);
-    border-radius: var(--radius-lg);
-    transition: background-color var(--transition-fast);
-    cursor: pointer;
-    text-decoration: none;
-    color: inherit;
+  display: flex;
+  align-items: center;
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  transition: background-color var(--transition-fast);
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
 }
 
 .user-card:hover {
-    background-color: var(--hover-color);
+  background-color: var(--hover-color);
 }
 
 .user-avatar {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-right: var(--space-3);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: var(--space-3);
 }
 
 .user-info {
-    flex: 1;
+  flex: 1;
 }
 
 .user-name {
-    font-weight: 600;
-    color: var(--text-color);
-    margin-bottom: 2px;
+  font-weight: 600;
+  color: var(--text-color);
+  margin-bottom: 2px;
 }
 
 .user-handle {
-    color: var(--text-muted);
-    font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
 }
 
 .user-bio {
-    color: var(--text-muted);
-    font-size: var(--font-size-sm);
-    margin-top: var(--space-1);
-    line-height: 1.4;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  margin-top: var(--space-1);
+  line-height: 1.4;
 }
 
 .follow-btn {
-    margin-left: var(--space-3);
-    white-space: nowrap;
+  margin-left: var(--space-3);
+  white-space: nowrap;
 }
 
-/* Posts Results */
+/* Posts Results – we just constrain width, actual look comes from feed-styles .post */
 .posts-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-}
-
-.post-card {
-    padding: var(--space-4);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border-light);
-    transition: all var(--transition-fast);
-    cursor: pointer;
-}
-
-.post-card:hover {
-    background-color: var(--hover-color);
-    border-color: var(--border-color);
-}
-
-.post-header {
-    display: flex;
-    align-items: center;
-    margin-bottom: var(--space-3);
-}
-
-.post-user-avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-right: var(--space-2);
-}
-
-.post-user-info {
-    flex: 1;
-}
-
-.post-display-name {
-    font-weight: 600;
-    color: var(--text-color);
-    font-size: var(--font-size-sm);
-}
-
-.post-username {
-    color: var(--text-muted);
-    font-size: var(--font-size-sm);
-}
-
-.post-time {
-    color: var(--text-muted);
-    font-size: var(--font-size-xs);
-}
-
-.post-content {
-    color: var(--text-color);
-    line-height: 1.5;
-    margin-bottom: var(--space-3);
-}
-
-.post-actions {
-    display: flex;
-    gap: var(--space-4);
-}
-
-.post-action {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-    padding: var(--space-1);
-    border-radius: var(--radius-sm);
-    transition: all var(--transition-fast);
-}
-
-.post-action:hover {
-    color: var(--primary-color);
-    background-color: var(--hover-color);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 /* Hashtags Results */
 .hashtags-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .hashtag-item {
-    display: flex;
-    align-items: center;
-    padding: var(--space-3);
-    border-radius: var(--radius-lg);
-    transition: background-color var(--transition-fast);
-    cursor: pointer;
-    text-decoration: none;
-    color: inherit;
+  display: flex;
+  align-items: center;
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  transition: background-color var(--transition-fast);
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
 }
 
 .hashtag-item:hover {
-    background-color: var(--hover-color);
+  background-color: var(--hover-color);
 }
 
 .hashtag-icon {
-    width: 24px;
-    height: 24px;
-    margin-right: var(--space-3);
-    color: var(--primary-color);
+  width: 24px;
+  height: 24px;
+  margin-right: var(--space-3);
+  color: var(--primary-color);
 }
 
 .hashtag-info {
-    flex: 1;
+  flex: 1;
 }
 
 .hashtag-name {
-    font-weight: 600;
-    color: var(--primary-color);
-    margin-bottom: 2px;
+  font-weight: 600;
+  color: var(--primary-color);
+  margin-bottom: 2px;
 }
 
 .hashtag-count {
-    color: var(--text-muted);
-    font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
 }
 
 /* Loading State */
 .search-loading-state {
-    padding: var(--space-8) var(--space-4);
-    display: flex;
-    justify-content: center;
-    align-items: center;
+  padding: var(--space-8) var(--space-4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 /* No Results */
 .no-results {
-    padding: var(--space-8) var(--space-4);
+  padding: var(--space-8) var(--space-4);
 }
 
 /* Responsive Design */
 @media (min-width: 768px) {
-    .search-header {
-        top: 60px;
-    }
-    
-    .search-filters {
-        top: 120px;
-    }
-    
-    .search-input-wrapper {
-        max-width: 500px;
-        margin: 0 auto;
-    }
-    
-    .filter-tabs {
-        justify-content: center;
-    }
-    
-    .users-list,
-    .posts-list,
-    .hashtags-list {
-        max-width: 500px;
-        margin: 0 auto;
-    }
+  .search-header {
+    top: 60px;
+  }
+
+  .search-filters {
+    top: 120px;
+  }
+
+  .search-input-wrapper {
+    max-width: 500px;
+    margin: 0 auto;
+  }
+
+  .filter-tabs {
+    justify-content: center;
+  }
+
+  .users-list,
+  .posts-list,
+  .hashtags-list {
+    max-width: 500px;
+    margin: 0 auto;
+  }
 }
 
 @media (max-width: 767px) {
-    .search-header {
-        padding: var(--space-3);
-    }
-    
-    .search-filters {
-        padding: var(--space-3);
-    }
-    
-    .filter-tabs {
-        gap: var(--space-3);
-    }
-    
-    .filter-tab {
-        font-size: var(--font-size-sm);
-        padding: var(--space-2);
-    }
+  .search-header {
+    padding: var(--space-3);
+  }
+
+  .search-filters {
+    padding: var(--space-3);
+  }
+
+  .filter-tabs {
+    gap: var(--space-3);
+  }
+
+  .filter-tab {
+    font-size: var(--font-size-sm);
+    padding: var(--space-2);
+  }
 }
 
-/* Animation for search transitions */
-.search-transition-enter {
-    opacity: 0;
-    transform: translateY(10px);
-}
-
-.search-transition-enter-active {
-    opacity: 1;
-    transform: translateY(0);
-    transition: all 0.3s ease;
-}
-
-.search-transition-exit {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.search-transition-exit-active {
-    opacity: 0;
-    transform: translateY(-10px);
-    transition: all 0.3s ease;
-}
-
-/* Centered header just for Search page */
+/* Centered header title */
 .header-centered {
-    justify-content: center;
+  justify-content: center;
 }
 
 .header-centered .logo {
-    margin: 0;
-}
-
-/* Search bar layout with button on the right */
-.search-input-wrapper {
-    display: flex;
-    align-items: center;
-    background: #111;
-    border-radius: 999px;
-    border: 1px solid #222;
-    padding-left: 16px;
-}
-
-.search-input {
-    flex: 1;
-    border: none;
-    background: transparent;
-    color: #fff;
-    padding: 12px 8px 12px 0;
-    font-size: 15px;
-}
-
-.search-input::placeholder {
-    color: #666;
-}
-
-.search-input:focus {
-    outline: none;
-}
-
-.search-button {
-    border: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 16px;
-    height: 36px;
-    border-radius: 999px;
-    cursor: pointer;
-}
-
-/* New: center title in header while keeping left/right content */
-.header-center {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    pointer-events: none; /* so clicks go to left/right controls only */
-}
-
-.header-page-title {
-    font-weight: 600;
-    font-size: 1rem;
-}
-
-/* Make search result like button turn red when liked */
-.posts-list .like-btn.liked span:first-child {
-    color: #e0245e;
+  margin: 0;
 }
