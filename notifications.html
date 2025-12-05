@@ -18,6 +18,42 @@
     crossorigin="anonymous"
     referrerpolicy="no-referrer"
   />
+
+  <!-- Make bottom nav look EXACTLY like index.html -->
+  <style>
+    @media (min-width: 900px) {
+      .content-wrapper {
+        max-width: 960px;
+        margin: 0 auto;
+        padding-top: 72px;
+      }
+      .notifications-main {
+        max-width: 700px;
+        margin: 0 auto;
+      }
+    }
+
+    /* Force bottom nav visible on desktop */
+    @media (min-width: 768px) {
+      .bottom-nav {
+        display: flex !important;
+      }
+    }
+
+    /* Font Awesome icons above labels in bottom nav */
+    .bottom-nav .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+    }
+
+    .bottom-nav .nav-icon {
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+  </style>
 </head>
 
 <body>
@@ -31,32 +67,35 @@
   <!-- ================= MAIN CONTENT ================= -->
   <div class="content-wrapper">
     <main class="main-content notifications-main">
-      <!-- Likes -->
-      <section class="notifications-section" id="likesSection">
-        <h2 class="notifications-title">
-          <i class="fa-regular fa-heart"></i>
-          Likes
-        </h2>
-        <div id="likesList" class="notifications-list"></div>
-      </section>
+      <!-- Row of 3 sections -->
+      <div class="notifications-sections-row">
+        <!-- Likes -->
+        <section class="notifications-section" id="likesSection">
+          <h2 class="notifications-title">
+            <i class="fa-regular fa-heart"></i>
+            Likes
+          </h2>
+          <div id="likesList" class="notifications-list"></div>
+        </section>
 
-      <!-- Comments -->
-      <section class="notifications-section" id="commentsSection">
-        <h2 class="notifications-title">
-          <i class="fa-regular fa-comment"></i>
-          Comments
-        </h2>
-        <div id="commentsList" class="notifications-list"></div>
-      </section>
+        <!-- Comments -->
+        <section class="notifications-section" id="commentsSection">
+          <h2 class="notifications-title">
+            <i class="fa-regular fa-comment"></i>
+            Comments
+          </h2>
+          <div id="commentsList" class="notifications-list"></div>
+        </section>
 
-      <!-- New Followers -->
-      <section class="notifications-section" id="followersSection">
-        <h2 class="notifications-title">
-          <i class="fa-solid fa-user-plus"></i>
-          New Followers
-        </h2>
-        <div id="followersList" class="notifications-list"></div>
-      </section>
+        <!-- New Followers -->
+        <section class="notifications-section" id="followersSection">
+          <h2 class="notifications-title">
+            <i class="fa-solid fa-user-plus"></i>
+            New Followers
+          </h2>
+          <div id="followersList" class="notifications-list"></div>
+        </section>
+      </div>
 
       <!-- Empty state -->
       <div class="notifications-empty" id="notificationsEmpty">
