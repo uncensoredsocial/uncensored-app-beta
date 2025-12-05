@@ -1,14 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Search - Uncensored Social</title>
 
-  <!-- Global styles -->
-  <link rel="stylesheet" href="css/styles.css" />
-  <link rel="stylesheet" href="css/search-styles.css" />
-  <link rel="stylesheet" href="css/icons.css" />
+  <!-- Font Awesome -->
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
@@ -17,81 +14,43 @@
     referrerpolicy="no-referrer"
   />
 
-  <!-- Desktop tweaks (same idea as index) -->
-  <style>
-    @media (min-width: 900px) {
-      .content-wrapper {
-        max-width: 960px;
-        margin: 0 auto;
-        padding-top: 72px;
-      }
-      .main-content {
-        max-width: 700px;
-        margin: 0 auto;
-      }
-    }
-
-    /* Force bottom nav visible on desktop too */
-    @media (min-width: 768px) {
-      .bottom-nav {
-        display: flex !important;
-      }
-    }
-
-    /* Font Awesome icons above labels in bottom nav */
-    .bottom-nav .nav-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 2px;
-    }
-
-    .bottom-nav .nav-icon {
-      font-size: 1.1rem;
-      line-height: 1;
-    }
-  </style>
+  <!-- Global styles -->
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/feed-styles.css"><!-- so posts look like feed -->
+  <link rel="stylesheet" href="css/search-styles.css">
+  <link rel="stylesheet" href="css/icons.css">
 </head>
-
 <body>
-  <!-- ============= HEADER (same as index) ============= -->
-  <header class="header">
-    <div class="header-left">
-      <div class="profile-section" id="profileSection">
-        <a href="profile.html" class="profile-icon">
-          <img
-            id="headerProfileImg"
-            src="assets/icons/default-profile.png"
-            alt="Profile"
-          />
-        </a>
-      </div>
-
-      <div class="auth-buttons" id="authButtons">
-        <a href="login.html" class="btn btn-sm btn-login">Log In</a>
-        <a href="signup.html" class="btn btn-sm btn-signup">Sign Up</a>
-      </div>
-    </div>
-
+  <!-- ===== TOP HEADER (centered logo only) ===== -->
+  <header class="header header-centered">
     <h1 class="logo">Uncensored<span>Social</span></h1>
-
-    <div class="header-actions">
-      <!-- You can reuse refresh for “refresh trending” if you want -->
-      <button
-        class="btn btn-ghost btn-icon"
-        title="Refresh"
-        onclick="window.location.reload()"
-      >
-        <span class="icon icon-refresh"></span>
-      </button>
-    </div>
   </header>
 
-  <!-- ============= MAIN CONTENT ============= -->
+  <!-- ===== MAIN LAYOUT ===== -->
   <div class="content-wrapper">
+    <!-- (Optional) Side nav on desktop – same as home -->
+    <nav class="side-nav" id="sideNav">
+      <a href="index.html" class="nav-item">
+        <span class="icon icon-home"></span>
+        <span class="nav-label">Home</span>
+      </a>
+      <a href="search.html" class="nav-item active">
+        <span class="icon icon-search"></span>
+        <span class="nav-label">Search</span>
+      </a>
+      <a href="notifications.html" class="nav-item">
+        <span class="icon icon-notifications"></span>
+        <span class="nav-label">Alerts</span>
+      </a>
+      <a href="messages.html" class="nav-item">
+        <span class="icon icon-messages"></span>
+        <span class="nav-label">Messages</span>
+      </a>
+    </nav>
+
+    <!-- ===== MAIN SEARCH CONTENT ===== -->
     <main class="main-content">
-      <!-- Search Header -->
+      <!-- Search bar -->
       <div class="search-header">
         <div class="search-container">
           <div class="search-input-wrapper">
@@ -102,17 +61,14 @@
               class="search-input"
             />
 
-            <!-- Clear (X) button -->
             <button
               class="btn btn-ghost btn-icon clear-search"
               id="clearSearch"
-              style="display: none;"
-              aria-label="Clear search"
+              style="display:none;"
             >
               <span class="icon icon-close"></span>
             </button>
 
-            <!-- Search button -->
             <button
               class="btn btn-primary btn-icon search-button"
               id="searchButton"
@@ -124,7 +80,7 @@
         </div>
       </div>
 
-      <!-- Search Filters -->
+      <!-- Filter tabs -->
       <div class="search-filters" id="searchFilters">
         <div class="filter-tabs">
           <button class="filter-tab active" data-filter="all">All</button>
@@ -134,68 +90,67 @@
         </div>
       </div>
 
-      <!-- Search Results Wrapper -->
+      <!-- Results wrapper -->
       <div class="search-results" id="searchResults">
-        <!-- Default State - Before Search -->
+        <!-- Default state -->
         <div class="search-default-state" id="searchDefault">
           <div class="trending-section">
             <h3>Trending Now</h3>
             <div class="trending-list">
-              <!-- Filled by search.js (loadTrendingHashtags) -->
+              <!-- Replaced by JS -->
             </div>
           </div>
 
           <div class="recent-searches" id="recentSearches">
             <h3>Recent Searches</h3>
             <div class="recent-list" id="recentList">
-              <!-- Recent searches rendered by search.js -->
+              <!-- Recent searches rendered here -->
             </div>
+            <button
+              class="btn btn-ghost btn-sm"
+              id="recentSeeMore"
+              style="display:none;margin-top:8px;"
+            >
+              See more
+            </button>
           </div>
         </div>
 
-        <!-- Loading State -->
-        <div
-          class="search-loading-state"
-          id="searchLoading"
-          style="display: none;"
-        >
+        <!-- Loading -->
+        <div class="search-loading-state" id="searchLoading" style="display:none;">
           <div class="loading-indicator">
             <div class="loading-spinner"></div>
             <span>Searching...</span>
           </div>
         </div>
 
-        <!-- Results State -->
-        <div
-          class="search-results-state"
-          id="searchResultsState"
-          style="display: none;"
-        >
+        <!-- Results state -->
+        <div class="search-results-state" id="searchResultsState" style="display:none;">
           <div class="results-header">
             <h3 id="resultsTitle">Search Results</h3>
             <span class="results-count" id="resultsCount">0 results</span>
           </div>
 
-          <!-- Users Results -->
+          <!-- Users -->
           <div class="results-section users-results" id="usersResults">
             <h4>Users</h4>
             <div class="users-list" id="usersList"></div>
           </div>
 
-          <!-- Posts Results -->
+          <!-- Posts -->
           <div class="results-section posts-results" id="postsResults">
             <h4>Posts</h4>
             <div class="posts-list" id="postsList"></div>
           </div>
 
-          <!-- Hashtags Results -->
+          <!-- Hashtags -->
           <div class="results-section hashtags-results" id="hashtagsResults">
             <h4>Hashtags</h4>
             <div class="hashtags-list" id="hashtagsList"></div>
           </div>
 
-          <!-- No Results State -->
-          <div class="no-results" id="noResults" style="display: none;">
+          <!-- No results -->
+          <div class="no-results" id="noResults" style="display:none;">
             <div class="empty-state">
               <h3>No results found</h3>
               <p>Try different keywords or check the spelling</p>
@@ -206,7 +161,7 @@
     </main>
   </div>
 
-  <!-- ============= BOTTOM NAV (same as index, Search active) ============= -->
+  <!-- ===== BOTTOM NAV (same as home, messages.html) ===== -->
   <nav class="bottom-nav" id="bottomNav">
     <a href="index.html" class="nav-item">
       <i class="fa-solid fa-house nav-icon"></i>
@@ -226,14 +181,10 @@
     </a>
   </nav>
 
-  <!-- ============= SCRIPTS ============= -->
+  <!-- Scripts -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/app.js"></script>
-
-  <!-- Supabase client (NEEDED for search.js to work) -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-
-  <!-- Your search logic -->
   <script src="js/search.js"></script>
 </body>
 </html>
