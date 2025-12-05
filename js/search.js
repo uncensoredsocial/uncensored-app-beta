@@ -21,8 +21,6 @@ class SearchManager {
     this.init();
   }
 
-  /* ================= INIT ================= */
-
   init() {
     this.initializeSupabase();
     this.setupEventListeners();
@@ -46,7 +44,7 @@ class SearchManager {
     const searchButton = document.getElementById("searchButton");
     const seeMoreBtn = document.getElementById("recentSeeMore");
 
-    // main input
+    // Input / Enter
     if (searchInput) {
       searchInput.addEventListener("input", (e) => {
         this.handleSearchInput(e.target.value);
@@ -59,7 +57,7 @@ class SearchManager {
       });
     }
 
-    // magnifying glass button
+    // Main search button
     if (searchButton) {
       searchButton.addEventListener("click", () => {
         const value = searchInput ? searchInput.value.trim() : "";
@@ -67,47 +65,41 @@ class SearchManager {
       });
     }
 
-    // clear X button
+    // Clear X
     if (clearSearch) {
       clearSearch.addEventListener("click", () => this.clearSearch());
     }
 
-    // filter tabs (All / Users / Posts / Hashtags)
+    // Tabs: All / Users / Posts / Hashtags
     filterTabs.forEach((tab) => {
-      tab.addEventListener("click", (e) =>
-        this.handleFilterChange(e.target.dataset.filter)
-      );
+      tab.addEventListener("click", () => {
+        const filter = tab.dataset.filter;
+        this.handleFilterChange(filter);
+      });
     });
 
-    // recent searches: click text to search, X to remove
+    // Recent searches: whole row clickable, X removes
     if (recentList) {
       recentList.addEventListener("click", (e) => {
         const clearBtn = e.target.closest(".clear-recent");
-        const queryEl = e.target.closest(".recent-query");
 
-        // remove from history
         if (clearBtn) {
           const item = clearBtn.closest(".recent-item");
           if (item) this.removeRecentSearch(item.dataset.query);
           return;
         }
 
-        // click the term -> run search
-        if (queryEl) {
-          const item = queryEl.closest(".recent-item");
-          if (!item) return;
-          const query = item.dataset.query || queryEl.textContent.trim();
-          if (!query) return;
-
+        const item = e.target.closest(".recent-item");
+        if (item && item.dataset.query) {
+          const query = item.dataset.query;
           const input = document.getElementById("searchInput");
           if (input) input.value = query;
-
           this.performSearch(query);
         }
       });
     }
 
-    // "See more" for recent searches
+    // “See more” for recents
     if (seeMoreBtn) {
       seeMoreBtn.addEventListener("click", () => {
         this.recentVisibleCount += 5;
@@ -116,7 +108,7 @@ class SearchManager {
     }
   }
 
-  /* ================= SEARCH FLOW ================= */
+  /* ---------- CORE SEARCH ---------- */
 
   handleSearchInput(query) {
     this.currentQuery = query.trim();
@@ -165,6 +157,21 @@ class SearchManager {
     }
   }
 
+  handleFilterChange(filter) {
+    if (!filter) return;
+    this.currentFilter = filter;
+
+    // Tab active state
+    document.querySelectorAll(".filter-tab").forEach((tab) => {
+      tab.classList.toggle("active", tab.dataset.filter === filter);
+    });
+
+    // Re-run search with new filter
+    if (this.currentQuery && this.currentQuery.length >= 2) {
+      this.performSearch(this.currentQuery);
+    }
+  }
+
   async fetchSearchResults(query, filter) {
     const results = { users: [], posts: [], hashtags: [] };
     const currentUser =
@@ -183,17 +190,14 @@ class SearchManager {
             let isFollowing = false;
 
             if (currentUser) {
-              const { data: followRows, error: followErr } =
-                await this.supabase
-                  .from("follows")
-                  .select("id")
-                  .eq("follower_id", currentUser.id)
-                  .eq("followed_id", user.id)
-                  .limit(1);
+              const { data: follow } = await this.supabase
+                .from("follows")
+                .select("id")
+                .eq("follower_id", currentUser.id)
+                .eq("followed_id", user.id)
+                .maybeSingle();
 
-              if (!followErr && followRows && followRows.length > 0) {
-                isFollowing = true;
-              }
+              isFollowing = !!follow;
             }
 
             return {
@@ -207,7 +211,6 @@ class SearchManager {
             };
           })
         );
-
         results.users = usersWithFollowStatus;
       } else {
         console.error("Error searching users:", error);
@@ -263,7 +266,7 @@ class SearchManager {
       }
     }
 
-    /* ----- LOG SEARCH (optional) ----- */
+    // Optional logging
     if (currentUser) {
       const totalResults = Object.values(results).reduce(
         (total, section) => total + section.length,
@@ -305,7 +308,7 @@ class SearchManager {
     if (totalResults === 0) this.showNoResults();
   }
 
-  /* ================= USERS SECTION ================= */
+  /* ---------- USERS SECTION ---------- */
 
   displayUsersResults(users) {
     const list = document.getElementById("usersList");
@@ -321,16 +324,14 @@ class SearchManager {
     list.innerHTML = users
       .map(
         (user) => `
-      <div class="user-card" data-username="${this.escapeHtml(
-        user.username
-      )}">
+      <div class="user-card" data-username="${user.username}">
         <img src="${user.avatar}" alt="${this.escapeHtml(
           user.displayName
         )}" class="user-avatar"
           onerror="this.src='assets/icons/default-profile.png'">
         <div class="user-info">
           <div class="user-name">${this.escapeHtml(user.displayName)}</div>
-          <div class="user-handle">@${this.escapeHtml(user.username)}</div>
+          <div class="user-handle">@${user.username}</div>
           ${
             user.bio
               ? `<div class="user-bio">${this.escapeHtml(user.bio)}</div>`
@@ -345,11 +346,7 @@ class SearchManager {
             user.isFollowing ? "btn-secondary" : "btn-primary"
           } follow-btn"
           onclick="searchManager.handleFollow('${user.id}', this)"
-          ${
-            typeof getCurrentUser !== "function" || !getCurrentUser()
-              ? "disabled"
-              : ""
-          }
+          ${typeof getCurrentUser !== "function" ? "disabled" : ""}
         >
           ${user.isFollowing ? "Following" : "Follow"}
         </button>
@@ -358,15 +355,13 @@ class SearchManager {
       )
       .join("");
 
-    // click card -> profile
+    // Clicking card -> profile
     list.querySelectorAll(".user-card").forEach((card) => {
       card.addEventListener("click", (e) => {
         if (e.target.closest(".follow-btn")) return;
-
         const username = card.dataset.username;
         const me =
           typeof getCurrentUser === "function" ? getCurrentUser() : null;
-
         if (me && me.username === username) {
           window.location.href = "profile.html";
         } else {
@@ -378,7 +373,7 @@ class SearchManager {
     });
   }
 
-  /* ================= POSTS SECTION (feed-style) ================= */
+  /* ---------- POSTS SECTION (feed-style) ---------- */
 
   displayPostsResults(posts) {
     const list = document.getElementById("postsList");
@@ -426,18 +421,18 @@ class SearchManager {
         <footer class="post-footer">
           <div class="post-actions">
             <button class="post-action like-btn">
-              <span class="post-action-icon">❤️</span>
+              <span class="icon icon-like"></span>
               <span class="post-action-count like-count">${post.likes}</span>
             </button>
             <button class="post-action comment-btn">
-              <span class="post-action-icon">💬</span>
+              <span class="icon icon-comment"></span>
               <span class="post-action-count comment-count">${post.comments}</span>
             </button>
             <button class="post-action share-btn">
-              <span class="post-action-icon">⤴</span>
+              <span class="icon icon-share"></span>
             </button>
             <button class="post-action save-btn">
-              <span class="post-action-icon">🔖</span>
+              <span class="icon icon-save"></span>
             </button>
           </div>
         </footer>
@@ -483,7 +478,7 @@ class SearchManager {
     posts.forEach((postEl) => {
       const postId = postEl.dataset.postId;
 
-      // click whole card -> post page (unless clicking actions / user)
+      // whole card -> post page (except actions / user)
       postEl.addEventListener("click", (e) => {
         if (
           e.target.closest(".post-actions") ||
@@ -547,7 +542,7 @@ class SearchManager {
     });
   }
 
-  /* ================= HASHTAGS SECTION ================= */
+  /* ---------- HASHTAGS SECTION ---------- */
 
   displayHashtagsResults(hashtags) {
     const list = document.getElementById("hashtagsList");
@@ -582,19 +577,7 @@ class SearchManager {
       .join("");
   }
 
-  /* ================= FOLLOW / LIKE / SAVE ================= */
-
-  getUuid() {
-    if (window.crypto && crypto.randomUUID) {
-      return crypto.randomUUID();
-    }
-    // simple fallback
-    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === "x" ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
-  }
+  /* ---------- FOLLOW / LIKE / SAVE ---------- */
 
   async handleFollow(userId, button) {
     const currentUser =
@@ -622,7 +605,6 @@ class SearchManager {
         this.showMessage("Unfollowed user", "success");
       } else {
         const { error } = await this.supabase.from("follows").insert({
-          id: this.getUuid(),
           follower_id: currentUser.id,
           followed_id: userId,
         });
@@ -724,7 +706,7 @@ class SearchManager {
     }
   }
 
-  /* ================= STATE HELPERS ================= */
+  /* ---------- STATE HELPERS ---------- */
 
   clearSearch() {
     const input = document.getElementById("searchInput");
@@ -776,7 +758,7 @@ class SearchManager {
     });
   }
 
-  /* ================= RECENT SEARCHES ================= */
+  /* ---------- RECENT SEARCHES ---------- */
 
   loadRecentSearches() {
     const fromStorage = JSON.parse(
@@ -826,8 +808,7 @@ class SearchManager {
     let recent = JSON.parse(localStorage.getItem("recentSearches") || "[]");
     recent = recent.filter((q) => q !== query);
     recent.unshift(query);
-    // keep more than 5 so "see more" can work, but not infinite
-    recent = recent.slice(0, 50);
+    recent = recent.slice(0, 50); // keep history but not infinite
     localStorage.setItem("recentSearches", JSON.stringify(recent));
 
     this.recentSearches = recent;
@@ -844,7 +825,7 @@ class SearchManager {
     this.renderRecentSearches();
   }
 
-  /* ================= TRENDING ================= */
+  /* ---------- TRENDING ---------- */
 
   async loadTrendingHashtags() {
     try {
@@ -915,7 +896,7 @@ class SearchManager {
     this.performSearch(`#${tag}`);
   }
 
-  /* ================= UTIL ================= */
+  /* ---------- UTIL ---------- */
 
   showMessage(message, type = "info") {
     const existing = document.querySelector(".status-message");
@@ -982,12 +963,9 @@ class SearchManager {
   }
 
   updateUI() {
-    // Search header is centered logo only on this page,
-    // so nothing special is needed here right now.
+    // Search page header is just centered logo now, nothing extra.
   }
 }
-
-/* ================= INIT GLOBAL ================= */
 
 let searchManager;
 document.addEventListener("DOMContentLoaded", () => {
