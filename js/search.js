@@ -21,6 +21,8 @@ class SearchManager {
     this.init();
   }
 
+  /* ================= INIT ================= */
+
   init() {
     this.initializeSupabase();
     this.setupEventListeners();
@@ -44,6 +46,7 @@ class SearchManager {
     const searchButton = document.getElementById("searchButton");
     const seeMoreBtn = document.getElementById("recentSeeMore");
 
+    // main input
     if (searchInput) {
       searchInput.addEventListener("input", (e) => {
         this.handleSearchInput(e.target.value);
@@ -56,6 +59,7 @@ class SearchManager {
       });
     }
 
+    // magnifying glass button
     if (searchButton) {
       searchButton.addEventListener("click", () => {
         const value = searchInput ? searchInput.value.trim() : "";
@@ -63,35 +67,47 @@ class SearchManager {
       });
     }
 
+    // clear X button
     if (clearSearch) {
       clearSearch.addEventListener("click", () => this.clearSearch());
     }
 
+    // filter tabs (All / Users / Posts / Hashtags)
     filterTabs.forEach((tab) => {
       tab.addEventListener("click", (e) =>
         this.handleFilterChange(e.target.dataset.filter)
       );
     });
 
-    // recent searches: click to search, X to remove
+    // recent searches: click text to search, X to remove
     if (recentList) {
       recentList.addEventListener("click", (e) => {
-        if (e.target.classList.contains("recent-query")) {
-          const query = e.target.textContent;
-          this.performSearch(query);
+        const clearBtn = e.target.closest(".clear-recent");
+        const queryEl = e.target.closest(".recent-query");
+
+        // remove from history
+        if (clearBtn) {
+          const item = clearBtn.closest(".recent-item");
+          if (item) this.removeRecentSearch(item.dataset.query);
+          return;
+        }
+
+        // click the term -> run search
+        if (queryEl) {
+          const item = queryEl.closest(".recent-item");
+          if (!item) return;
+          const query = item.dataset.query || queryEl.textContent.trim();
+          if (!query) return;
+
           const input = document.getElementById("searchInput");
           if (input) input.value = query;
-        } else if (
-          e.target.classList.contains("clear-recent") ||
-          e.target.closest(".clear-recent")
-        ) {
-          const item = e.target.closest(".recent-item");
-          if (item) this.removeRecentSearch(item.dataset.query);
+
+          this.performSearch(query);
         }
       });
     }
 
-    // See more button
+    // "See more" for recent searches
     if (seeMoreBtn) {
       seeMoreBtn.addEventListener("click", () => {
         this.recentVisibleCount += 5;
@@ -99,6 +115,8 @@ class SearchManager {
       });
     }
   }
+
+  /* ================= SEARCH FLOW ================= */
 
   handleSearchInput(query) {
     this.currentQuery = query.trim();
@@ -152,7 +170,7 @@ class SearchManager {
     const currentUser =
       typeof getCurrentUser === "function" ? getCurrentUser() : null;
 
-    // USERS
+    /* ----- USERS ----- */
     if (filter === "all" || filter === "users") {
       const { data: users, error } = await this.supabase.rpc("search_users", {
         search_query: query,
@@ -165,14 +183,17 @@ class SearchManager {
             let isFollowing = false;
 
             if (currentUser) {
-              const { data: follow } = await this.supabase
-                .from("follows")
-                .select("id")
-                .eq("follower_id", currentUser.id)
-                .eq("followed_id", user.id)
-                .maybeSingle();
+              const { data: followRows, error: followErr } =
+                await this.supabase
+                  .from("follows")
+                  .select("id")
+                  .eq("follower_id", currentUser.id)
+                  .eq("followed_id", user.id)
+                  .limit(1);
 
-              isFollowing = !!follow;
+              if (!followErr && followRows && followRows.length > 0) {
+                isFollowing = true;
+              }
             }
 
             return {
@@ -186,13 +207,14 @@ class SearchManager {
             };
           })
         );
+
         results.users = usersWithFollowStatus;
       } else {
         console.error("Error searching users:", error);
       }
     }
 
-    // POSTS
+    /* ----- POSTS ----- */
     if (filter === "all" || filter === "posts") {
       const { data: posts, error } = await this.supabase.rpc("search_posts", {
         search_query: query,
@@ -220,7 +242,7 @@ class SearchManager {
       }
     }
 
-    // HASHTAGS
+    /* ----- HASHTAGS ----- */
     if (filter === "all" || filter === "hashtags") {
       const { data: hashtags, error } = await this.supabase.rpc(
         "search_hashtags",
@@ -241,7 +263,7 @@ class SearchManager {
       }
     }
 
-    // optional logging
+    /* ----- LOG SEARCH (optional) ----- */
     if (currentUser) {
       const totalResults = Object.values(results).reduce(
         (total, section) => total + section.length,
@@ -283,7 +305,7 @@ class SearchManager {
     if (totalResults === 0) this.showNoResults();
   }
 
-  /* ---------- USERS SECTION ---------- */
+  /* ================= USERS SECTION ================= */
 
   displayUsersResults(users) {
     const list = document.getElementById("usersList");
@@ -299,14 +321,16 @@ class SearchManager {
     list.innerHTML = users
       .map(
         (user) => `
-      <div class="user-card" data-username="${user.username}">
+      <div class="user-card" data-username="${this.escapeHtml(
+        user.username
+      )}">
         <img src="${user.avatar}" alt="${this.escapeHtml(
           user.displayName
         )}" class="user-avatar"
           onerror="this.src='assets/icons/default-profile.png'">
         <div class="user-info">
           <div class="user-name">${this.escapeHtml(user.displayName)}</div>
-          <div class="user-handle">@${user.username}</div>
+          <div class="user-handle">@${this.escapeHtml(user.username)}</div>
           ${
             user.bio
               ? `<div class="user-bio">${this.escapeHtml(user.bio)}</div>`
@@ -321,7 +345,11 @@ class SearchManager {
             user.isFollowing ? "btn-secondary" : "btn-primary"
           } follow-btn"
           onclick="searchManager.handleFollow('${user.id}', this)"
-          ${!getCurrentUser ? "disabled" : ""}
+          ${
+            typeof getCurrentUser !== "function" || !getCurrentUser()
+              ? "disabled"
+              : ""
+          }
         >
           ${user.isFollowing ? "Following" : "Follow"}
         </button>
@@ -330,13 +358,15 @@ class SearchManager {
       )
       .join("");
 
-    // Clicking card -> go to user.html/profile
+    // click card -> profile
     list.querySelectorAll(".user-card").forEach((card) => {
       card.addEventListener("click", (e) => {
         if (e.target.closest(".follow-btn")) return;
+
         const username = card.dataset.username;
         const me =
           typeof getCurrentUser === "function" ? getCurrentUser() : null;
+
         if (me && me.username === username) {
           window.location.href = "profile.html";
         } else {
@@ -348,7 +378,7 @@ class SearchManager {
     });
   }
 
-  /* ---------- POSTS SECTION (feed-style) ---------- */
+  /* ================= POSTS SECTION (feed-style) ================= */
 
   displayPostsResults(posts) {
     const list = document.getElementById("postsList");
@@ -517,7 +547,7 @@ class SearchManager {
     });
   }
 
-  /* ---------- HASHTAGS SECTION ---------- */
+  /* ================= HASHTAGS SECTION ================= */
 
   displayHashtagsResults(hashtags) {
     const list = document.getElementById("hashtagsList");
@@ -552,7 +582,19 @@ class SearchManager {
       .join("");
   }
 
-  /* ---------- FOLLOW / LIKE / SAVE ---------- */
+  /* ================= FOLLOW / LIKE / SAVE ================= */
+
+  getUuid() {
+    if (window.crypto && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    // simple fallback
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
 
   async handleFollow(userId, button) {
     const currentUser =
@@ -580,6 +622,7 @@ class SearchManager {
         this.showMessage("Unfollowed user", "success");
       } else {
         const { error } = await this.supabase.from("follows").insert({
+          id: this.getUuid(),
           follower_id: currentUser.id,
           followed_id: userId,
         });
@@ -681,7 +724,7 @@ class SearchManager {
     }
   }
 
-  /* ---------- STATE HELPERS ---------- */
+  /* ================= STATE HELPERS ================= */
 
   clearSearch() {
     const input = document.getElementById("searchInput");
@@ -733,7 +776,7 @@ class SearchManager {
     });
   }
 
-  /* ---------- RECENT SEARCHES ---------- */
+  /* ================= RECENT SEARCHES ================= */
 
   loadRecentSearches() {
     const fromStorage = JSON.parse(
@@ -801,7 +844,7 @@ class SearchManager {
     this.renderRecentSearches();
   }
 
-  /* ---------- TRENDING ---------- */
+  /* ================= TRENDING ================= */
 
   async loadTrendingHashtags() {
     try {
@@ -872,7 +915,7 @@ class SearchManager {
     this.performSearch(`#${tag}`);
   }
 
-  /* ---------- UTIL ---------- */
+  /* ================= UTIL ================= */
 
   showMessage(message, type = "info") {
     const existing = document.querySelector(".status-message");
@@ -939,9 +982,12 @@ class SearchManager {
   }
 
   updateUI() {
-    // header on search page is centered logo only, so nothing special to do now
+    // Search header is centered logo only on this page,
+    // so nothing special is needed here right now.
   }
 }
+
+/* ================= INIT GLOBAL ================= */
 
 let searchManager;
 document.addEventListener("DOMContentLoaded", () => {
