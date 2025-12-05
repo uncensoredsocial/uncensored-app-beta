@@ -17,9 +17,36 @@
     <link rel="stylesheet" href="css/icons.css">
 </head>
 <body>
-    <!-- Top Header (centered Search text, no profile/menu) -->
-    <header class="header header-centered">
-        <h1 class="logo">Search</h1>
+    <!-- Top Header – same structure as Home -->
+    <header class="header">
+        <div class="header-left">
+            <a href="index.html" class="logo">Uncensored Social</a>
+        </div>
+
+        <div class="header-center">
+            <span class="header-page-title">Search</span>
+        </div>
+
+        <div class="header-right">
+            <!-- Shown when NOT logged in -->
+            <div class="auth-buttons" id="authButtons">
+                <a href="login.html" class="btn btn-ghost btn-sm">Log in</a>
+                <a href="signup.html" class="btn btn-primary btn-sm">Sign up</a>
+            </div>
+
+            <!-- Shown when logged in -->
+            <button class="header-profile-btn" id="profileSection" style="display: none;">
+                <img
+                    id="headerProfileImg"
+                    src="assets/icons/default-profile.png"
+                    alt="Profile">
+            </button>
+
+            <!-- Sidebar / menu toggle (same id app.js expects) -->
+            <button class="btn btn-ghost btn-icon" id="openSidebar" aria-label="Open menu">
+                <span class="icon icon-menu"></span>
+            </button>
+        </div>
     </header>
 
     <!-- Main Content Area -->
@@ -58,14 +85,14 @@
                             class="search-input"
                         >
 
-                        <!-- Clear (X) button – already used by your JS -->
+                        <!-- Clear (X) button – used by search.js -->
                         <button class="btn btn-ghost btn-icon clear-search"
                                 id="clearSearch"
                                 style="display: none;">
                             <span class="icon icon-close"></span>
                         </button>
 
-                        <!-- NEW search button with magnifying glass icon -->
+                        <!-- Search button with magnifying glass icon -->
                         <button
                             class="btn btn-primary btn-icon search-button"
                             id="searchButton"
@@ -92,7 +119,7 @@
                 <div class="search-default-state" id="searchDefault">
                     <div class="trending-section">
                         <h3>Trending Now</h3>
-                        <!-- Your JS replaces this .trending-list content -->
+                        <!-- JS replaces this .trending-list content -->
                         <div class="trending-list">
                             <div class="trending-item">
                                 <span class="trending-rank">1</span>
@@ -121,7 +148,7 @@
                     <div class="recent-searches" id="recentSearches">
                         <h3>Recent Searches</h3>
                         <div class="recent-list" id="recentList">
-                            <!-- Recent searches are rendered here by search.js -->
+                            <!-- Recent searches rendered by search.js -->
                         </div>
                     </div>
                 </div>
@@ -197,7 +224,7 @@
         </a>
     </nav>
 
-    <!-- Sidebar Menu (still present, but no profile button on this page to open it) -->
+    <!-- Sidebar Menu -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-content">
             <div class="sidebar-header">
@@ -240,6 +267,9 @@
         </div>
     </div>
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Supabase client so search.js can actually call RPCs -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2.48.0/dist/umd/supabase.js"></script>
 
     <script src="js/auth.js"></script>
     <script src="js/app.js"></script>
