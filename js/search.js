@@ -1,838 +1,950 @@
-// Search Functionality with Supabase Integration
+// Search Functionality with Supabase Integration + feed-style posts
+
+// Reuse API base from auth.js or fall back
+const FEED_API_BASE_URL =
+  typeof API_BASE_URL !== "undefined"
+    ? API_BASE_URL
+    : "https://uncensored-app-beta-production.up.railway.app/api";
+
 class SearchManager {
-    constructor() {
-        this.currentQuery = '';
-        this.currentFilter = 'all';
-        this.searchTimeout = null;
-        this.isSearching = false;
-        this.supabase = null;
-        
-        this.init();
+  constructor() {
+    this.currentQuery = "";
+    this.currentFilter = "all";
+    this.searchTimeout = null;
+    this.isSearching = false;
+    this.supabase = null;
+
+    // recent searches paging
+    this.recentSearches = [];
+    this.recentVisibleCount = 5;
+
+    this.init();
+  }
+
+  init() {
+    this.initializeSupabase();
+    this.setupEventListeners();
+    this.loadRecentSearches();
+    this.loadTrendingHashtags();
+    this.updateUI();
+  }
+
+  initializeSupabase() {
+    this.supabase = supabase.createClient(
+      "https://hbbbsreonwhvqfvbszne.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyOTc5ODYsImV4cCI6MjA3OTg3Mzk4Nn0.LvqmdOqetnMrH8bnkJY6_S-dsGD8gnvpFczSCJPy-Q4"
+    );
+  }
+
+  setupEventListeners() {
+    const searchInput = document.getElementById("searchInput");
+    const clearSearch = document.getElementById("clearSearch");
+    const filterTabs = document.querySelectorAll(".filter-tab");
+    const recentList = document.getElementById("recentList");
+    const searchButton = document.getElementById("searchButton");
+    const seeMoreBtn = document.getElementById("recentSeeMore");
+
+    if (searchInput) {
+      searchInput.addEventListener("input", (e) => {
+        this.handleSearchInput(e.target.value);
+      });
+
+      searchInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          this.performSearch(e.target.value.trim());
+        }
+      });
     }
 
-    init() {
-        this.initializeSupabase();
-        this.setupEventListeners();
-        this.loadRecentSearches();
-        this.loadTrendingHashtags();
-        this.updateUI();
+    if (searchButton) {
+      searchButton.addEventListener("click", () => {
+        const value = searchInput ? searchInput.value.trim() : "";
+        this.performSearch(value);
+      });
     }
 
-    initializeSupabase() {
-        // Initialize Supabase client
-        this.supabase = supabase.createClient(
-            'https://hbbbsreonwhvqfvbszne.supabase.co',
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyOTc5ODYsImV4cCI6MjA3OTg3Mzk4Nn0.LvqmdOqetnMrH8bnkJY6_S-dsGD8gnvpFczSCJPy-Q4'
-        );
+    if (clearSearch) {
+      clearSearch.addEventListener("click", () => this.clearSearch());
     }
 
-    setupEventListeners() {
-        const searchInput = document.getElementById('searchInput');
-        const clearSearch = document.getElementById('clearSearch');
-        const filterTabs = document.querySelectorAll('.filter-tab');
-        const recentList = document.getElementById('recentList');
-        const searchButton = document.getElementById('searchButton');
+    filterTabs.forEach((tab) => {
+      tab.addEventListener("click", (e) =>
+        this.handleFilterChange(e.target.dataset.filter)
+      );
+    });
 
-        // Search input events
-        if (searchInput) {
-            searchInput.addEventListener('input', (e) => {
-                this.handleSearchInput(e.target.value);
-            });
-
-            searchInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    this.performSearch(e.target.value.trim());
-                }
-            });
-
-            searchInput.addEventListener('focus', () => {
-                this.showSearchSuggestions();
-            });
+    // recent searches: click to search, X to remove
+    if (recentList) {
+      recentList.addEventListener("click", (e) => {
+        if (e.target.classList.contains("recent-query")) {
+          const query = e.target.textContent;
+          this.performSearch(query);
+          const input = document.getElementById("searchInput");
+          if (input) input.value = query;
+        } else if (
+          e.target.classList.contains("clear-recent") ||
+          e.target.closest(".clear-recent")
+        ) {
+          const item = e.target.closest(".recent-item");
+          if (item) this.removeRecentSearch(item.dataset.query);
         }
-
-        // Search button events (NEW)
-        if (searchButton) {
-            searchButton.addEventListener('click', () => {
-                const value = searchInput ? searchInput.value.trim() : '';
-                console.log('Search button clicked with value:', value);
-                this.performSearch(value);
-            });
-        }
-
-        // Clear search button
-        if (clearSearch) {
-            clearSearch.addEventListener('click', () => {
-                this.clearSearch();
-            });
-        }
-
-        // Filter tabs
-        filterTabs.forEach(tab => {
-            tab.addEventListener('click', (e) => {
-                this.handleFilterChange(e.target.dataset.filter);
-            });
-        });
-
-        // Recent searches delegation
-        if (recentList) {
-            recentList.addEventListener('click', (e) => {
-                if (e.target.classList.contains('recent-query')) {
-                    const query = e.target.textContent;
-                    this.performSearch(query);
-                } else if (e.target.classList.contains('clear-recent') || e.target.closest('.clear-recent')) {
-                    const item = e.target.closest('.recent-item');
-                    this.removeRecentSearch(item.dataset.query);
-                }
-            });
-        }
+      });
     }
 
-    handleSearchInput(query) {
-        this.currentQuery = query.trim();
-        const clearSearchBtn = document.getElementById('clearSearch');
+    // See more button
+    if (seeMoreBtn) {
+      seeMoreBtn.addEventListener("click", () => {
+        this.recentVisibleCount += 5;
+        this.renderRecentSearches();
+      });
+    }
+  }
 
-        // Show/hide clear button
-        if (clearSearchBtn) {
-            clearSearchBtn.style.display = this.currentQuery ? 'flex' : 'none';
-        }
+  handleSearchInput(query) {
+    this.currentQuery = query.trim();
+    const clearSearchBtn = document.getElementById("clearSearch");
 
-        // Clear previous timeout
-        if (this.searchTimeout) {
-            clearTimeout(this.searchTimeout);
-        }
-
-        // Perform search after delay (debounce)
-        if (this.currentQuery.length >= 2) {
-            this.searchTimeout = setTimeout(() => {
-                this.performSearch(this.currentQuery);
-            }, 300);
-        } else if (this.currentQuery.length === 0) {
-            this.clearSearch();
-        }
+    if (clearSearchBtn) {
+      clearSearchBtn.style.display = this.currentQuery ? "flex" : "none";
     }
 
-    async performSearch(query) {
-        if (!query || query.length < 2) {
-            this.showDefaultState();
-            return;
-        }
+    if (this.searchTimeout) clearTimeout(this.searchTimeout);
 
-        this.currentQuery = query;
-        this.isSearching = true;
+    if (this.currentQuery.length >= 2) {
+      this.searchTimeout = setTimeout(
+        () => this.performSearch(this.currentQuery),
+        300
+      );
+    } else if (this.currentQuery.length === 0) {
+      this.clearSearch();
+    }
+  }
 
-        // Update UI to loading state
-        this.showLoadingState();
-
-        try {
-            // Save to recent searches
-            this.saveToRecentSearches(query);
-
-            // Perform API call
-            const results = await this.fetchSearchResults(query, this.currentFilter);
-
-            // Display results
-            this.displaySearchResults(results, query);
-
-        } catch (error) {
-            console.error('Search error:', error);
-            this.showErrorState();
-        } finally {
-            this.isSearching = false;
-        }
+  async performSearch(query) {
+    if (!query || query.length < 2) {
+      this.showDefaultState();
+      return;
     }
 
-    async fetchSearchResults(query, filter) {
-        try {
-            const results = {
-                users: [],
-                posts: [],
-                hashtags: []
+    this.currentQuery = query;
+    this.isSearching = true;
+    this.showLoadingState();
+
+    try {
+      this.saveToRecentSearches(query);
+
+      const results = await this.fetchSearchResults(
+        query,
+        this.currentFilter
+      );
+
+      this.displaySearchResults(results, query);
+    } catch (err) {
+      console.error("Search error:", err);
+      this.showErrorState();
+    } finally {
+      this.isSearching = false;
+    }
+  }
+
+  async fetchSearchResults(query, filter) {
+    const results = { users: [], posts: [], hashtags: [] };
+    const currentUser =
+      typeof getCurrentUser === "function" ? getCurrentUser() : null;
+
+    // USERS
+    if (filter === "all" || filter === "users") {
+      const { data: users, error } = await this.supabase.rpc("search_users", {
+        search_query: query,
+        result_limit: 20,
+      });
+
+      if (!error && users) {
+        const usersWithFollowStatus = await Promise.all(
+          users.map(async (user) => {
+            let isFollowing = false;
+
+            if (currentUser) {
+              const { data: follow } = await this.supabase
+                .from("follows")
+                .select("id")
+                .eq("follower_id", currentUser.id)
+                .eq("followed_id", user.id)
+                .maybeSingle();
+
+              isFollowing = !!follow;
+            }
+
+            return {
+              id: user.id,
+              username: user.username,
+              displayName: user.display_name || user.username,
+              avatar: user.avatar_url || "assets/icons/default-profile.png",
+              bio: user.bio,
+              followersCount: user.followers_count || 0,
+              isFollowing,
             };
+          })
+        );
+        results.users = usersWithFollowStatus;
+      } else {
+        console.error("Error searching users:", error);
+      }
+    }
 
-            // Get current user for follow status checks
-            const currentUser = getCurrentUser();
+    // POSTS
+    if (filter === "all" || filter === "posts") {
+      const { data: posts, error } = await this.supabase.rpc("search_posts", {
+        search_query: query,
+        result_limit: 20,
+      });
 
-            // Search users
-            if (filter === 'all' || filter === 'users') {
-                const { data: users, error } = await this.supabase
-                    .rpc('search_users', { 
-                        search_query: query,
-                        result_limit: 20
-                    });
-                
-                if (!error && users) {
-                    // Check follow status for each user if logged in
-                    const usersWithFollowStatus = await Promise.all(
-                        users.map(async (user) => {
-                            let isFollowing = false;
-                            
-                            if (currentUser) {
-                                const { data: follow } = await this.supabase
-                                    .from('follows')
-                                    .select('id')
-                                    .eq('follower_id', currentUser.id)
-                                    .eq('following_id', user.id)
-                                    .single();
-                                
-                                isFollowing = !!follow;
-                            }
-                            
-                            return {
-                                id: user.id,
-                                username: user.username,
-                                displayName: user.display_name || user.username,
-                                avatar: user.avatar_url || 'assets/icons/default-profile.png',
-                                bio: user.bio,
-                                followersCount: user.followers_count || 0,
-                                isFollowing: isFollowing
-                            };
-                        })
-                    );
-                    
-                    results.users = usersWithFollowStatus;
-                } else {
-                    console.error('Error searching users:', error);
-                }
-            }
+      if (!error && posts) {
+        results.posts = posts.map((post) => ({
+          id: post.id,
+          userId: post.user_id,
+          content: post.content,
+          createdAt: post.created_at,
+          likes: post.like_count || post.likes_count || 0,
+          comments: post.comment_count || post.comments_count || 0,
+          media_url: post.media_url,
+          media_type: post.media_type,
+          user: {
+            username: post.username,
+            displayName: post.display_name || post.username,
+            avatar: post.avatar_url || "assets/icons/default-profile.png",
+          },
+        }));
+      } else {
+        console.error("Error searching posts:", error);
+      }
+    }
 
-            // Search posts
-            if (filter === 'all' || filter === 'posts') {
-                const { data: posts, error } = await this.supabase
-                    .rpc('search_posts', { 
-                        search_query: query,
-                        result_limit: 20
-                    });
-                
-                if (!error && posts) {
-                    results.posts = posts.map(post => ({
-                        id: post.id,
-                        userId: post.user_id,
-                        content: post.content,
-                        createdAt: post.created_at,
-                        likes: post.likes_count || 0,
-                        comments: post.comments_count || 0,
-                        user: {
-                            username: post.username,
-                            displayName: post.display_name || post.username,
-                            avatar: post.avatar_url || 'assets/icons/default-profile.png'
-                        }
-                    }));
-                } else {
-                    console.error('Error searching posts:', error);
-                }
-            }
-
-            // Search hashtags
-            if (filter === 'all' || filter === 'hashtags') {
-                const { data: hashtags, error } = await this.supabase
-                    .rpc('search_hashtags', { 
-                        search_query: query,
-                        result_limit: 20
-                    });
-                
-                if (!error && hashtags) {
-                    results.hashtags = hashtags.map(hashtag => ({
-                        name: hashtag.name,
-                        count: hashtag.posts_count || 0,
-                        recentCount: hashtag.recent_posts_count || 0
-                    }));
-                } else {
-                    console.error('Error searching hashtags:', error);
-                }
-            }
-
-            // Log search to history if user is logged in
-            if (currentUser) {
-                const totalResults = Object.values(results).reduce((total, section) => total + section.length, 0);
-                await this.supabase.rpc('log_search', {
-                    search_user_id: currentUser.id,
-                    search_query: query,
-                    search_results_count: totalResults,
-                    search_type: filter
-                });
-            }
-
-            return results;
-
-        } catch (error) {
-            console.error('Search API error:', error);
-            throw error;
+    // HASHTAGS
+    if (filter === "all" || filter === "hashtags") {
+      const { data: hashtags, error } = await this.supabase.rpc(
+        "search_hashtags",
+        {
+          search_query: query,
+          result_limit: 20,
         }
+      );
+
+      if (!error && hashtags) {
+        results.hashtags = hashtags.map((h) => ({
+          name: h.tag,
+          count: h.posts_count || 0,
+          recentCount: h.recent_posts_count || 0,
+        }));
+      } else {
+        console.error("Error searching hashtags:", error);
+      }
     }
 
-    displaySearchResults(results, query) {
-        this.hideAllStates();
-        
-        const resultsState = document.getElementById('searchResultsState');
-        const resultsTitle = document.getElementById('resultsTitle');
-        const resultsCount = document.getElementById('resultsCount');
+    // optional logging
+    if (currentUser) {
+      const totalResults = Object.values(results).reduce(
+        (total, section) => total + section.length,
+        0
+      );
+      await this.supabase.rpc("log_search", {
+        search_user_id: currentUser.id,
+        search_query: query,
+        search_results_count: totalResults,
+        search_type: filter,
+      });
+    }
 
-        if (resultsState && resultsTitle && resultsCount) {
-            resultsState.style.display = 'block';
-            resultsTitle.textContent = `Results for "${query}"`;
-            
-            // Calculate total results
-            const totalResults = Object.values(results).reduce((total, section) => total + section.length, 0);
-            resultsCount.textContent = `${totalResults} results`;
+    return results;
+  }
 
-            // Display results by section
-            this.displayUsersResults(results.users);
-            this.displayPostsResults(results.posts);
-            this.displayHashtagsResults(results.hashtags);
+  displaySearchResults(results, query) {
+    this.hideAllStates();
 
-            // Show no results if empty
-            if (totalResults === 0) {
-                this.showNoResults();
-            }
+    const state = document.getElementById("searchResultsState");
+    const title = document.getElementById("resultsTitle");
+    const count = document.getElementById("resultsCount");
+
+    if (!state || !title || !count) return;
+
+    state.style.display = "block";
+    title.textContent = `Results for "${query}"`;
+
+    const totalResults = Object.values(results).reduce(
+      (total, section) => total + section.length,
+      0
+    );
+    count.textContent = `${totalResults} results`;
+
+    this.displayUsersResults(results.users);
+    this.displayPostsResults(results.posts);
+    this.displayHashtagsResults(results.hashtags);
+
+    if (totalResults === 0) this.showNoResults();
+  }
+
+  /* ---------- USERS SECTION ---------- */
+
+  displayUsersResults(users) {
+    const list = document.getElementById("usersList");
+    const section = document.getElementById("usersResults");
+    if (!list || !section) return;
+
+    if (!users.length) {
+      section.style.display = "none";
+      return;
+    }
+
+    section.style.display = "block";
+    list.innerHTML = users
+      .map(
+        (user) => `
+      <div class="user-card" data-username="${user.username}">
+        <img src="${user.avatar}" alt="${this.escapeHtml(
+          user.displayName
+        )}" class="user-avatar"
+          onerror="this.src='assets/icons/default-profile.png'">
+        <div class="user-info">
+          <div class="user-name">${this.escapeHtml(user.displayName)}</div>
+          <div class="user-handle">@${user.username}</div>
+          ${
+            user.bio
+              ? `<div class="user-bio">${this.escapeHtml(user.bio)}</div>`
+              : ""
+          }
+          <div class="user-stats">
+            <span class="follower-count">${user.followersCount.toLocaleString()} followers</span>
+          </div>
+        </div>
+        <button
+          class="btn btn-sm ${
+            user.isFollowing ? "btn-secondary" : "btn-primary"
+          } follow-btn"
+          onclick="searchManager.handleFollow('${user.id}', this)"
+          ${!getCurrentUser ? "disabled" : ""}
+        >
+          ${user.isFollowing ? "Following" : "Follow"}
+        </button>
+      </div>
+    `
+      )
+      .join("");
+
+    // Clicking card -> go to user.html/profile
+    list.querySelectorAll(".user-card").forEach((card) => {
+      card.addEventListener("click", (e) => {
+        if (e.target.closest(".follow-btn")) return;
+        const username = card.dataset.username;
+        const me =
+          typeof getCurrentUser === "function" ? getCurrentUser() : null;
+        if (me && me.username === username) {
+          window.location.href = "profile.html";
+        } else {
+          window.location.href = `user.html?user=${encodeURIComponent(
+            username
+          )}`;
         }
+      });
+    });
+  }
+
+  /* ---------- POSTS SECTION (feed-style) ---------- */
+
+  displayPostsResults(posts) {
+    const list = document.getElementById("postsList");
+    const section = document.getElementById("postsResults");
+    if (!list || !section) return;
+
+    if (!posts.length) {
+      section.style.display = "none";
+      return;
     }
 
-    displayUsersResults(users) {
-    const usersList = document.getElementById('usersList');
-    const usersSection = document.getElementById('usersResults');
+    section.style.display = "block";
+    list.innerHTML = posts
+      .map((post) => {
+        const avatar = post.user.avatar || "assets/icons/default-profile.png";
+        const username = post.user.username || "unknown";
+        const displayName = post.user.displayName || username;
+        const time = this.formatTime(post.createdAt);
+        const mediaHtml = this.renderMediaHtml(
+          post.media_url,
+          post.media_type
+        );
 
-    if (!usersList || !usersSection) return;
-
-    if (users.length === 0) {
-        usersSection.style.display = 'none';
-        return;
-    }
-
-    usersSection.style.display = 'block';
-    usersList.innerHTML = users.map(user => `
-        <div class="user-card" data-username="${user.username}">
-            <img src="${user.avatar}" alt="${user.displayName}" class="user-avatar" onerror="this.src='assets/icons/default-profile.png'">
-            <div class="user-info">
-                <div class="user-name">${this.escapeHtml(user.displayName)}</div>
-                <div class="user-handle">@${user.username}</div>
-                ${user.bio ? `<div class="user-bio">${this.escapeHtml(user.bio)}</div>` : ''}
-                <div class="user-stats">
-                    <span class="follower-count">${user.followersCount.toLocaleString()} followers</span>
-                </div>
+        return `
+      <article class="post" data-post-id="${post.id}">
+        <header class="post-header">
+          <div class="post-user" data-username="${this.escapeHtml(username)}">
+            <img class="post-user-avatar" src="${avatar}"
+              onerror="this.src='assets/icons/default-profile.png'">
+            <div class="post-user-info">
+              <span class="post-display-name">${this.escapeHtml(
+                displayName
+              )}</span>
+              <span class="post-username">@${this.escapeHtml(username)}</span>
             </div>
-            <button class="btn btn-sm ${user.isFollowing ? 'btn-secondary' : 'btn-primary'} follow-btn" 
-                    onclick="searchManager.handleFollow('${user.id}', this)"
-                    ${!getCurrentUser() ? 'disabled' : ''}>
-                ${user.isFollowing ? 'Following' : 'Follow'}
+          </div>
+          <span class="post-time">${time}</span>
+        </header>
+
+        <div class="post-content">
+          ${this.formatPostContent(post.content)}
+        </div>
+        ${mediaHtml}
+
+        <footer class="post-footer">
+          <div class="post-actions">
+            <button class="post-action like-btn">
+              <span class="post-action-icon">❤️</span>
+              <span class="post-action-count like-count">${post.likes}</span>
             </button>
-        </div>
-    `).join('');
+            <button class="post-action comment-btn">
+              <span class="post-action-icon">💬</span>
+              <span class="post-action-count comment-count">${post.comments}</span>
+            </button>
+            <button class="post-action share-btn">
+              <span class="post-action-icon">⤴</span>
+            </button>
+            <button class="post-action save-btn">
+              <span class="post-action-icon">🔖</span>
+            </button>
+          </div>
+        </footer>
+      </article>
+    `;
+      })
+      .join("");
 
-    // Click -> go to user.html?user=username (or profile.html for yourself)
-    usersList.querySelectorAll('.user-card').forEach(card => {
-        card.addEventListener('click', (e) => {
-            if (e.target.closest('.follow-btn')) return;
+    this.attachPostEvents();
+  }
 
-            const username = card.dataset.username;
-            const me = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+  renderMediaHtml(url, type) {
+    if (!url) return "";
+    const lower = url.toLowerCase();
+    const isVideo =
+      (type && (type.startsWith("video/") || type === "video")) ||
+      lower.endsWith(".mp4") ||
+      lower.endsWith(".webm") ||
+      lower.endsWith(".ogg");
 
-            if (me && me.username === username) {
-                window.location.href = 'profile.html';
-            } else {
-                window.location.href = `user.html?user=${encodeURIComponent(username)}`;
-            }
+    if (isVideo) {
+      return `
+      <div class="post-media">
+        <video controls playsinline preload="metadata">
+          <source src="${url}">
+          Your browser does not support video.
+        </video>
+      </div>
+    `;
+    }
+
+    return `
+      <div class="post-media">
+        <a href="${url}" target="_blank" rel="noopener noreferrer">
+          <img src="${url}" loading="lazy">
+        </a>
+      </div>
+    `;
+  }
+
+  attachPostEvents() {
+    const posts = document.querySelectorAll("#postsList .post");
+    posts.forEach((postEl) => {
+      const postId = postEl.dataset.postId;
+
+      // click whole card -> post page (unless clicking actions / user)
+      postEl.addEventListener("click", (e) => {
+        if (
+          e.target.closest(".post-actions") ||
+          e.target.closest(".post-user")
+        )
+          return;
+        window.location.href = `post.html?id=${postId}`;
+      });
+
+      // avatar / username -> profile
+      const userEl = postEl.querySelector(".post-user");
+      if (userEl) {
+        userEl.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const username = userEl.dataset.username;
+          const me =
+            typeof getCurrentUser === "function" ? getCurrentUser() : null;
+          if (me && me.username === username) {
+            window.location.href = "profile.html";
+          } else {
+            window.location.href = `user.html?user=${encodeURIComponent(
+              username
+            )}`;
+          }
         });
+      }
+
+      const likeBtn = postEl.querySelector(".like-btn");
+      if (likeBtn) {
+        likeBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.handleLike(postId, likeBtn);
+        });
+      }
+
+      const commentBtn = postEl.querySelector(".comment-btn");
+      if (commentBtn) {
+        commentBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          window.location.href = `post.html?id=${postId}#comments`;
+        });
+      }
+
+      const shareBtn = postEl.querySelector(".share-btn");
+      if (shareBtn) {
+        shareBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const url = `${window.location.origin}/post.html?id=${postId}`;
+          navigator.clipboard.writeText(url).catch(() => {});
+          this.showMessage("Link copied!", "success");
+        });
+      }
+
+      const saveBtn = postEl.querySelector(".save-btn");
+      if (saveBtn) {
+        saveBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.handleSave(postId, saveBtn);
+        });
+      }
     });
-}
-    displayPostsResults(posts) {
-    const postsList = document.getElementById('postsList');
-    const postsSection = document.getElementById('postsResults');
+  }
 
-    if (!postsList || !postsSection) return;
+  /* ---------- HASHTAGS SECTION ---------- */
 
-    if (posts.length === 0) {
-        postsSection.style.display = 'none';
-        return;
+  displayHashtagsResults(hashtags) {
+    const list = document.getElementById("hashtagsList");
+    const section = document.getElementById("hashtagsResults");
+    if (!list || !section) return;
+
+    if (!hashtags.length) {
+      section.style.display = "none";
+      return;
     }
 
-    postsSection.style.display = 'block';
-    postsList.innerHTML = posts.map(post => `
-        <div class="post-card" data-post-id="${post.id}">
-            <div class="post-header">
-                <img src="${post.user.avatar}" alt="${post.user.displayName}" class="post-user-avatar" onerror="this.src='assets/icons/default-profile.png'">
-                <div class="post-user-info">
-                    <div class="post-display-name">${this.escapeHtml(post.user.displayName)}</div>
-                    <div class="post-username">@${post.user.username}</div>
-                </div>
-                <div class="post-time">${this.formatTime(post.createdAt)}</div>
-            </div>
-            <div class="post-content">
-                ${this.formatPostContent(post.content)}
-            </div>
-            <div class="post-actions">
-                <button class="post-action like-btn" onclick="searchManager.handleLike('${post.id}', this)" ${!getCurrentUser() ? 'disabled' : ''}>
-                    <span>❤️</span>
-                    <span class="like-count">${post.likes}</span>
-                </button>
-                <button class="post-action comment-btn" onclick="searchManager.handleComment('${post.id}')" ${!getCurrentUser() ? 'disabled' : ''}>
-                    <span>💬</span>
-                    <span class="comment-count">${post.comments}</span>
-                </button>
-            </div>
+    section.style.display = "block";
+    list.innerHTML = hashtags
+      .map(
+        (h) => `
+      <a href="hashtag.html?tag=${encodeURIComponent(
+        h.name
+      )}" class="hashtag-item">
+        <span class="icon icon-feeds hashtag-icon"></span>
+        <div class="hashtag-info">
+          <div class="hashtag-name">#${h.name}</div>
+          <div class="hashtag-count">${h.count.toLocaleString()} posts</div>
+          ${
+            h.recentCount > 0
+              ? `<div class="hashtag-recent">${h.recentCount} recent</div>`
+              : ""
+          }
         </div>
-    `).join('');
+      </a>
+    `
+      )
+      .join("");
+  }
 
-    // Click card -> post detail
-    postsList.querySelectorAll('.post-card').forEach(card => {
-        card.addEventListener('click', (e) => {
-            if (e.target.closest('.post-actions')) return;
-            const postId = card.dataset.postId;
-            window.location.href = `post.html?id=${postId}`;
+  /* ---------- FOLLOW / LIKE / SAVE ---------- */
+
+  async handleFollow(userId, button) {
+    const currentUser =
+      typeof getCurrentUser === "function" ? getCurrentUser() : null;
+    if (!currentUser) {
+      this.showMessage("Please log in to follow users", "error");
+      return;
+    }
+
+    try {
+      const isFollowing = button.textContent.trim() === "Following";
+
+      if (isFollowing) {
+        const { error } = await this.supabase
+          .from("follows")
+          .delete()
+          .eq("follower_id", currentUser.id)
+          .eq("followed_id", userId);
+
+        if (error) throw error;
+
+        button.textContent = "Follow";
+        button.classList.remove("btn-secondary");
+        button.classList.add("btn-primary");
+        this.showMessage("Unfollowed user", "success");
+      } else {
+        const { error } = await this.supabase.from("follows").insert({
+          follower_id: currentUser.id,
+          followed_id: userId,
         });
+
+        if (error) throw error;
+
+        button.textContent = "Following";
+        button.classList.remove("btn-primary");
+        button.classList.add("btn-secondary");
+        this.showMessage("Followed user", "success");
+      }
+    } catch (err) {
+      console.error("Follow error:", err);
+      this.showMessage("Failed to follow user", "error");
+    }
+  }
+
+  getAuthToken() {
+    try {
+      return typeof getAuthToken === "function"
+        ? getAuthToken()
+        : localStorage.getItem("authToken");
+    } catch {
+      return null;
+    }
+  }
+
+  async handleLike(postId, btn) {
+    const user =
+      typeof getCurrentUser === "function" ? getCurrentUser() : null;
+    if (!user) return this.showMessage("Log in to like posts", "error");
+
+    const token = this.getAuthToken();
+    if (!token) return this.showMessage("Missing token", "error");
+
+    const countEl = btn.querySelector(".like-count");
+    let count = parseInt(countEl.textContent || "0", 10) || 0;
+    const wasLiked = btn.classList.contains("liked");
+
+    // optimistic UI
+    if (wasLiked) {
+      btn.classList.remove("liked");
+      count = Math.max(0, count - 1);
+    } else {
+      btn.classList.add("liked");
+      count += 1;
+    }
+    countEl.textContent = String(count);
+
+    try {
+      const res = await fetch(`${FEED_API_BASE_URL}/posts/${postId}/like`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update like");
+
+      const serverLikes =
+        typeof data.likes === "number"
+          ? data.likes
+          : typeof data.like_count === "number"
+          ? data.like_count
+          : null;
+      if (serverLikes !== null) {
+        countEl.textContent = String(serverLikes);
+      }
+    } catch (err) {
+      console.error(err);
+      this.showMessage("Failed to update like", "error");
+    }
+  }
+
+  async handleSave(postId, btn) {
+    const user =
+      typeof getCurrentUser === "function" ? getCurrentUser() : null;
+    if (!user) return this.showMessage("Log in to save posts", "error");
+
+    const token = this.getAuthToken();
+    if (!token) return this.showMessage("Missing token", "error");
+
+    const wasSaved = btn.classList.contains("saved");
+
+    if (wasSaved) {
+      btn.classList.remove("saved");
+    } else {
+      btn.classList.add("saved");
+    }
+
+    try {
+      const res = await fetch(`${FEED_API_BASE_URL}/posts/${postId}/save`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update save");
+    } catch (err) {
+      console.error(err);
+      this.showMessage("Failed to update save", "error");
+    }
+  }
+
+  /* ---------- STATE HELPERS ---------- */
+
+  clearSearch() {
+    const input = document.getElementById("searchInput");
+    const clearBtn = document.getElementById("clearSearch");
+    if (input) {
+      input.value = "";
+      input.focus();
+    }
+    if (clearBtn) clearBtn.style.display = "none";
+
+    this.currentQuery = "";
+    this.showDefaultState();
+  }
+
+  showDefaultState() {
+    this.hideAllStates();
+    const el = document.getElementById("searchDefault");
+    if (el) el.style.display = "block";
+  }
+
+  showLoadingState() {
+    this.hideAllStates();
+    const el = document.getElementById("searchLoading");
+    if (el) el.style.display = "block";
+  }
+
+  showNoResults() {
+    const noResults = document.getElementById("noResults");
+    const state = document.getElementById("searchResultsState");
+    if (state) state.style.display = "block";
+    if (noResults) noResults.style.display = "block";
+  }
+
+  showErrorState() {
+    this.hideAllStates();
+    this.showNoResults();
+  }
+
+  hideAllStates() {
+    ["searchDefault", "searchLoading", "searchResultsState", "noResults"].forEach(
+      (id) => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = "none";
+      }
+    );
+    ["usersResults", "postsResults", "hashtagsResults"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = "none";
     });
-}
-    displayHashtagsResults(hashtags) {
-        const hashtagsList = document.getElementById('hashtagsList');
-        const hashtagsSection = document.getElementById('hashtagsResults');
+  }
 
-        if (!hashtagsList || !hashtagsSection) return;
+  /* ---------- RECENT SEARCHES ---------- */
 
-        if (hashtags.length === 0) {
-            hashtagsSection.style.display = 'none';
-            return;
+  loadRecentSearches() {
+    const fromStorage = JSON.parse(
+      localStorage.getItem("recentSearches") || "[]"
+    );
+    this.recentSearches = fromStorage;
+    this.recentVisibleCount = 5;
+    this.renderRecentSearches();
+  }
+
+  renderRecentSearches() {
+    const list = document.getElementById("recentList");
+    const seeMoreBtn = document.getElementById("recentSeeMore");
+    if (!list) return;
+
+    if (!this.recentSearches.length) {
+      list.innerHTML =
+        '<div class="recent-item"><span class="recent-query">No recent searches</span></div>';
+      if (seeMoreBtn) seeMoreBtn.style.display = "none";
+      return;
+    }
+
+    const visible = this.recentSearches.slice(0, this.recentVisibleCount);
+    list.innerHTML = visible
+      .map(
+        (q) => `
+      <div class="recent-item" data-query="${this.escapeHtml(q)}">
+        <span class="recent-query">${this.escapeHtml(q)}</span>
+        <button class="btn btn-ghost btn-icon clear-recent" title="Remove from history">
+          <span class="icon icon-close"></span>
+        </button>
+      </div>
+    `
+      )
+      .join("");
+
+    if (seeMoreBtn) {
+      if (this.recentVisibleCount >= this.recentSearches.length) {
+        seeMoreBtn.style.display = "none";
+      } else {
+        seeMoreBtn.style.display = "inline-flex";
+      }
+    }
+  }
+
+  saveToRecentSearches(query) {
+    let recent = JSON.parse(localStorage.getItem("recentSearches") || "[]");
+    recent = recent.filter((q) => q !== query);
+    recent.unshift(query);
+    // keep more than 5 so "see more" can work, but not infinite
+    recent = recent.slice(0, 50);
+    localStorage.setItem("recentSearches", JSON.stringify(recent));
+
+    this.recentSearches = recent;
+    this.recentVisibleCount = 5;
+    this.renderRecentSearches();
+  }
+
+  removeRecentSearch(query) {
+    let recent = JSON.parse(localStorage.getItem("recentSearches") || "[]");
+    recent = recent.filter((q) => q !== query);
+    localStorage.setItem("recentSearches", JSON.stringify(recent));
+    this.recentSearches = recent;
+    this.recentVisibleCount = 5;
+    this.renderRecentSearches();
+  }
+
+  /* ---------- TRENDING ---------- */
+
+  async loadTrendingHashtags() {
+    try {
+      const { data: trending, error } = await this.supabase.rpc(
+        "get_trending_hashtags",
+        {
+          limit_count: 10,
+          days_back: 7,
         }
+      );
 
-        hashtagsSection.style.display = 'block';
-        hashtagsList.innerHTML = hashtags.map(hashtag => `
-            <a href="hashtag.html?tag=${hashtag.name}" class="hashtag-item">
-                <span class="icon icon-feeds hashtag-icon"></span>
-                <div class="hashtag-info">
-                    <div class="hashtag-name">#${hashtag.name}</div>
-                    <div class="hashtag-count">${hashtag.count.toLocaleString()} posts</div>
-                    ${hashtag.recentCount > 0 ? `<div class="hashtag-recent">${hashtag.recentCount} recent</div>` : ''}
-                </div>
-            </a>
-        `).join('');
-    }
-
-    async handleFollow(userId, button) {
-        const currentUser = getCurrentUser();
-        if (!currentUser) {
-            this.showMessage('Please log in to follow users', 'error');
-            return;
-        }
-
-        try {
-            const isCurrentlyFollowing = button.textContent === 'Following';
-            
-            if (isCurrentlyFollowing) {
-                // Unfollow
-                const { error } = await this.supabase
-                    .from('follows')
-                    .delete()
-                    .eq('follower_id', currentUser.id)
-                    .eq('following_id', userId);
-                
-                if (!error) {
-                    button.textContent = 'Follow';
-                    button.classList.remove('btn-secondary');
-                    button.classList.add('btn-primary');
-                    this.showMessage('Unfollowed user', 'success');
-                } else {
-                    throw error;
-                }
-            } else {
-                // Follow
-                const { error } = await this.supabase
-                    .from('follows')
-                    .insert({
-                        follower_id: currentUser.id,
-                        following_id: userId
-                    });
-                
-                if (!error) {
-                    button.textContent = 'Following';
-                    button.classList.remove('btn-primary');
-                    button.classList.add('btn-secondary');
-                    this.showMessage('Followed user', 'success');
-                } else {
-                    throw error;
-                }
-            }
-        } catch (error) {
-            console.error('Follow error:', error);
-            this.showMessage('Failed to follow user', 'error');
-        }
-    }
-
-    async handleLike(postId, button) {
-        const currentUser = getCurrentUser();
-        if (!currentUser) {
-            this.showMessage('Please log in to like posts', 'error');
-            return;
-        }
-
-        try {
-            const likeCount = button.querySelector('.like-count');
-            const isCurrentlyLiked = button.classList.contains('liked');
-            
-            if (isCurrentlyLiked) {
-                // Unlike
-                const { error } = await this.supabase
-                    .from('likes')
-                    .delete()
-                    .eq('user_id', currentUser.id)
-                    .eq('post_id', postId);
-                
-                if (!error) {
-                    button.classList.remove('liked');
-                    likeCount.textContent = parseInt(likeCount.textContent) - 1;
-                    this.showMessage('Post unliked', 'success');
-                } else {
-                    throw error;
-                }
-            } else {
-                // Like
-                const { error } = await this.supabase
-                    .from('likes')
-                    .insert({
-                        user_id: currentUser.id,
-                        post_id: postId
-                    });
-                
-                if (!error) {
-                    button.classList.add('liked');
-                    likeCount.textContent = parseInt(likeCount.textContent) + 1;
-                    this.showMessage('Post liked', 'success');
-                } else {
-                    throw error;
-                }
-            }
-        } catch (error) {
-            console.error('Like error:', error);
-            this.showMessage('Failed to like post', 'error');
-        }
-    }
-
-    handleComment(postId) {
-        const currentUser = getCurrentUser();
-        if (!currentUser) {
-            this.showMessage('Please log in to comment', 'error');
-            return;
-        }
-        
-        // You can implement comment functionality here
-        // For now, just show a message
-        this.showMessage('Comment feature coming soon!', 'info');
-    }
-
-    handleFilterChange(filter) {
-        this.currentFilter = filter;
-        
-        // Update active tab
-        document.querySelectorAll('.filter-tab').forEach(tab => {
-            tab.classList.toggle('active', tab.dataset.filter === filter);
-        });
-
-        // Refresh search if we have a current query
-        if (this.currentQuery) {
-            this.performSearch(this.currentQuery);
-        }
-    }
-
-    clearSearch() {
-        const searchInput = document.getElementById('searchInput');
-        const clearSearchBtn = document.getElementById('clearSearch');
-
-        if (searchInput) {
-            searchInput.value = '';
-            searchInput.focus();
-        }
-
-        if (clearSearchBtn) {
-            clearSearchBtn.style.display = 'none';
-        }
-
-        this.currentQuery = '';
-        this.showDefaultState();
-    }
-
-    showDefaultState() {
-        this.hideAllStates();
-        const defaultState = document.getElementById('searchDefault');
-        if (defaultState) {
-            defaultState.style.display = 'block';
-        }
-    }
-
-    showLoadingState() {
-        this.hideAllStates();
-        const loadingState = document.getElementById('searchLoading');
-        if (loadingState) {
-            loadingState.style.display = 'block';
-        }
-    }
-
-    showNoResults() {
-        const noResults = document.getElementById('noResults');
-        const resultsState = document.getElementById('searchResultsState');
-        if (resultsState) resultsState.style.display = 'block';
-        if (noResults) noResults.style.display = 'block';
-    }
-
-    showErrorState() {
-        this.hideAllStates();
-        // You could implement a specific error state here
-        this.showNoResults();
-    }
-
-    hideAllStates() {
-        const states = [
-            'searchDefault',
-            'searchLoading',
-            'searchResultsState',
-            'noResults'
-        ];
-
-        states.forEach(stateId => {
-            const element = document.getElementById(stateId);
-            if (element) {
-                element.style.display = 'none';
-            }
-        });
-
-        // Hide all result sections
-        const sections = ['usersResults', 'postsResults', 'hashtagsResults'];
-        sections.forEach(sectionId => {
-            const element = document.getElementById(sectionId);
-            if (element) {
-                element.style.display = 'none';
-            }
-        });
-    }
-
-    showSearchSuggestions() {
-        // Implement search suggestions dropdown (optional)
-    }
-
-    // Recent Searches Management
-    loadRecentSearches() {
-        const recentSearches = JSON.parse(localStorage.getItem('recentSearches') || '[]');
-        this.displayRecentSearches(recentSearches);
-    }
-
-    displayRecentSearches(searches) {
-        const recentList = document.getElementById('recentList');
-        if (!recentList) return;
-
-        if (searches.length === 0) {
-            recentList.innerHTML = '<div class="recent-item"><span class="recent-query">No recent searches</span></div>';
-            return;
-        }
-
-        recentList.innerHTML = searches.map((query, index) => `
-            <div class="recent-item" data-query="${this.escapeHtml(query)}">
-                <span class="recent-query">${this.escapeHtml(query)}</span>
-                <button class="btn btn-ghost btn-icon clear-recent" title="Remove from history">
-                    <span class="icon icon-close"></span>
-                </button>
+      if (!error && trending) {
+        const list = document.querySelector(".trending-list");
+        if (list) {
+          list.innerHTML = trending
+            .map(
+              (item, index) => `
+            <div class="trending-item" onclick="searchManager.searchHashtag('${
+              item.tag
+            }')">
+              <span class="trending-rank">${index + 1}</span>
+              <div class="trending-content">
+                <span class="trending-tag">#${item.tag}</span>
+                <span class="trending-count">${item.posts_count.toLocaleString()} posts</span>
+              </div>
             </div>
-        `).join('');
-    }
-
-    saveToRecentSearches(query) {
-        let recentSearches = JSON.parse(localStorage.getItem('recentSearches') || '[]');
-        
-        // Remove if already exists
-        recentSearches = recentSearches.filter(q => q !== query);
-        
-        // Add to beginning
-        recentSearches.unshift(query);
-        
-        // Keep only last 10 searches
-        recentSearches = recentSearches.slice(0, 10);
-        
-        localStorage.setItem('recentSearches', JSON.stringify(recentSearches));
-        this.displayRecentSearches(recentSearches);
-    }
-
-    removeRecentSearch(query) {
-        let recentSearches = JSON.parse(localStorage.getItem('recentSearches') || '[]');
-        recentSearches = recentSearches.filter(q => q !== query);
-        localStorage.setItem('recentSearches', JSON.stringify(recentSearches));
-        this.displayRecentSearches(recentSearches);
-    }
-
-    async loadTrendingHashtags() {
-        try {
-            const { data: trending, error } = await this.supabase
-                .rpc('get_trending_hashtags', { 
-                    limit_count: 10,
-                    days_back: 7
-                });
-            
-            if (!error && trending) {
-                // Update the trending section in your HTML
-                const trendingList = document.querySelector('.trending-list');
-                if (trendingList) {
-                    trendingList.innerHTML = trending.map((item, index) => `
-                        <div class="trending-item" onclick="searchManager.searchHashtag('${item.name}')">
-                            <span class="trending-rank">${index + 1}</span>
-                            <div class="trending-content">
-                                <span class="trending-tag">#${item.name}</span>
-                                <span class="trending-count">${item.posts_count.toLocaleString()} posts</span>
-                            </div>
-                        </div>
-                    `).join('');
-                }
-            } else {
-                console.error('Error loading trending hashtags:', error);
-                // Fallback to mock data
-                this.loadMockTrendingHashtags();
-            }
-        } catch (error) {
-            console.error('Error loading trending hashtags:', error);
-            // Fallback to mock data
-            this.loadMockTrendingHashtags();
+          `
+            )
+            .join("");
         }
+      } else {
+        this.loadMockTrendingHashtags();
+      }
+    } catch (err) {
+      console.error("Error loading trending hashtags:", err);
+      this.loadMockTrendingHashtags();
     }
+  }
 
-    loadMockTrendingHashtags() {
-        const mockTrending = [
-            { name: 'SocialMedia', posts_count: 2540 },
-            { name: 'Tech', posts_count: 1820 },
-            { name: 'Uncensored', posts_count: 1200 },
-            { name: 'Freedom', posts_count: 950 },
-            { name: 'Community', posts_count: 870 }
-        ];
+  loadMockTrendingHashtags() {
+    const mock = [
+      { tag: "SocialMedia", posts_count: 2540 },
+      { tag: "Tech", posts_count: 1820 },
+      { tag: "Uncensored", posts_count: 1200 },
+      { tag: "Freedom", posts_count: 950 },
+      { tag: "Community", posts_count: 870 },
+    ];
+    const list = document.querySelector(".trending-list");
+    if (!list) return;
+    list.innerHTML = mock
+      .map(
+        (item, index) => `
+      <div class="trending-item" onclick="searchManager.searchHashtag('${item.tag}')">
+        <span class="trending-rank">${index + 1}</span>
+        <div class="trending-content">
+          <span class="trending-tag">#${item.tag}</span>
+          <span class="trending-count">${item.posts_count.toLocaleString()} posts</span>
+        </div>
+      </div>
+    `
+      )
+      .join("");
+  }
 
-        const trendingList = document.querySelector('.trending-list');
-        if (trendingList) {
-            trendingList.innerHTML = mockTrending.map((item, index) => `
-                <div class="trending-item" onclick="searchManager.searchHashtag('${item.name}')">
-                    <span class="trending-rank">${index + 1}</span>
-                    <div class="trending-content">
-                        <span class="trending-tag">#${item.name}</span>
-                        <span class="trending-count">${item.posts_count.toLocaleString()} posts</span>
-                    </div>
-                </div>
-            `).join('');
-        }
-    }
+  searchHashtag(tag) {
+    const input = document.getElementById("searchInput");
+    if (input) input.value = `#${tag}`;
+    this.performSearch(`#${tag}`);
+  }
 
-    searchHashtag(hashtag) {
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput) {
-            searchInput.value = `#${hashtag}`;
-            this.performSearch(`#${hashtag}`);
-        }
-    }
+  /* ---------- UTIL ---------- */
 
-    showMessage(message, type = 'info') {
-        // Remove existing message
-        const existingMsg = document.querySelector('.status-message');
-        if (existingMsg) existingMsg.remove();
+  showMessage(message, type = "info") {
+    const existing = document.querySelector(".status-message");
+    if (existing) existing.remove();
 
-        // Create new message
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `status-message status-${type}`;
-        messageDiv.textContent = message;
-        messageDiv.style.cssText = `
-            position: fixed;
-            top: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 10000;
-            max-width: 90%;
-            padding: 12px 20px;
-            border-radius: 8px;
-            font-weight: 500;
-        `;
+    const el = document.createElement("div");
+    el.className = `status-message status-${type}`;
+    el.textContent = message;
+    el.style.cssText = `
+      position: fixed;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10000;
+      max-width: 90%;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-weight: 500;
+    `;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+  }
 
-        document.body.appendChild(messageDiv);
+  formatTime(ts) {
+    const date = new Date(ts);
+    const now = new Date();
+    const diffMs = now - date;
+    const mins = Math.floor(diffMs / 60000);
+    const hrs = Math.floor(diffMs / 3600000);
+    const days = Math.floor(diffMs / 86400000);
 
-        // Auto remove after 3 seconds
-        setTimeout(() => {
-            if (messageDiv.parentNode) {
-                messageDiv.parentNode.removeChild(messageDiv);
-            }
-        }, 3000);
-    }
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m`;
+    if (hrs < 24) return `${hrs}h`;
+    if (days < 7) return `${days}d`;
+    return date.toLocaleDateString();
+  }
 
-    // Utility functions
-    formatTime(timestamp) {
-        const date = new Date(timestamp);
-        const now = new Date();
-        const diffMs = now - date;
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffMs / 86400000);
+  formatPostContent(content) {
+    if (!content) return "";
+    let formatted = this.escapeHtml(content);
+    formatted = formatted.replace(
+      /(https?:\/\/[^\s]+)/g,
+      '<a href="$1" target="_blank" rel="noopener" style="color: var(--primary-color); text-decoration: none;">$1</a>'
+    );
+    formatted = formatted.replace(
+      /#(\w+)/g,
+      '<span style="color: var(--primary-color); font-weight: 500;">#$1</span>'
+    );
+    formatted = formatted.replace(
+      /@(\w+)/g,
+      '<span style="color: var(--primary-color); font-weight: 500;">@$1</span>'
+    );
+    return formatted;
+  }
 
-        if (diffMins < 1) return 'just now';
-        if (diffMins < 60) return `${diffMins}m`;
-        if (diffHours < 24) return `${diffHours}h`;
-        if (diffDays < 7) return `${diffDays}d`;
-        
-        return date.toLocaleDateString();
-    }
+  escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
 
-    formatPostContent(content) {
-        if (!content) return '';
-        
-        let formatted = this.escapeHtml(content);
-        
-        // Convert URLs to links
-        formatted = formatted.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color: var(--primary-color); text-decoration: none;">$1</a>');
-        
-        // Convert hashtags
-        formatted = formatted.replace(/#(\w+)/g, '<span style="color: var(--primary-color); font-weight: 500;">#$1</span>');
-        
-        // Convert mentions
-        formatted = formatted.replace(/@(\w+)/g, '<span style="color: var(--primary-color); font-weight: 500;">@$1</span>');
-        
-        return formatted;
-    }
-
-    escapeHtml(unsafe) {
-        return unsafe
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-    }
-
-    updateUI() {
-        const currentUser = getCurrentUser ? getCurrentUser() : null;
-        const profileSection = document.getElementById('profileSection');
-        const authButtons = document.getElementById('authButtons');
-
-        if (profileSection && authButtons) {
-            if (currentUser) {
-                profileSection.style.display = 'flex';
-                authButtons.style.display = 'none';
-                
-                // Update profile images
-                const headerProfileImg = document.getElementById('headerProfileImg');
-                const sidebarProfileImg = document.getElementById('sidebarProfileImg');
-                const sidebarUserName = document.getElementById('sidebarUserName');
-                const sidebarUserHandle = document.getElementById('sidebarUserHandle');
-                
-                if (headerProfileImg && currentUser.avatar_url) {
-                    headerProfileImg.src = currentUser.avatar_url;
-                }
-                if (sidebarProfileImg && currentUser.avatar_url) {
-                    sidebarProfileImg.src = currentUser.avatar_url;
-                }
-                if (sidebarUserName) {
-                    sidebarUserName.textContent = currentUser.displayName || currentUser.username;
-                }
-                if (sidebarUserHandle) {
-                    sidebarUserHandle.textContent = `@${currentUser.username}`;
-                }
-            } else {
-                profileSection.style.display = 'none';
-                authButtons.style.display = 'flex';
-            }
-        }
-    }
+  updateUI() {
+    // header on search page is centered logo only, so nothing special to do now
+  }
 }
 
-// Initialize search manager when page loads
 let searchManager;
-
-document.addEventListener('DOMContentLoaded', () => {
-    searchManager = new SearchManager();
-    // Make globally available for inline onclick handlers
-    window.searchManager = searchManager;
+document.addEventListener("DOMContentLoaded", () => {
+  searchManager = new SearchManager();
+  window.searchManager = searchManager;
 });
