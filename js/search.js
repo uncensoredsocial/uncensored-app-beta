@@ -78,10 +78,10 @@ class SearchManager {
       });
     });
 
-    // Recent searches: whole row clickable, X removes
+    // Recent searches: single tap on mobile (touchstart) + click fallback
     if (recentList) {
-      recentList.addEventListener("click", (e) => {
-        const clearBtn = e.target.closest(".clear-recent");
+      const handler = (target) => {
+        const clearBtn = target.closest(".clear-recent");
 
         if (clearBtn) {
           const item = clearBtn.closest(".recent-item");
@@ -89,13 +89,25 @@ class SearchManager {
           return;
         }
 
-        const item = e.target.closest(".recent-item");
+        const item = target.closest(".recent-item");
         if (item && item.dataset.query) {
           const query = item.dataset.query;
           const input = document.getElementById("searchInput");
-          if (input) input.value = query;
+          if (input) {
+            input.blur();
+            input.value = query;
+          }
           this.performSearch(query);
         }
+      };
+
+      // touchstart helps with iOS where first tap just dismisses keyboard
+      recentList.addEventListener("touchstart", (e) => {
+        handler(e.target);
+      });
+
+      recentList.addEventListener("click", (e) => {
+        handler(e.target);
       });
     }
 
@@ -225,13 +237,24 @@ class SearchManager {
       });
 
       if (!error && posts) {
-        results.posts = posts.map((post) => ({
+        // Map basic fields
+        let mapped = posts.map((post) => ({
           id: post.id,
           userId: post.user_id,
           content: post.content,
           createdAt: post.created_at,
-          likes: post.like_count || post.likes_count || 0,
-          comments: post.comment_count || post.comments_count || 0,
+          likes:
+            post.like_count != null
+              ? post.like_count
+              : post.likes_count != null
+              ? post.likes_count
+              : 0,
+          comments:
+            post.comment_count != null
+              ? post.comment_count
+              : post.comments_count != null
+              ? post.comments_count
+              : 0,
           media_url: post.media_url,
           media_type: post.media_type,
           user: {
@@ -239,7 +262,41 @@ class SearchManager {
             displayName: post.display_name || post.username,
             avatar: post.avatar_url || "assets/icons/default-profile.png",
           },
+          liked_by_me: false,
+          saved_by_me: false,
         }));
+
+        // Add liked/saved state from post_likes / post_saves
+        if (currentUser && mapped.length) {
+          const ids = mapped.map((p) => p.id);
+
+          const { data: likedRows } = await this.supabase
+            .from("post_likes")
+            .select("post_id")
+            .eq("user_id", currentUser.id)
+            .in("post_id", ids);
+
+          const { data: savedRows } = await this.supabase
+            .from("post_saves")
+            .select("post_id")
+            .eq("user_id", currentUser.id)
+            .in("post_id", ids);
+
+          const likedSet = new Set(
+            (likedRows || []).map((row) => row.post_id)
+          );
+          const savedSet = new Set(
+            (savedRows || []).map((row) => row.post_id)
+          );
+
+          mapped = mapped.map((p) => ({
+            ...p,
+            liked_by_me: likedSet.has(p.id),
+            saved_by_me: savedSet.has(p.id),
+          }));
+        }
+
+        results.posts = mapped;
       } else {
         console.error("Error searching posts:", error);
       }
@@ -386,24 +443,38 @@ class SearchManager {
     }
 
     section.style.display = "block";
-    list.innerHTML = posts
-      .map((post) => {
-        const avatar = post.user.avatar || "assets/icons/default-profile.png";
-        const username = post.user.username || "unknown";
-        const displayName = post.user.displayName || username;
-        const time = this.formatTime(post.createdAt);
-        const mediaHtml = this.renderMediaHtml(
-          post.media_url,
-          post.media_type
-        );
 
-        return `
+    list.innerHTML = posts.map((post) => this.renderFeedStylePost(post)).join(
+      ""
+    );
+
+    this.attachPostEvents();
+  }
+
+  // This matches FeedManager.renderPostHtml() layout/icons
+  renderFeedStylePost(post) {
+    const user = post.user || {};
+    const username = user.username || "unknown";
+    const displayName = user.displayName || username;
+    const avatar = user.avatar || "assets/icons/default-profile.png";
+
+    const time = this.formatTime(post.createdAt);
+
+    const liked = !!post.liked_by_me;
+    const saved = !!post.saved_by_me;
+
+    const likeCount = typeof post.likes === "number" ? post.likes : 0;
+    const commentCount =
+      typeof post.comments === "number" ? post.comments : 0;
+
+    const mediaHtml = this.renderMediaHtml(post.media_url, post.media_type);
+
+    return `
       <article class="post" data-post-id="${post.id}">
         <header class="post-header">
           <div class="post-user" data-username="${this.escapeHtml(username)}">
-            <img class="post-user-avatar" src="${avatar}"
-              onerror="this.src='assets/icons/default-profile.png'">
-            <div class="post-user-info">
+            <img class="post-avatar" src="${avatar}" onerror="this.src='assets/icons/default-profile.png'">
+            <div class="post-user-meta">
               <span class="post-display-name">${this.escapeHtml(
                 displayName
               )}</span>
@@ -413,35 +484,41 @@ class SearchManager {
           <span class="post-time">${time}</span>
         </header>
 
-        <div class="post-content">
-          ${this.formatPostContent(post.content)}
+        <div class="post-body">
+          <div class="post-text">${this.formatPostContent(
+            post.content || ""
+          )}</div>
+          ${mediaHtml}
         </div>
-        ${mediaHtml}
 
         <footer class="post-footer">
-          <div class="post-actions">
-            <button class="post-action like-btn">
-              <span class="icon icon-like"></span>
-              <span class="post-action-count like-count">${post.likes}</span>
+          <div class="post-actions"
+               style="display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;">
+            <button class="post-action like-btn ${liked ? "liked" : ""}"
+                    style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center;">
+              <i class="fa-${liked ? "solid" : "regular"} fa-heart"></i>
+              <span class="like-count">${likeCount}</span>
             </button>
-            <button class="post-action comment-btn">
-              <span class="icon icon-comment"></span>
-              <span class="post-action-count comment-count">${post.comments}</span>
+
+            <button class="post-action comment-btn"
+                    style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center;">
+              <i class="fa-regular fa-comment"></i>
+              <span class="comment-count">${commentCount}</span>
             </button>
-            <button class="post-action share-btn">
-              <span class="icon icon-share"></span>
+
+            <button class="post-action share-btn"
+                    style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center;">
+              <i class="fa-solid fa-arrow-up-from-bracket"></i>
             </button>
-            <button class="post-action save-btn">
-              <span class="icon icon-save"></span>
+
+            <button class="post-action save-btn ${saved ? "saved" : ""}"
+                    style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center;">
+              <i class="fa-${saved ? "solid" : "regular"} fa-bookmark"></i>
             </button>
           </div>
         </footer>
       </article>
     `;
-      })
-      .join("");
-
-    this.attachPostEvents();
   }
 
   renderMediaHtml(url, type) {
@@ -641,25 +718,31 @@ class SearchManager {
     if (!token) return this.showMessage("Missing token", "error");
 
     const countEl = btn.querySelector(".like-count");
-    let count = parseInt(countEl.textContent || "0", 10) || 0;
-    const wasLiked = btn.classList.contains("liked");
+    const icon = btn.querySelector("i");
 
-    // optimistic UI
+    const wasLiked = btn.classList.contains("liked");
+    let newCount = parseInt(countEl.textContent || "0", 10);
+
+    // Optimistic UI
     if (wasLiked) {
       btn.classList.remove("liked");
-      count = Math.max(0, count - 1);
+      icon.classList.replace("fa-solid", "fa-regular");
+      newCount--;
     } else {
       btn.classList.add("liked");
-      count += 1;
+      icon.classList.replace("fa-regular", "fa-solid");
+      newCount++;
     }
-    countEl.textContent = String(count);
+    countEl.textContent = String(Math.max(newCount, 0));
 
     try {
       const res = await fetch(`${FEED_API_BASE_URL}/posts/${postId}/like`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
+
       const data = await res.json();
+
       if (!res.ok) throw new Error(data.error || "Failed to update like");
 
       const serverLikes =
@@ -668,6 +751,7 @@ class SearchManager {
           : typeof data.like_count === "number"
           ? data.like_count
           : null;
+
       if (serverLikes !== null) {
         countEl.textContent = String(serverLikes);
       }
@@ -685,12 +769,16 @@ class SearchManager {
     const token = this.getAuthToken();
     if (!token) return this.showMessage("Missing token", "error");
 
+    const icon = btn.querySelector("i");
     const wasSaved = btn.classList.contains("saved");
 
+    // Optimistic UI
     if (wasSaved) {
       btn.classList.remove("saved");
+      icon.classList.replace("fa-solid", "fa-regular");
     } else {
       btn.classList.add("saved");
+      icon.classList.replace("fa-regular", "fa-solid");
     }
 
     try {
@@ -698,6 +786,7 @@ class SearchManager {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to update save");
     } catch (err) {
@@ -963,7 +1052,28 @@ class SearchManager {
   }
 
   updateUI() {
-    // Search page header is just centered logo now, nothing extra.
+    // Mirror auth header behaviour from feed.js using same DOM ids
+    const user =
+      typeof getCurrentUser === "function" ? getCurrentUser() : null;
+    const loggedIn = !!user;
+
+    const profileSection = document.getElementById("profileSection");
+    const authButtons = document.getElementById("authButtons");
+    const headerProfileImg = document.getElementById("headerProfileImg");
+
+    if (profileSection && authButtons) {
+      if (loggedIn) {
+        profileSection.style.display = "flex";
+        authButtons.style.display = "none";
+
+        if (headerProfileImg && user.avatar_url) {
+          headerProfileImg.src = user.avatar_url;
+        }
+      } else {
+        profileSection.style.display = "none";
+        authButtons.style.display = "flex";
+      }
+    }
   }
 }
 
