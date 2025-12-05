@@ -1,0 +1,122 @@
+/* ===== NOTIFICATIONS PAGE STYLES ===== */
+
+.notifications-main {
+  padding: var(--space-4);
+}
+
+/* Sections */
+.notifications-section {
+  margin-bottom: var(--space-6);
+}
+
+.notifications-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-lg);
+  margin-bottom: var(--space-3);
+}
+
+.notifications-title i {
+  color: var(--primary-color);
+}
+
+/* Lists */
+.notifications-list {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+  background-color: var(--bg-secondary);
+}
+
+/* Each notification row */
+.notification-item {
+  display: flex;
+  align-items: flex-start;
+  padding: var(--space-3);
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.notification-item:last-child {
+  border-bottom: none;
+}
+
+.notification-item:hover {
+  background-color: var(--hover-color);
+}
+
+/* Avatar */
+.notification-avatar-wrapper {
+  flex-shrink: 0;
+}
+
+.notification-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* Body */
+.notification-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification-text {
+  font-size: var(--font-size-sm);
+  color: var(--text-color);
+}
+
+.notification-text strong {
+  font-weight: 600;
+}
+
+.notification-meta {
+  margin-top: 4px;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+/* Follow button on follower notifications */
+.notification-follow-btn {
+  margin-left: auto;
+  align-self: center;
+  white-space: nowrap;
+}
+
+/* Empty state */
+.notifications-empty {
+  text-align: center;
+  padding: var(--space-8) var(--space-4);
+  color: var(--text-muted);
+  display: none;
+}
+
+.notifications-empty h3 {
+  margin-bottom: var(--space-2);
+  color: var(--text-color);
+}
+
+/* Centered header helper (already defined for search, safe to repeat) */
+.header-centered {
+  justify-content: center;
+}
+
+.header-centered .logo {
+  margin: 0;
+}
+
+/* Responsive tweaks */
+@media (max-width: 767px) {
+  .notifications-main {
+    padding: var(--space-3);
+  }
+
+  .notifications-list {
+    border-radius: var(--radius-md);
+  }
+}
