@@ -4,11 +4,19 @@
   padding: var(--space-4);
 }
 
-/* Sections */
-.notifications-section {
-  margin-bottom: var(--space-6);
+/* Row layout for Likes / Comments / Followers */
+.notifications-sections-row {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
 }
 
+/* each section shares the row equally */
+.notifications-section {
+  flex: 1;
+}
+
+/* Titles */
 .notifications-title {
   display: flex;
   align-items: center;
@@ -101,7 +109,7 @@
   color: var(--text-color);
 }
 
-/* Centered header helper (already defined for search, safe to repeat) */
+/* Centered header helper (already used on search, safe here too) */
 .header-centered {
   justify-content: center;
 }
@@ -111,6 +119,13 @@
 }
 
 /* Responsive tweaks */
+@media (max-width: 900px) {
+  /* stack sections on smaller screens so each has full width */
+  .notifications-sections-row {
+    flex-direction: column;
+  }
+}
+
 @media (max-width: 767px) {
   .notifications-main {
     padding: var(--space-3);
