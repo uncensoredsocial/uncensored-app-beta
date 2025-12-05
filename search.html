@@ -1,265 +1,248 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Search - Uncensored Social</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Search - Uncensored Social</title>
 
-    <!-- Font Awesome for magnifying glass icon -->
-    <link
-        rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-        integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
-        crossorigin="anonymous"
-        referrerpolicy="no-referrer"
-    />
-
-    <link rel="stylesheet" href="css/styles.css" />
-    <link rel="stylesheet" href="css/search-styles.css" />
-    <link rel="stylesheet" href="css/icons.css" />
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/search-styles.css" />
+  <link rel="stylesheet" href="css/icons.css" />
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer"
+  />
 </head>
+
 <body>
-    <!-- TOP HEADER – SAME AS HOME -->
-    <header class="header">
-        <div class="header-left">
-            <a href="index.html" class="logo">Uncensored Social</a>
-        </div>
+  <!-- ============= HEADER (SAME AS INDEX) ============= -->
+  <header class="header">
+    <div class="header-left">
+      <div class="profile-section" id="profileSection">
+        <a href="profile.html" class="profile-icon">
+          <img
+            id="headerProfileImg"
+            src="assets/icons/default-profile.png"
+            alt="Profile"
+          />
+        </a>
+      </div>
 
-        <div class="header-right">
-            <!-- Shown when NOT logged in -->
-            <div id="authButtons" class="auth-buttons">
-                <a href="login.html" class="btn btn-ghost btn-sm">Log in</a>
-                <a href="signup.html" class="btn btn-primary btn-sm">Sign up</a>
-            </div>
-
-            <!-- Shown when logged in -->
-            <div id="profileSection" class="profile-section" style="display: none;">
-                <img
-                    id="headerProfileImg"
-                    src="assets/icons/default-profile.png"
-                    alt="Profile"
-                    class="profile-avatar"
-                />
-                <button class="btn btn-ghost btn-icon" id="openSidebar" aria-label="Open menu">
-                    <span class="icon icon-menu"></span>
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <!-- MAIN LAYOUT -->
-    <div class="content-wrapper">
-        <!-- Side Navigation - Desktop -->
-        <nav class="side-nav" id="sideNav">
-            <a href="index.html" class="nav-item">
-                <span class="icon icon-home"></span>
-                <span class="nav-label">Home</span>
-            </a>
-            <a href="search.html" class="nav-item active">
-                <span class="icon icon-search"></span>
-                <span class="nav-label">Search</span>
-            </a>
-            <a href="notifications.html" class="nav-item">
-                <span class="icon icon-notifications"></span>
-                <span class="nav-label">Alerts</span>
-            </a>
-            <a href="dms.html" class="nav-item">
-                <span class="icon icon-messages"></span>
-                <span class="nav-label">Messages</span>
-            </a>
-        </nav>
-
-        <!-- MAIN SEARCH CONTENT -->
-        <main class="main-content">
-            <!-- Search Header (search bar) -->
-            <div class="search-header">
-                <div class="search-container">
-                    <div class="search-input-wrapper">
-                        <input
-                            type="text"
-                            id="searchInput"
-                            placeholder="Search users, posts, or hashtags..."
-                            class="search-input"
-                        />
-
-                        <!-- Clear (X) button -->
-                        <button
-                            class="btn btn-ghost btn-icon clear-search"
-                            id="clearSearch"
-                            style="display: none;"
-                            aria-label="Clear search"
-                        >
-                            <span class="icon icon-close"></span>
-                        </button>
-
-                        <!-- Search button -->
-                        <button
-                            class="btn btn-primary btn-icon search-button"
-                            id="searchButton"
-                            aria-label="Search"
-                        >
-                            <i class="fa-solid fa-magnifying-glass"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Search Filters -->
-            <div class="search-filters" id="searchFilters">
-                <div class="filter-tabs">
-                    <button class="filter-tab active" data-filter="all">All</button>
-                    <button class="filter-tab" data-filter="users">Users</button>
-                    <button class="filter-tab" data-filter="posts">Posts</button>
-                    <button class="filter-tab" data-filter="hashtags">Hashtags</button>
-                </div>
-            </div>
-
-            <!-- Search Results Wrapper -->
-            <div class="search-results" id="searchResults">
-                <!-- Default State - Before Search -->
-                <div class="search-default-state" id="searchDefault">
-                    <div class="trending-section">
-                        <h3>Trending Now</h3>
-                        <div class="trending-list">
-                            <!-- Filled by search.js (loadTrendingHashtags) -->
-                        </div>
-                    </div>
-
-                    <div class="recent-searches" id="recentSearches">
-                        <h3>Recent Searches</h3>
-                        <div class="recent-list" id="recentList">
-                            <!-- Filled by search.js -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Loading State -->
-                <div class="search-loading-state" id="searchLoading" style="display: none;">
-                    <div class="loading-indicator">
-                        <div class="loading-spinner"></div>
-                        <span>Searching...</span>
-                    </div>
-                </div>
-
-                <!-- Results State -->
-                <div class="search-results-state" id="searchResultsState" style="display: none;">
-                    <div class="results-header">
-                        <h3 id="resultsTitle">Search Results</h3>
-                        <span class="results-count" id="resultsCount">0 results</span>
-                    </div>
-
-                    <!-- Users Results -->
-                    <div class="results-section users-results" id="usersResults">
-                        <h4>Users</h4>
-                        <div class="users-list" id="usersList"></div>
-                    </div>
-
-                    <!-- Posts Results -->
-                    <div class="results-section posts-results" id="postsResults">
-                        <h4>Posts</h4>
-                        <div class="posts-list" id="postsList"></div>
-                    </div>
-
-                    <!-- Hashtags Results -->
-                    <div class="results-section hashtags-results" id="hashtagsResults">
-                        <h4>Hashtags</h4>
-                        <div class="hashtags-list" id="hashtagsList"></div>
-                    </div>
-
-                    <!-- No Results State -->
-                    <div class="no-results" id="noResults" style="display: none;">
-                        <div class="empty-state">
-                            <h3>No results found</h3>
-                            <p>Try different keywords or check the spelling</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
+      <div class="auth-buttons" id="authButtons">
+        <a href="login.html" class="btn btn-sm btn-login">Log In</a>
+        <a href="signup.html" class="btn btn-sm btn-signup">Sign Up</a>
+      </div>
     </div>
 
-    <!-- Bottom Navigation - Mobile -->
-    <nav class="bottom-nav" id="bottomNav">
-        <a href="index.html" class="nav-item">
-            <span class="icon icon-home"></span>
-            <span class="nav-label">Home</span>
-        </a>
-        <a href="search.html" class="nav-item active">
-            <span class="icon icon-search"></span>
-            <span class="nav-label">Search</span>
-        </a>
-        <a href="notifications.html" class="nav-item">
-            <span class="icon icon-notifications"></span>
-            <span class="nav-label">Alerts</span>
-        </a>
-        <a href="dms.html" class="nav-item">
-            <span class="icon icon-messages"></span>
-            <span class="nav-label">Messages</span>
-        </a>
-    </nav>
+    <!-- Centered logo text -->
+    <h1 class="logo">Uncensored<span>Social</span></h1>
 
-    <!-- SIDEBAR MENU (same as home) -->
-    <div class="sidebar" id="sidebar">
-        <div class="sidebar-content">
-            <div class="sidebar-header">
-                <h3>Menu</h3>
-                <button class="btn btn-ghost btn-icon" id="closeSidebar">
-                    <span class="icon icon-close"></span>
-                </button>
-            </div>
-
-            <div class="sidebar-user">
-                <img
-                    src="assets/icons/default-profile.png"
-                    alt="Profile"
-                    id="sidebarProfileImg"
-                />
-                <div class="sidebar-user-info">
-                    <h4 id="sidebarUserName">Username</h4>
-                    <p id="sidebarUserHandle">@username</p>
-                </div>
-            </div>
-
-            <ul class="menu-items">
-                <li>
-                    <a href="profile.html?user=me">
-                        <span class="icon icon-profile"></span>
-                        <span>My Profile</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="#" id="feedsToggle">
-                        <span class="icon icon-feeds"></span>
-                        <span>Feeds: For You</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="saved.html">
-                        <span class="icon icon-saved"></span>
-                        <span>Saved Posts</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="settings.html">
-                        <span class="icon icon-settings"></span>
-                        <span>Settings</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="#" onclick="logout()">
-                        <span class="icon icon-logout"></span>
-                        <span>Logout</span>
-                    </a>
-                </li>
-            </ul>
-        </div>
+    <div class="header-actions">
+      <!-- On search page, refresh just re-runs the last search -->
+      <button
+        class="btn btn-ghost btn-icon"
+        onclick="if(window.searchManager){searchManager.performSearch(searchManager.currentQuery || '');}"
+        title="Refresh"
+      >
+        <span class="icon icon-refresh"></span>
+      </button>
     </div>
-    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  </header>
 
-    <!-- SCRIPTS -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/auth.js"></script>
-    <script src="js/app.js"></script>
-    <script src="js/search.js"></script>
+  <!-- ============= MAIN CONTENT ============= -->
+  <div class="content-wrapper">
+    <main class="main-content">
+      <!-- Search bar -->
+      <div class="search-header">
+        <div class="search-container">
+          <div class="search-input-wrapper">
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="Search users, posts, or hashtags..."
+              class="search-input"
+            />
+
+            <button
+              class="btn btn-ghost btn-icon clear-search"
+              id="clearSearch"
+              style="display: none;"
+              aria-label="Clear search"
+            >
+              <span class="icon icon-close"></span>
+            </button>
+
+            <button
+              class="btn btn-primary btn-icon search-button"
+              id="searchButton"
+              aria-label="Search"
+            >
+              <i class="fa-solid fa-magnifying-glass"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter tabs -->
+      <div class="search-filters" id="searchFilters">
+        <div class="filter-tabs">
+          <button class="filter-tab active" data-filter="all">All</button>
+          <button class="filter-tab" data-filter="users">Users</button>
+          <button class="filter-tab" data-filter="posts">Posts</button>
+          <button class="filter-tab" data-filter="hashtags">Hashtags</button>
+        </div>
+      </div>
+
+      <!-- Search states -->
+      <div class="search-results" id="searchResults">
+        <!-- Default state -->
+        <div class="search-default-state" id="searchDefault">
+          <div class="trending-section">
+            <h3>Trending Now</h3>
+            <div class="trending-list">
+              <!-- filled by search.js (loadTrendingHashtags) -->
+            </div>
+          </div>
+
+          <div class="recent-searches" id="recentSearches">
+            <h3>Recent Searches</h3>
+            <div class="recent-list" id="recentList"></div>
+          </div>
+        </div>
+
+        <!-- Loading state -->
+        <div class="search-loading-state" id="searchLoading" style="display:none;">
+          <div class="loading-indicator">
+            <div class="loading-spinner"></div>
+            <span>Searching...</span>
+          </div>
+        </div>
+
+        <!-- Results -->
+        <div class="search-results-state" id="searchResultsState" style="display:none;">
+          <div class="results-header">
+            <h3 id="resultsTitle">Search Results</h3>
+            <span class="results-count" id="resultsCount">0 results</span>
+          </div>
+
+          <!-- Users -->
+          <div class="results-section users-results" id="usersResults">
+            <h4>Users</h4>
+            <div class="users-list" id="usersList"></div>
+          </div>
+
+          <!-- Posts -->
+          <div class="results-section posts-results" id="postsResults">
+            <h4>Posts</h4>
+            <div class="posts-list" id="postsList"></div>
+          </div>
+
+          <!-- Hashtags -->
+          <div class="results-section hashtags-results" id="hashtagsResults">
+            <h4>Hashtags</h4>
+            <div class="hashtags-list" id="hashtagsList"></div>
+          </div>
+
+          <!-- No results -->
+          <div class="no-results" id="noResults" style="display:none;">
+            <div class="empty-state">
+              <h3>No results</h3>
+              <p>Try different keywords or check the spelling.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ============= BOTTOM NAV (SAME AS INDEX) ============= -->
+  <nav class="bottom-nav" id="bottomNav">
+    <a href="index.html" class="nav-item">
+      <i class="fa-solid fa-house nav-icon"></i>
+      <span class="nav-label">Home</span>
+    </a>
+    <a href="search.html" class="nav-item active">
+      <i class="fa-solid fa-magnifying-glass nav-icon"></i>
+      <span class="nav-label">Search</span>
+    </a>
+    <a href="notifications.html" class="nav-item">
+      <i class="fa-regular fa-bell nav-icon"></i>
+      <span class="nav-label">Alerts</span>
+    </a>
+    <a href="messages.html" class="nav-item">
+      <i class="fa-regular fa-envelope nav-icon"></i>
+      <span class="nav-label">Messages</span>
+    </a>
+  </nav>
+
+  <!-- ============= SIDEBAR (same structure as index) ============= -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-content">
+      <div class="sidebar-header">
+        <h3>Menu</h3>
+        <button class="btn btn-ghost btn-icon" id="closeSidebar">
+          <span class="icon icon-close"></span>
+        </button>
+      </div>
+
+      <div class="sidebar-user">
+        <img
+          src="assets/icons/default-profile.png"
+          alt="Profile"
+          id="sidebarProfileImg"
+        />
+        <div class="sidebar-user-info">
+          <h4 id="sidebarUserName">Username</h4>
+          <p id="sidebarUserHandle">@username</p>
+        </div>
+      </div>
+
+      <ul class="menu-items">
+        <li>
+          <a href="profile.html?user=me">
+            <span class="icon icon-profile"></span>
+            <span>My Profile</span>
+          </a>
+        </li>
+        <li>
+          <a href="#" id="feedsToggle">
+            <span class="icon icon-feeds"></span>
+            <span>Feeds: For You</span>
+          </a>
+        </li>
+        <li>
+          <a href="saved.html">
+            <span class="icon icon-saved"></span>
+            <span>Saved Posts</span>
+          </a>
+        </li>
+        <li>
+          <a href="settings.html">
+            <span class="icon icon-settings"></span>
+            <span>Settings</span>
+          </a>
+        </li>
+        <li>
+          <a href="#" onclick="logout()">
+            <span class="icon icon-logout"></span>
+            <span>Logout</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- ============= SCRIPTS ============= -->
+  <!-- Supabase v1 so supabase.createClient works -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@1.35.7/dist/supabase.min.js"></script>
+
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/search.js"></script>
 </body>
 </html>
