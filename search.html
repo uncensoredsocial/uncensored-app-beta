@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Search - Uncensored Social</title>
 
-  <!-- Styles -->
+  <!-- Global styles -->
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/search-styles.css" />
   <link rel="stylesheet" href="css/icons.css" />
@@ -16,10 +16,46 @@
     crossorigin="anonymous"
     referrerpolicy="no-referrer"
   />
+
+  <!-- Desktop tweaks (same idea as index) -->
+  <style>
+    @media (min-width: 900px) {
+      .content-wrapper {
+        max-width: 960px;
+        margin: 0 auto;
+        padding-top: 72px;
+      }
+      .main-content {
+        max-width: 700px;
+        margin: 0 auto;
+      }
+    }
+
+    /* Force bottom nav visible on desktop too */
+    @media (min-width: 768px) {
+      .bottom-nav {
+        display: flex !important;
+      }
+    }
+
+    /* Font Awesome icons above labels in bottom nav */
+    .bottom-nav .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+    }
+
+    .bottom-nav .nav-icon {
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+  </style>
 </head>
 
 <body>
-  <!-- ============= HEADER (SAME AS INDEX) ============= -->
+  <!-- ============= HEADER (same as index) ============= -->
   <header class="header">
     <div class="header-left">
       <div class="profile-section" id="profileSection">
@@ -38,15 +74,14 @@
       </div>
     </div>
 
-    <!-- Centered logo text -->
     <h1 class="logo">Uncensored<span>Social</span></h1>
 
     <div class="header-actions">
-      <!-- On search page, refresh just re-runs the last search -->
+      <!-- You can reuse refresh for “refresh trending” if you want -->
       <button
         class="btn btn-ghost btn-icon"
-        onclick="if(window.searchManager){searchManager.performSearch(searchManager.currentQuery || '');}"
         title="Refresh"
+        onclick="window.location.reload()"
       >
         <span class="icon icon-refresh"></span>
       </button>
@@ -56,7 +91,7 @@
   <!-- ============= MAIN CONTENT ============= -->
   <div class="content-wrapper">
     <main class="main-content">
-      <!-- Search bar -->
+      <!-- Search Header -->
       <div class="search-header">
         <div class="search-container">
           <div class="search-input-wrapper">
@@ -67,6 +102,7 @@
               class="search-input"
             />
 
+            <!-- Clear (X) button -->
             <button
               class="btn btn-ghost btn-icon clear-search"
               id="clearSearch"
@@ -76,6 +112,7 @@
               <span class="icon icon-close"></span>
             </button>
 
+            <!-- Search button -->
             <button
               class="btn btn-primary btn-icon search-button"
               id="searchButton"
@@ -87,7 +124,7 @@
         </div>
       </div>
 
-      <!-- Filter tabs -->
+      <!-- Search Filters -->
       <div class="search-filters" id="searchFilters">
         <div class="filter-tabs">
           <button class="filter-tab active" data-filter="all">All</button>
@@ -97,61 +134,71 @@
         </div>
       </div>
 
-      <!-- Search states -->
+      <!-- Search Results Wrapper -->
       <div class="search-results" id="searchResults">
-        <!-- Default state -->
+        <!-- Default State - Before Search -->
         <div class="search-default-state" id="searchDefault">
           <div class="trending-section">
             <h3>Trending Now</h3>
             <div class="trending-list">
-              <!-- filled by search.js (loadTrendingHashtags) -->
+              <!-- Filled by search.js (loadTrendingHashtags) -->
             </div>
           </div>
 
           <div class="recent-searches" id="recentSearches">
             <h3>Recent Searches</h3>
-            <div class="recent-list" id="recentList"></div>
+            <div class="recent-list" id="recentList">
+              <!-- Recent searches rendered by search.js -->
+            </div>
           </div>
         </div>
 
-        <!-- Loading state -->
-        <div class="search-loading-state" id="searchLoading" style="display:none;">
+        <!-- Loading State -->
+        <div
+          class="search-loading-state"
+          id="searchLoading"
+          style="display: none;"
+        >
           <div class="loading-indicator">
             <div class="loading-spinner"></div>
             <span>Searching...</span>
           </div>
         </div>
 
-        <!-- Results -->
-        <div class="search-results-state" id="searchResultsState" style="display:none;">
+        <!-- Results State -->
+        <div
+          class="search-results-state"
+          id="searchResultsState"
+          style="display: none;"
+        >
           <div class="results-header">
             <h3 id="resultsTitle">Search Results</h3>
             <span class="results-count" id="resultsCount">0 results</span>
           </div>
 
-          <!-- Users -->
+          <!-- Users Results -->
           <div class="results-section users-results" id="usersResults">
             <h4>Users</h4>
             <div class="users-list" id="usersList"></div>
           </div>
 
-          <!-- Posts -->
+          <!-- Posts Results -->
           <div class="results-section posts-results" id="postsResults">
             <h4>Posts</h4>
             <div class="posts-list" id="postsList"></div>
           </div>
 
-          <!-- Hashtags -->
+          <!-- Hashtags Results -->
           <div class="results-section hashtags-results" id="hashtagsResults">
             <h4>Hashtags</h4>
             <div class="hashtags-list" id="hashtagsList"></div>
           </div>
 
-          <!-- No results -->
-          <div class="no-results" id="noResults" style="display:none;">
+          <!-- No Results State -->
+          <div class="no-results" id="noResults" style="display: none;">
             <div class="empty-state">
-              <h3>No results</h3>
-              <p>Try different keywords or check the spelling.</p>
+              <h3>No results found</h3>
+              <p>Try different keywords or check the spelling</p>
             </div>
           </div>
         </div>
@@ -159,7 +206,7 @@
     </main>
   </div>
 
-  <!-- ============= BOTTOM NAV (SAME AS INDEX) ============= -->
+  <!-- ============= BOTTOM NAV (same as index, Search active) ============= -->
   <nav class="bottom-nav" id="bottomNav">
     <a href="index.html" class="nav-item">
       <i class="fa-solid fa-house nav-icon"></i>
@@ -179,70 +226,14 @@
     </a>
   </nav>
 
-  <!-- ============= SIDEBAR (same structure as index) ============= -->
-  <div class="sidebar" id="sidebar">
-    <div class="sidebar-content">
-      <div class="sidebar-header">
-        <h3>Menu</h3>
-        <button class="btn btn-ghost btn-icon" id="closeSidebar">
-          <span class="icon icon-close"></span>
-        </button>
-      </div>
-
-      <div class="sidebar-user">
-        <img
-          src="assets/icons/default-profile.png"
-          alt="Profile"
-          id="sidebarProfileImg"
-        />
-        <div class="sidebar-user-info">
-          <h4 id="sidebarUserName">Username</h4>
-          <p id="sidebarUserHandle">@username</p>
-        </div>
-      </div>
-
-      <ul class="menu-items">
-        <li>
-          <a href="profile.html?user=me">
-            <span class="icon icon-profile"></span>
-            <span>My Profile</span>
-          </a>
-        </li>
-        <li>
-          <a href="#" id="feedsToggle">
-            <span class="icon icon-feeds"></span>
-            <span>Feeds: For You</span>
-          </a>
-        </li>
-        <li>
-          <a href="saved.html">
-            <span class="icon icon-saved"></span>
-            <span>Saved Posts</span>
-          </a>
-        </li>
-        <li>
-          <a href="settings.html">
-            <span class="icon icon-settings"></span>
-            <span>Settings</span>
-          </a>
-        </li>
-        <li>
-          <a href="#" onclick="logout()">
-            <span class="icon icon-logout"></span>
-            <span>Logout</span>
-          </a>
-        </li>
-      </ul>
-    </div>
-  </div>
-  <div class="sidebar-overlay" id="sidebarOverlay"></div>
-
   <!-- ============= SCRIPTS ============= -->
-  <!-- Supabase v1 so supabase.createClient works -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@1.35.7/dist/supabase.min.js"></script>
-
   <script src="js/auth.js"></script>
   <script src="js/app.js"></script>
+
+  <!-- Supabase client (NEEDED for search.js to work) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+  <!-- Your search logic -->
   <script src="js/search.js"></script>
 </body>
 </html>
