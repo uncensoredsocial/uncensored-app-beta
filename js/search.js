@@ -288,99 +288,99 @@ class SearchManager {
     }
 
     displayUsersResults(users) {
-        const usersList = document.getElementById('usersList');
-        const usersSection = document.getElementById('usersResults');
+    const usersList = document.getElementById('usersList');
+    const usersSection = document.getElementById('usersResults');
 
-        if (!usersList || !usersSection) return;
+    if (!usersList || !usersSection) return;
 
-        if (users.length === 0) {
-            usersSection.style.display = 'none';
-            return;
-        }
+    if (users.length === 0) {
+        usersSection.style.display = 'none';
+        return;
+    }
 
-        usersSection.style.display = 'block';
-        usersList.innerHTML = users.map(user => `
-            <div class="user-card" data-user-id="${user.id}">
-                <img src="${user.avatar}" alt="${user.displayName}" class="user-avatar" onerror="this.src='assets/icons/default-profile.png'">
-                <div class="user-info">
-                    <div class="user-name">${this.escapeHtml(user.displayName)}</div>
-                    <div class="user-handle">@${user.username}</div>
-                    ${user.bio ? `<div class="user-bio">${this.escapeHtml(user.bio)}</div>` : ''}
-                    <div class="user-stats">
-                        <span class="follower-count">${user.followersCount.toLocaleString()} followers</span>
-                    </div>
+    usersSection.style.display = 'block';
+    usersList.innerHTML = users.map(user => `
+        <div class="user-card" data-username="${user.username}">
+            <img src="${user.avatar}" alt="${user.displayName}" class="user-avatar" onerror="this.src='assets/icons/default-profile.png'">
+            <div class="user-info">
+                <div class="user-name">${this.escapeHtml(user.displayName)}</div>
+                <div class="user-handle">@${user.username}</div>
+                ${user.bio ? `<div class="user-bio">${this.escapeHtml(user.bio)}</div>` : ''}
+                <div class="user-stats">
+                    <span class="follower-count">${user.followersCount.toLocaleString()} followers</span>
                 </div>
-                <button class="btn btn-sm ${user.isFollowing ? 'btn-secondary' : 'btn-primary'} follow-btn" 
-                        onclick="searchManager.handleFollow('${user.id}', this)"
-                        ${!getCurrentUser() ? 'disabled' : ''}>
-                    ${user.isFollowing ? 'Following' : 'Follow'}
+            </div>
+            <button class="btn btn-sm ${user.isFollowing ? 'btn-secondary' : 'btn-primary'} follow-btn" 
+                    onclick="searchManager.handleFollow('${user.id}', this)"
+                    ${!getCurrentUser() ? 'disabled' : ''}>
+                ${user.isFollowing ? 'Following' : 'Follow'}
+            </button>
+        </div>
+    `).join('');
+
+    // Click -> go to user.html?user=username (or profile.html for yourself)
+    usersList.querySelectorAll('.user-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('.follow-btn')) return;
+
+            const username = card.dataset.username;
+            const me = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+
+            if (me && me.username === username) {
+                window.location.href = 'profile.html';
+            } else {
+                window.location.href = `user.html?user=${encodeURIComponent(username)}`;
+            }
+        });
+    });
+}
+    displayPostsResults(posts) {
+    const postsList = document.getElementById('postsList');
+    const postsSection = document.getElementById('postsResults');
+
+    if (!postsList || !postsSection) return;
+
+    if (posts.length === 0) {
+        postsSection.style.display = 'none';
+        return;
+    }
+
+    postsSection.style.display = 'block';
+    postsList.innerHTML = posts.map(post => `
+        <div class="post-card" data-post-id="${post.id}">
+            <div class="post-header">
+                <img src="${post.user.avatar}" alt="${post.user.displayName}" class="post-user-avatar" onerror="this.src='assets/icons/default-profile.png'">
+                <div class="post-user-info">
+                    <div class="post-display-name">${this.escapeHtml(post.user.displayName)}</div>
+                    <div class="post-username">@${post.user.username}</div>
+                </div>
+                <div class="post-time">${this.formatTime(post.createdAt)}</div>
+            </div>
+            <div class="post-content">
+                ${this.formatPostContent(post.content)}
+            </div>
+            <div class="post-actions">
+                <button class="post-action like-btn" onclick="searchManager.handleLike('${post.id}', this)" ${!getCurrentUser() ? 'disabled' : ''}>
+                    <span>❤️</span>
+                    <span class="like-count">${post.likes}</span>
+                </button>
+                <button class="post-action comment-btn" onclick="searchManager.handleComment('${post.id}')" ${!getCurrentUser() ? 'disabled' : ''}>
+                    <span>💬</span>
+                    <span class="comment-count">${post.comments}</span>
                 </button>
             </div>
-        `).join('');
+        </div>
+    `).join('');
 
-        // Add click handlers to user cards
-        usersList.querySelectorAll('.user-card').forEach(card => {
-            card.addEventListener('click', (e) => {
-                // Don't navigate if clicking the follow button
-                if (!e.target.closest('.follow-btn')) {
-                    const userId = card.dataset.userId;
-                    window.location.href = `profile.html?user=${userId}`;
-                }
-            });
+    // Click card -> post detail
+    postsList.querySelectorAll('.post-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('.post-actions')) return;
+            const postId = card.dataset.postId;
+            window.location.href = `post.html?id=${postId}`;
         });
-    }
-
-    displayPostsResults(posts) {
-        const postsList = document.getElementById('postsList');
-        const postsSection = document.getElementById('postsResults');
-
-        if (!postsList || !postsSection) return;
-
-        if (posts.length === 0) {
-            postsSection.style.display = 'none';
-            return;
-        }
-
-        postsSection.style.display = 'block';
-        postsList.innerHTML = posts.map(post => `
-            <div class="post-card" data-post-id="${post.id}">
-                <div class="post-header">
-                    <img src="${post.user.avatar}" alt="${post.user.displayName}" class="post-user-avatar" onerror="this.src='assets/icons/default-profile.png'">
-                    <div class="post-user-info">
-                        <div class="post-display-name">${this.escapeHtml(post.user.displayName)}</div>
-                        <div class="post-username">@${post.user.username}</div>
-                    </div>
-                    <div class="post-time">${this.formatTime(post.createdAt)}</div>
-                </div>
-                <div class="post-content">
-                    ${this.formatPostContent(post.content)}
-                </div>
-                <div class="post-actions">
-                    <button class="post-action like-btn" onclick="searchManager.handleLike('${post.id}', this)" ${!getCurrentUser() ? 'disabled' : ''}>
-                        <span>❤️</span>
-                        <span class="like-count">${post.likes}</span>
-                    </button>
-                    <button class="post-action comment-btn" onclick="searchManager.handleComment('${post.id}')" ${!getCurrentUser() ? 'disabled' : ''}>
-                        <span>💬</span>
-                        <span class="comment-count">${post.comments}</span>
-                    </button>
-                </div>
-            </div>
-        `).join('');
-
-        // Add click handlers to post cards
-        postsList.querySelectorAll('.post-card').forEach(card => {
-            card.addEventListener('click', (e) => {
-                // Don't navigate if clicking action buttons
-                if (!e.target.closest('.post-actions')) {
-                    const postId = card.dataset.postId;
-                    // You can implement a post detail page or show modal
-                    console.log('View post:', postId);
-                }
-            });
-        });
-    }
-
+    });
+}
     displayHashtagsResults(hashtags) {
         const hashtagsList = document.getElementById('hashtagsList');
         const hashtagsSection = document.getElementById('hashtagsResults');
