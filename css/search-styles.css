@@ -558,3 +558,21 @@
     border-radius: 999px;
     cursor: pointer;
 }
+
+/* New: center title in header while keeping left/right content */
+.header-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    pointer-events: none; /* so clicks go to left/right controls only */
+}
+
+.header-page-title {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+/* Make search result like button turn red when liked */
+.posts-list .like-btn.liked span:first-child {
+    color: #e0245e;
+}
