@@ -1,7 +1,7 @@
 // Account Settings page logic
 // - Requires auth.js helpers: isLoggedIn(), getCurrentUser(), getAuthToken()
 // - Backend endpoints assumed:
-//     GET  /api/users/me
+//     GET   /api/users/me
 //     PATCH /api/users/me   (JSON body with fields to update)
 
 const ACCOUNT_API_BASE_URL =
@@ -15,12 +15,12 @@ class AccountSettingsPage {
     this.saveButton = null;
     this.statusEl = null;
 
+    this.displayNameValueEl = null;
+
     this.inputs = {
-      displayName: null,
       username: null,
       email: null,
-      phone: null,
-      address: null
+      phone: null
     };
   }
 
@@ -42,11 +42,11 @@ class AccountSettingsPage {
     this.saveButton = document.getElementById("accountSaveButton");
     this.statusEl = document.getElementById("accountSettingsStatus");
 
-    this.inputs.displayName = document.getElementById("displayNameInput");
+    this.displayNameValueEl = document.getElementById("displayNameValue");
+
     this.inputs.username = document.getElementById("usernameInput");
     this.inputs.email = document.getElementById("emailInput");
     this.inputs.phone = document.getElementById("phoneInput");
-    this.inputs.address = document.getElementById("addressInput");
   }
 
   bindEvents() {
@@ -64,11 +64,11 @@ class AccountSettingsPage {
         window.location.href = "login.html";
       }
     } catch {
-      // if helpers blow up, do nothing
+      // ignore
     }
   }
 
-  // Prefill from whatever auth.js has for current user
+  // Prefill from cached currentUser
   prefillFromLocal() {
     let user = null;
     try {
@@ -81,9 +81,11 @@ class AccountSettingsPage {
 
     if (!user) return;
 
-    if (this.inputs.displayName && user.display_name) {
-      this.inputs.displayName.value = user.display_name;
+    if (this.displayNameValueEl) {
+      this.displayNameValueEl.textContent =
+        user.display_name || user.username || "";
     }
+
     if (this.inputs.username && user.username) {
       this.inputs.username.value = user.username;
     }
@@ -92,9 +94,6 @@ class AccountSettingsPage {
     }
     if (this.inputs.phone && (user.phone || user.phone_number)) {
       this.inputs.phone.value = user.phone || user.phone_number;
-    }
-    if (this.inputs.address && user.address) {
-      this.inputs.address.value = user.address;
     }
   }
 
@@ -105,9 +104,7 @@ class AccountSettingsPage {
 
     try {
       const res = await fetch(`${ACCOUNT_API_BASE_URL}/users/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: { Authorization: `Bearer ${token}` }
       });
 
       if (!res.ok) {
@@ -126,9 +123,11 @@ class AccountSettingsPage {
   applyProfileToForm(user) {
     if (!user) return;
 
-    if (this.inputs.displayName) {
-      this.inputs.displayName.value = user.display_name || "";
+    if (this.displayNameValueEl) {
+      this.displayNameValueEl.textContent =
+        user.display_name || user.username || "";
     }
+
     if (this.inputs.username) {
       this.inputs.username.value = user.username || "";
     }
@@ -137,9 +136,6 @@ class AccountSettingsPage {
     }
     if (this.inputs.phone) {
       this.inputs.phone.value = user.phone || user.phone_number || "";
-    }
-    if (this.inputs.address) {
-      this.inputs.address.value = user.address || "";
     }
   }
 
@@ -153,18 +149,13 @@ class AccountSettingsPage {
     }
 
     const payload = {
-      display_name: this.inputs.displayName?.value.trim() || null,
       username: this.inputs.username?.value.trim() || null,
       email: this.inputs.email?.value.trim() || null,
-      phone: this.inputs.phone?.value.trim() || null,
-      address: this.inputs.address?.value.trim() || null
+      phone: this.inputs.phone?.value.trim() || null
     };
 
-    // Simple username check
-    if (
-      payload.username &&
-      !/^[a-zA-Z0-9_]+$/.test(payload.username)
-    ) {
+    // Simple username validation
+    if (payload.username && !/^[a-zA-Z0-9_]+$/.test(payload.username)) {
       this.showStatus(
         "Username can only contain letters, numbers, and underscores.",
         "error"
@@ -232,16 +223,14 @@ class AccountSettingsPage {
     return null;
   }
 
-  // Try to keep whatever auth.js / localStorage uses in sync
+  // Keep local currentUser in sync
   updateLocalUser(data) {
     if (!data) return;
 
     try {
-      // If auth.js exposes setCurrentUser, prefer that.
       if (typeof setCurrentUser === "function") {
         setCurrentUser(data);
       } else {
-        // Fallback to localStorage key
         localStorage.setItem("currentUser", JSON.stringify(data));
       }
     } catch (err) {
@@ -254,5 +243,5 @@ class AccountSettingsPage {
 document.addEventListener("DOMContentLoaded", () => {
   const page = new AccountSettingsPage();
   page.init();
-  window.accountSettingsPage = page; // for debugging if you want
+  window.accountSettingsPage = page;
 });
