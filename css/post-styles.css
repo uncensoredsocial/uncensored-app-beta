@@ -133,7 +133,7 @@
   gap: 8px;
   padding: 8px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  cursor: pointer; /* whole comment is clickable */
+  cursor: pointer;
 }
 
 .comment:last-child {
@@ -189,25 +189,6 @@
   margin-top: 6px;
   font-size: 0.9rem;
   color: #888;
-}
-
-/* ========= Bottom nav on desktop ========= */
-
-@media (min-width: 768px) {
-  .bottom-nav {
-    display: flex !important;
-  }
-
-  .bottom-nav .nav-item {
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-  }
-
-  .bottom-nav .nav-icon {
-    font-size: 1.1rem;
-  }
 }
 
 /* Slightly more top padding on large screens */
