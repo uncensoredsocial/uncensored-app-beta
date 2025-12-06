@@ -1,8 +1,5 @@
 // Account Settings page logic
-// - Requires auth.js helpers: isLoggedIn(), getCurrentUser(), getAuthToken()
-// - Backend endpoints assumed:
-//     GET   /api/users/me
-//     PATCH /api/users/me   (JSON body with fields to update)
+// Requires auth.js helpers: isLoggedIn(), getCurrentUser(), getAuthToken(), setCurrentUser (or localStorage fallback)
 
 const ACCOUNT_API_BASE_URL =
   typeof API_BASE_URL !== "undefined"
@@ -20,7 +17,7 @@ class AccountSettingsPage {
     this.inputs = {
       username: null,
       email: null,
-      phone: null
+      phone: null,
     };
   }
 
@@ -33,7 +30,11 @@ class AccountSettingsPage {
     this.cacheDom();
     this.bindEvents();
     this.guardAuth();
+
+    // Fill from cached currentUser immediately so it shows up
     this.prefillFromLocal();
+
+    // Then pull fresh data from backend so it’s 100% accurate
     this.fetchFreshProfile();
   }
 
@@ -68,12 +69,16 @@ class AccountSettingsPage {
     }
   }
 
-  // Prefill from cached currentUser
+  /* ---------- PREFILL FROM LOCAL USER (instant display name) ---------- */
+
   prefillFromLocal() {
     let user = null;
     try {
       if (typeof getCurrentUser === "function") {
         user = getCurrentUser();
+      } else {
+        const raw = localStorage.getItem("currentUser");
+        if (raw) user = JSON.parse(raw);
       }
     } catch {
       user = null;
@@ -81,9 +86,10 @@ class AccountSettingsPage {
 
     if (!user) return;
 
+    // display name (read-only)
     if (this.displayNameValueEl) {
       this.displayNameValueEl.textContent =
-        user.display_name || user.username || "";
+        user.display_name || user.name || user.username || "";
     }
 
     if (this.inputs.username && user.username) {
@@ -97,18 +103,19 @@ class AccountSettingsPage {
     }
   }
 
-  // Pull a fresh copy from backend
+  /* ---------- FETCH FRESH PROFILE FROM BACKEND ---------- */
+
   async fetchFreshProfile() {
     const token = this.getAuthTokenSafe();
     if (!token) return;
 
     try {
       const res = await fetch(`${ACCOUNT_API_BASE_URL}/users/me`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!res.ok) {
-        console.warn("Could not fetch /users/me", res.status);
+        console.warn("GET /users/me failed:", res.status);
         return;
       }
 
@@ -125,7 +132,7 @@ class AccountSettingsPage {
 
     if (this.displayNameValueEl) {
       this.displayNameValueEl.textContent =
-        user.display_name || user.username || "";
+        user.display_name || user.name || user.username || "";
     }
 
     if (this.inputs.username) {
@@ -139,6 +146,8 @@ class AccountSettingsPage {
     }
   }
 
+  /* ---------- SAVE HANDLER ---------- */
+
   async handleSubmit() {
     if (!this.form || !this.saveButton) return;
 
@@ -148,20 +157,20 @@ class AccountSettingsPage {
       return;
     }
 
-    const payload = {
-      username: this.inputs.username?.value.trim() || null,
-      email: this.inputs.email?.value.trim() || null,
-      phone: this.inputs.phone?.value.trim() || null
-    };
+    const username = this.inputs.username?.value.trim() || null;
+    const email = this.inputs.email?.value.trim() || null;
+    const phone = this.inputs.phone?.value.trim() || null;
 
-    // Simple username validation
-    if (payload.username && !/^[a-zA-Z0-9_]+$/.test(payload.username)) {
+    // very simple username validation
+    if (username && !/^[a-zA-Z0-9_]+$/.test(username)) {
       this.showStatus(
         "Username can only contain letters, numbers, and underscores.",
         "error"
       );
       return;
     }
+
+    const payload = { username, email, phone };
 
     this.setSaving(true);
     this.showStatus("Saving…", null);
@@ -171,9 +180,9 @@ class AccountSettingsPage {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -186,9 +195,10 @@ class AccountSettingsPage {
         throw new Error(errMsg);
       }
 
-      this.showStatus("Account updated.", "success");
+      // success – update UI + local cache
       this.applyProfileToForm(data);
       this.updateLocalUser(data);
+      this.showStatus("Account updated.", "success");
     } catch (err) {
       console.error("Account settings save error:", err);
       this.showStatus(err.message || "Failed to save changes.", "error");
@@ -218,12 +228,12 @@ class AccountSettingsPage {
         return getAuthToken();
       }
     } catch {
-      // ignore
+      /* ignore */
     }
     return null;
   }
 
-  // Keep local currentUser in sync
+  // Keep local currentUser in sync with backend
   updateLocalUser(data) {
     if (!data) return;
 
@@ -239,7 +249,6 @@ class AccountSettingsPage {
   }
 }
 
-// init on DOMContentLoaded
 document.addEventListener("DOMContentLoaded", () => {
   const page = new AccountSettingsPage();
   page.init();
