@@ -1,128 +1,147 @@
-/* ===== Delete Account Settings Page ===== */
+/* ===== DELETE ACCOUNT PAGE STYLES ===== */
 
-.delete-account-main {
-  max-width: 600px;
-  margin: 0 auto;
-  padding: var(--space-4);
-  padding-bottom: 80px; /* space above bottom nav */
+.delete-page-body {
+  background-color: var(--bg-color, #000);
+  color: var(--text-color, #fff);
 }
 
-.delete-account-card {
+/* Main layout */
+.delete-account-main {
+  max-width: 600px;
+  margin: 80px auto 80px;
+  padding: 0 var(--space-4, 1rem);
+}
+
+/* Card */
+.delete-card {
   background-color: var(--bg-secondary, #111);
   border-radius: var(--radius-xl, 16px);
   border: 1px solid var(--border-light, #2f3336);
-  padding: var(--space-5);
-  box-shadow: var(--shadow-lg, 0 10px 15px rgba(0, 0, 0, 0.3));
+  padding: var(--space-5, 1.5rem);
+  box-shadow: var(--shadow-lg, 0 10px 30px rgba(0, 0, 0, 0.6));
 }
 
-.delete-account-card h2 {
-  margin-bottom: var(--space-3);
-  font-size: var(--font-size-xl, 1.25rem);
+.delete-title {
+  font-size: var(--font-size-2xl, 1.5rem);
+  margin-bottom: var(--space-2, 0.5rem);
 }
 
-.delete-account-warning {
-  margin-bottom: var(--space-3);
-  color: var(--warning-color, #ffaa00);
+.delete-subtitle {
+  color: var(--text-muted, #6e767d);
+  margin-bottom: var(--space-4, 1rem);
   font-size: var(--font-size-sm, 0.875rem);
-  line-height: 1.6;
 }
 
-.delete-account-warning strong {
-  color: var(--error-color, #ff4444);
-}
-
-.delete-account-list {
-  margin-left: 1.1rem;
-  margin-bottom: var(--space-4);
+.delete-list {
+  margin-left: 1.2rem;
+  margin-bottom: var(--space-4, 1rem);
   color: var(--text-muted, #6e767d);
   font-size: var(--font-size-sm, 0.875rem);
 }
 
-.delete-account-list li {
-  margin-bottom: var(--space-2);
+.delete-list li {
+  margin-bottom: 0.35rem;
 }
 
-/* Confirm section */
-
-.delete-account-confirm {
-  border-top: 1px solid var(--border-light, #2f3336);
-  border-bottom: 1px solid var(--border-light, #2f3336);
-  padding: var(--space-3) 0;
-  margin-bottom: var(--space-4);
-}
-
-.checkbox-row {
+/* Warning banner */
+.delete-warning {
   display: flex;
+  gap: var(--space-3, 0.75rem);
   align-items: flex-start;
-  gap: var(--space-2);
-  margin-bottom: var(--space-3);
-  font-size: var(--font-size-sm, 0.875rem);
-  color: var(--text-color, #fff);
+  padding: var(--space-3, 0.75rem);
+  border-radius: var(--radius-lg, 12px);
+  background: rgba(255, 68, 68, 0.06);
+  border: 1px solid rgba(255, 68, 68, 0.3);
+  color: var(--error-color, #ff4444);
+  margin-bottom: var(--space-4, 1rem);
 }
 
-.checkbox-row input[type="checkbox"] {
-  margin-top: 2px;
+.delete-warning i {
+  margin-top: 3px;
+}
+
+/* Confirmation checkbox */
+.confirm-row {
+  margin-bottom: var(--space-3, 0.75rem);
+}
+
+.confirm-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--text-muted, #6e767d);
+}
+
+.confirm-label input[type="checkbox"] {
   width: 16px;
   height: 16px;
 }
 
+/* "Type DELETE" input */
+.delete-input-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+  margin-bottom: var(--space-4, 1rem);
+}
+
 .confirm-text-label {
-  display: block;
-  margin-bottom: var(--space-2);
   font-size: var(--font-size-sm, 0.875rem);
   color: var(--text-muted, #6e767d);
 }
 
 .confirm-text-input {
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md, 8px);
-  border: 1px solid var(--border-color, #333);
-  background-color: #050505;
+  background-color: var(--bg-color, #000);
   color: var(--text-color, #fff);
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-light, #2f3336);
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
   font-size: var(--font-size-base, 1rem);
-}
-
-.confirm-text-input::placeholder {
-  color: var(--text-muted, #6e767d);
+  outline: none;
 }
 
 .confirm-text-input:focus {
-  outline: none;
   border-color: var(--error-color, #ff4444);
 }
 
 /* Delete button */
+.delete-button {
+  width: 100%;
+  justify-content: center;
+}
 
+/* Danger button style */
 .btn-danger {
   background-color: var(--error-color, #ff4444);
   color: #fff;
 }
 
 .btn-danger:hover:not(:disabled) {
-  background-color: #e13838;
+  background-color: #e63b3b;
   transform: translateY(-1px);
 }
 
-.delete-account-button {
-  width: 100%;
-  margin-top: var(--space-1);
-}
-
-.delete-account-button:disabled {
-  opacity: 0.6;
+.btn-danger:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.delete-account-note {
-  margin-top: var(--space-3);
-  font-size: var(--font-size-xs, 0.75rem);
+/* Status text */
+.delete-status-message {
+  margin-top: var(--space-3, 0.75rem);
+  font-size: var(--font-size-sm, 0.875rem);
   color: var(--text-muted, #6e767d);
 }
 
-/* Small screen tweaks */
+/* Make content breathe on mobile */
 @media (max-width: 767px) {
-  .delete-account-card {
-    padding: var(--space-4);
+  .delete-account-main {
+    margin-top: 72px;
+    margin-bottom: 72px;
+  }
+
+  .delete-card {
+    padding: var(--space-4, 1rem);
   }
 }
