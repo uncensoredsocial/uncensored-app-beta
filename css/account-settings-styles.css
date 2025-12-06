@@ -1,0 +1,185 @@
+/* ===== Account Settings page layout ===== */
+
+.settings-page-body {
+  background-color: var(--bg-color, #000);
+  color: var(--text-color, #fff);
+}
+
+/* Top bar with centered title and back button */
+.settings-header-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-4, 1rem);
+  background-color: rgba(0, 0, 0, 0.95);
+  border-bottom: 1px solid var(--border-light, #2f3336);
+  backdrop-filter: blur(20px);
+}
+
+.settings-header-title {
+  margin: 0;
+  font-size: var(--font-size-lg, 1.125rem);
+  font-weight: 700;
+}
+
+.settings-header-back {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.settings-header-spacer {
+  position: absolute;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+}
+
+/* main area */
+.settings-main {
+  max-width: 600px;
+  margin: 0 auto;
+  width: 100%;
+  padding: var(--space-4, 1rem) var(--space-4, 1rem) 80px;
+}
+
+/* section card */
+.settings-section {
+  background-color: var(--bg-secondary, #151515);
+  border-radius: var(--radius-xl, 16px);
+  border: 1px solid var(--border-light, #2f3336);
+  padding: var(--space-4, 1rem) var(--space-4, 1rem) var(--space-5, 1.5rem);
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.6));
+}
+
+.settings-section-title {
+  margin: 0 0 var(--space-2, 0.5rem);
+  font-size: var(--font-size-xl, 1.25rem);
+  font-weight: 700;
+}
+
+.settings-section-subtitle {
+  margin: 0 0 var(--space-4, 1rem);
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--text-muted, #6e767d);
+}
+
+/* form */
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 1rem);
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 0.25rem);
+}
+
+.settings-label {
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: 500;
+}
+
+.settings-input,
+.settings-textarea {
+  width: 100%;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-light, #2f3336);
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  background-color: #050505;
+  color: var(--text-color, #fff);
+  font-family: inherit;
+  font-size: var(--font-size-base, 1rem);
+}
+
+.settings-input:focus,
+.settings-textarea:focus {
+  outline: none;
+  border-color: var(--primary-color, #1DA1F2);
+  box-shadow: 0 0 0 1px rgba(29, 161, 242, 0.4);
+}
+
+.settings-input::placeholder,
+.settings-textarea::placeholder {
+  color: var(--text-muted, #6e767d);
+}
+
+/* username with @ prefix */
+.settings-input-prefix-wrapper {
+  display: flex;
+  align-items: stretch;
+}
+
+.settings-input-prefix {
+  padding: 0 var(--space-3, 0.75rem);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #050505;
+  border-radius: var(--radius-md, 8px) 0 0 var(--radius-md, 8px);
+  border: 1px solid var(--border-light, #2f3336);
+  border-right: none;
+  color: var(--text-muted, #6e767d);
+  font-size: var(--font-size-base, 1rem);
+}
+
+.settings-input.no-left-radius {
+  border-radius: 0 var(--radius-md, 8px) var(--radius-md, 8px) 0;
+}
+
+/* hint text */
+.settings-field-hint {
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--text-muted, #6e767d);
+}
+
+/* textarea tweaks */
+.settings-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* status message */
+.settings-status-message {
+  min-height: 18px;
+  font-size: var(--font-size-xs, 0.75rem);
+  margin-top: -4px;
+}
+
+/* when JS sets these classes */
+.settings-status-message.success {
+  color: var(--success-color, #00C851);
+}
+
+.settings-status-message.error {
+  color: var(--error-color, #ff4444);
+}
+
+.settings-actions {
+  margin-top: var(--space-2, 0.5rem);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.settings-save-btn {
+  border-radius: 999px;
+  padding-inline: var(--space-5, 1.5rem);
+}
+
+/* responsive */
+@media (max-width: 600px) {
+  .settings-main {
+    padding-inline: var(--space-3, 0.75rem);
+  }
+
+  .settings-section {
+    border-radius: var(--radius-lg, 12px);
+  }
+}
