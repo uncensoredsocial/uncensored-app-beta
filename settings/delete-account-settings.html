@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Delete Account - Uncensored Social</title>
+
+  <!-- Global styles -->
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/delete-account-styles.css" />
+  <link rel="stylesheet" href="css/icons.css" />
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer"
+  />
+</head>
+
+<body>
+  <!-- ================= HEADER ================= -->
+  <header class="header">
+    <div class="header-left">
+      <button
+        class="btn btn-ghost btn-icon"
+        onclick="window.location.href='settings.html'"
+        title="Back to settings"
+      >
+        <i class="fa-solid fa-arrow-left"></i>
+      </button>
+    </div>
+
+    <h1 class="logo">Delete Account</h1>
+
+    <div class="header-actions">
+      <!-- empty to balance header layout -->
+    </div>
+  </header>
+
+  <!-- ================= MAIN CONTENT ================= -->
+  <div class="content-wrapper">
+    <main class="main-content delete-account-main">
+      <section class="delete-account-card">
+        <h2>Delete your account</h2>
+        <p class="delete-account-warning">
+          This will permanently delete your account, posts, likes, comments,
+          messages, followers, and all other data associated with your profile.
+          <strong>This action cannot be undone.</strong>
+        </p>
+
+        <ul class="delete-account-list">
+          <li>Your username will no longer be associated with Uncensored Social.</li>
+          <li>Your email and profile data will be removed from our platform.</li>
+          <li>Your posts, likes, comments, and messages will be deleted.</li>
+        </ul>
+
+        <div class="delete-account-confirm">
+          <label class="checkbox-row">
+            <input type="checkbox" id="confirmCheckbox" />
+            <span>I understand that this action is permanent and cannot be undone.</span>
+          </label>
+
+          <label class="confirm-text-label" for="confirmTextInput">
+            To confirm, type <strong>DELETE</strong> below:
+          </label>
+          <input
+            type="text"
+            id="confirmTextInput"
+            class="confirm-text-input"
+            placeholder="Type DELETE to confirm"
+            autocomplete="off"
+          />
+        </div>
+
+        <button
+          id="deleteAccountButton"
+          class="btn btn-danger delete-account-button"
+          disabled
+        >
+          Delete my account permanently
+        </button>
+
+        <p class="delete-account-note">
+          If you change your mind later, you will need to create a new account.
+        </p>
+      </section>
+    </main>
+  </div>
+
+  <!-- ================= BOTTOM NAV (same as rest of site) ================= -->
+  <nav class="bottom-nav" id="bottomNav">
+    <a href="index.html" class="nav-item">
+      <span class="icon icon-home"></span>
+      <span class="nav-label">Home</span>
+    </a>
+    <a href="search.html" class="nav-item">
+      <span class="icon icon-search"></span>
+      <span class="nav-label">Search</span>
+    </a>
+    <a href="notifications.html" class="nav-item">
+      <span class="icon icon-notifications"></span>
+      <span class="nav-label">Alerts</span>
+    </a>
+    <a href="dms.html" class="nav-item">
+      <span class="icon icon-messages"></span>
+      <span class="nav-label">Messages</span>
+    </a>
+  </nav>
+
+  <!-- Scripts -->
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/delete-account-settings.js"></script>
+</body>
+</html>
