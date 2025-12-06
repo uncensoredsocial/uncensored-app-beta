@@ -43,23 +43,18 @@
       <section class="settings-section">
         <h2 class="settings-section-title">Account details</h2>
         <p class="settings-section-subtitle">
-          Update your basic account information. Changes may be visible across Uncensored Social.
+          Update your basic account information.
         </p>
 
         <form id="accountSettingsForm" class="settings-form">
-          <!-- Display name -->
+          <!-- Display name (read-only) -->
           <div class="settings-field">
-            <label for="displayNameInput" class="settings-label">Display name</label>
-            <input
-              type="text"
-              id="displayNameInput"
-              class="settings-input"
-              autocomplete="name"
-              maxlength="50"
-              placeholder="Your name"
-            />
+            <label class="settings-label">Display name</label>
+            <div id="displayNameValue" class="settings-readonly">
+              Loading…
+            </div>
             <p class="settings-field-hint">
-              This is the name shown on your profile.
+              Change your display name from your profile edit screen.
             </p>
           </div>
 
@@ -106,18 +101,6 @@
             />
           </div>
 
-          <!-- Address -->
-          <div class="settings-field">
-            <label for="addressInput" class="settings-label">Address</label>
-            <textarea
-              id="addressInput"
-              class="settings-input settings-textarea"
-              rows="3"
-              autocomplete="street-address"
-              placeholder="Optional"
-            ></textarea>
-          </div>
-
           <!-- Status / error text -->
           <div id="accountSettingsStatus" class="settings-status-message" aria-live="polite"></div>
 
@@ -132,7 +115,7 @@
     </main>
   </div>
 
-  <!-- ===== BOTTOM NAV (same as index) ===== -->
+  <!-- ===== BOTTOM NAV (EXACT SAME STRUCTURE AS HOME) ===== -->
   <nav class="bottom-nav" id="bottomNav">
     <a href="index.html" class="nav-item">
       <span class="icon icon-home"></span>
