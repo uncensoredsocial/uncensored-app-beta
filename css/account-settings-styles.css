@@ -87,8 +87,8 @@
   font-weight: 500;
 }
 
-.settings-input,
-.settings-textarea {
+/* normal editable inputs */
+.settings-input {
   width: 100%;
   border-radius: var(--radius-md, 8px);
   border: 1px solid var(--border-light, #2f3336);
@@ -99,16 +99,21 @@
   font-size: var(--font-size-base, 1rem);
 }
 
-.settings-input:focus,
-.settings-textarea:focus {
+.settings-input:focus {
   outline: none;
   border-color: var(--primary-color, #1DA1F2);
   box-shadow: 0 0 0 1px rgba(29, 161, 242, 0.4);
 }
 
-.settings-input::placeholder,
-.settings-textarea::placeholder {
+.settings-input::placeholder {
   color: var(--text-muted, #6e767d);
+}
+
+/* read-only value for display name */
+.settings-readonly {
+  padding: var(--space-2, 0.5rem) 0;
+  font-size: var(--font-size-base, 1rem);
+  color: var(--text-color, #fff);
 }
 
 /* username with @ prefix */
@@ -140,12 +145,6 @@
   color: var(--text-muted, #6e767d);
 }
 
-/* textarea tweaks */
-.settings-textarea {
-  resize: vertical;
-  min-height: 80px;
-}
-
 /* status message */
 .settings-status-message {
   min-height: 18px;
@@ -153,7 +152,6 @@
   margin-top: -4px;
 }
 
-/* when JS sets these classes */
 .settings-status-message.success {
   color: var(--success-color, #00C851);
 }
