@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Account Settings - Uncensored Social</title>
+
+  <!-- Global styles -->
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/account-settings-styles.css" />
+  <link rel="stylesheet" href="css/icons.css" />
+
+  <!-- Font Awesome (for back icon) -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer"
+  />
+</head>
+
+<body class="settings-page-body">
+  <!-- ===== TOP HEADER BAR ===== -->
+  <header class="settings-header-bar">
+    <button
+      class="btn btn-ghost btn-icon settings-header-back"
+      onclick="history.back()"
+      aria-label="Back to Settings"
+    >
+      <i class="fa-solid fa-arrow-left"></i>
+    </button>
+
+    <h1 class="settings-header-title">Account</h1>
+
+    <!-- right side spacer to balance back button -->
+    <div class="settings-header-spacer"></div>
+  </header>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <div class="content-wrapper">
+    <main class="main-content settings-main">
+      <section class="settings-section">
+        <h2 class="settings-section-title">Account details</h2>
+        <p class="settings-section-subtitle">
+          Update your basic account information. Changes may be visible across Uncensored Social.
+        </p>
+
+        <form id="accountSettingsForm" class="settings-form">
+          <!-- Display name -->
+          <div class="settings-field">
+            <label for="displayNameInput" class="settings-label">Display name</label>
+            <input
+              type="text"
+              id="displayNameInput"
+              class="settings-input"
+              autocomplete="name"
+              maxlength="50"
+              placeholder="Your name"
+            />
+            <p class="settings-field-hint">
+              This is the name shown on your profile.
+            </p>
+          </div>
+
+          <!-- Username -->
+          <div class="settings-field">
+            <label for="usernameInput" class="settings-label">Username</label>
+            <div class="settings-input-prefix-wrapper">
+              <span class="settings-input-prefix">@</span>
+              <input
+                type="text"
+                id="usernameInput"
+                class="settings-input no-left-radius"
+                autocomplete="username"
+                maxlength="30"
+                placeholder="username"
+              />
+            </div>
+            <p class="settings-field-hint">
+              Usernames can only contain letters, numbers, and underscores.
+            </p>
+          </div>
+
+          <!-- Email -->
+          <div class="settings-field">
+            <label for="emailInput" class="settings-label">Email</label>
+            <input
+              type="email"
+              id="emailInput"
+              class="settings-input"
+              autocomplete="email"
+              placeholder="you@example.com"
+            />
+          </div>
+
+          <!-- Phone -->
+          <div class="settings-field">
+            <label for="phoneInput" class="settings-label">Phone number</label>
+            <input
+              type="tel"
+              id="phoneInput"
+              class="settings-input"
+              autocomplete="tel"
+              placeholder="Optional"
+            />
+          </div>
+
+          <!-- Address -->
+          <div class="settings-field">
+            <label for="addressInput" class="settings-label">Address</label>
+            <textarea
+              id="addressInput"
+              class="settings-input settings-textarea"
+              rows="3"
+              autocomplete="street-address"
+              placeholder="Optional"
+            ></textarea>
+          </div>
+
+          <!-- Status / error text -->
+          <div id="accountSettingsStatus" class="settings-status-message" aria-live="polite"></div>
+
+          <!-- Save button -->
+          <div class="settings-actions">
+            <button type="submit" class="btn btn-primary settings-save-btn" id="accountSaveButton">
+              Save changes
+            </button>
+          </div>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <!-- ===== BOTTOM NAV (same as index) ===== -->
+  <nav class="bottom-nav" id="bottomNav">
+    <a href="index.html" class="nav-item">
+      <span class="icon icon-home"></span>
+      <span class="nav-label">Home</span>
+    </a>
+    <a href="search.html" class="nav-item">
+      <span class="icon icon-search"></span>
+      <span class="nav-label">Search</span>
+    </a>
+    <a href="notifications.html" class="nav-item">
+      <span class="icon icon-notifications"></span>
+      <span class="nav-label">Alerts</span>
+    </a>
+    <a href="dms.html" class="nav-item">
+      <span class="icon icon-messages"></span>
+      <span class="nav-label">Messages</span>
+    </a>
+  </nav>
+
+  <!-- Scripts -->
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/account-settings.js"></script>
+</body>
+</html>
