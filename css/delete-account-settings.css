@@ -12,7 +12,7 @@
   padding: 0 var(--space-4, 1rem);
 }
 
-/* Card */
+/* Card container */
 .delete-card {
   background-color: var(--bg-secondary, #111);
   border-radius: var(--radius-xl, 16px);
@@ -43,7 +43,7 @@
   margin-bottom: 0.35rem;
 }
 
-/* Warning banner */
+/* Warning box */
 .delete-warning {
   display: flex;
   gap: var(--space-3, 0.75rem);
@@ -78,7 +78,7 @@
   height: 16px;
 }
 
-/* "Type DELETE" input */
+/* Text confirmation */
 .delete-input-row {
   display: flex;
   flex-direction: column;
@@ -111,7 +111,7 @@
   justify-content: center;
 }
 
-/* Danger button style */
+/* Danger button style, built on top of .btn */
 .btn-danger {
   background-color: var(--error-color, #ff4444);
   color: #fff;
@@ -134,7 +134,7 @@
   color: var(--text-muted, #6e767d);
 }
 
-/* Make content breathe on mobile */
+/* Mobile tweaks */
 @media (max-width: 767px) {
   .delete-account-main {
     margin-top: 72px;
