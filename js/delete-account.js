@@ -1,14 +1,8 @@
 // ============================================================
-// Delete Account Page
-// ------------------------------------------------------------
-// - User must be logged in
-// - Requires checkbox + "DELETE" text
-// - Shows native confirm dialog
-// - Calls backend DELETE endpoint
-// - On success: clears auth + redirects
+// Delete Account Settings Page
 // ============================================================
 
-class DeleteAccountPage {
+class DeleteAccountSettingsPage {
   constructor() {
     this.confirmCheckbox = null;
     this.confirmTextInput = null;
@@ -60,11 +54,9 @@ class DeleteAccountPage {
         }, 1500);
       }
     } catch {
-      // if something explodes, just let page render
+      // ignore if helper missing
     }
   }
-
-  // --------- Helpers ---------
 
   getTokenFallback() {
     try {
@@ -100,8 +92,6 @@ class DeleteAccountPage {
     }
   }
 
-  // --------- Delete Flow ---------
-
   async handleDeleteClick() {
     if (!this.deleteButton) return;
 
@@ -129,7 +119,8 @@ class DeleteAccountPage {
           ? API_BASE_URL
           : "https://uncensored-app-beta-production.up.railway.app/api";
 
-      // 🔥 Adjust endpoint if your backend uses a different URL
+      // 🔥 Backend must implement this endpoint:
+      // DELETE /api/account    (auth required)
       const res = await fetch(`${base}/account`, {
         method: "DELETE",
         headers: {
@@ -181,9 +172,8 @@ class DeleteAccountPage {
   }
 }
 
-// Initialize
 document.addEventListener("DOMContentLoaded", () => {
-  const page = new DeleteAccountPage();
+  const page = new DeleteAccountSettingsPage();
   page.init();
-  window.deleteAccountPage = page; // for debugging if needed
+  window.deleteAccountSettingsPage = page;
 });
