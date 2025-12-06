@@ -287,7 +287,7 @@
     }
 }
 
-/* Centered header title helper (mirrors search page behavior) */
+/* Centered header title helper */
 .header-centered {
     justify-content: center;
 }
@@ -296,10 +296,12 @@
     margin: 0;
 }
 
-/* === Bottom Navigation – match main site/search styling === */
+/* --------------------------------------------------
+   BOTTOM NAV – FORCE SAME AS HOME/SEARCH
+-------------------------------------------------- */
 
 .bottom-nav {
-    position: fixed;
+    position: fixed !important;
     bottom: 0;
     left: 0;
     right: 0;
@@ -307,9 +309,9 @@
     border-top: 1px solid var(--border-light);
     display: flex;
     justify-content: space-around;
-    padding: var(--space-2) 0;
+    padding: var(--space-2) 0 !important;
     z-index: 1000;
-    height: 60px;
+    height: 60px !important;
 }
 
 .bottom-nav .nav-item {
@@ -320,7 +322,7 @@
     padding: var(--space-2);
     text-decoration: none;
     color: var(--text-color);
-    font-size: var(--font-size-xs);
+    font-size: var(--font-size-xs) !important;
     opacity: 0.7;
     transition: all var(--transition-fast);
     border-radius: var(--radius-md);
@@ -350,19 +352,6 @@
 }
 
 .bottom-nav .nav-label {
-    font-size: 10px;
+    font-size: 10px !important;
     font-weight: 500;
-}
-
-/* FIX NAV BAR SHRINKING ON SETTINGS PAGE (same as search) */
-.bottom-nav .nav-item {
-    font-size: var(--font-size-xs);
-}
-
-.bottom-nav .nav-icon {
-    font-size: 1.1rem;
-}
-
-.bottom-nav .nav-label {
-    font-size: 10px;
 }
