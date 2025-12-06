@@ -2,14 +2,13 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     /* -------------------------------------------
-       Back arrow in header -> profile.html
+       Back arrow in header -> profile.html?user=me
     ------------------------------------------- */
     const backToProfileBtn = document.getElementById('settingsBackToProfile');
     if (backToProfileBtn) {
         backToProfileBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            // change to profile.html?user=me if you prefer
-            window.location.href = 'profile.html';
+            window.location.href = 'profile.html?user=me';
         });
     }
 
