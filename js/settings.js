@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Save previous state then turn all off
                 lastPerTypeState = perTypeToggles.map(input => input.checked);
                 perTypeToggles.forEach(input => {
-                    input.checked = false;
+                    input.checked = false);
                 });
             } else {
                 // Restore previous state or enable all if none saved
