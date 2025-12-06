@@ -286,3 +286,83 @@
         padding: 8px 12px;
     }
 }
+
+/* Centered header title helper (mirrors search page behavior) */
+.header-centered {
+    justify-content: center;
+}
+
+.header-centered .logo {
+    margin: 0;
+}
+
+/* === Bottom Navigation – match main site/search styling === */
+
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: var(--bg-color);
+    border-top: 1px solid var(--border-light);
+    display: flex;
+    justify-content: space-around;
+    padding: var(--space-2) 0;
+    z-index: 1000;
+    height: 60px;
+}
+
+.bottom-nav .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-2);
+    text-decoration: none;
+    color: var(--text-color);
+    font-size: var(--font-size-xs);
+    opacity: 0.7;
+    transition: all var(--transition-fast);
+    border-radius: var(--radius-md);
+    flex: 1;
+    max-width: 80px;
+    height: 100%;
+}
+
+.bottom-nav .nav-item:hover,
+.bottom-nav .nav-item.active {
+    opacity: 1;
+    background-color: var(--hover-color);
+    color: var(--primary-color);
+}
+
+.bottom-nav .nav-item .icon,
+.bottom-nav .nav-item .nav-icon {
+    margin-bottom: 2px;
+    opacity: 0.9;
+    width: 20px;
+    height: 20px;
+}
+
+.bottom-nav .nav-item.active .icon,
+.bottom-nav .nav-item.active .nav-icon {
+    opacity: 1;
+}
+
+.bottom-nav .nav-label {
+    font-size: 10px;
+    font-weight: 500;
+}
+
+/* FIX NAV BAR SHRINKING ON SETTINGS PAGE (same as search) */
+.bottom-nav .nav-item {
+    font-size: var(--font-size-xs);
+}
+
+.bottom-nav .nav-icon {
+    font-size: 1.1rem;
+}
+
+.bottom-nav .nav-label {
+    font-size: 10px;
+}
