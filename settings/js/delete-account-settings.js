@@ -1,155 +1,136 @@
-// delete-account-settings.js
-// Handles "Delete my account" flow on delete-account-settings.html
-
-const SETTINGS_API_BASE_URL =
-  typeof API_BASE_URL !== "undefined"
-    ? API_BASE_URL
-    : "https://uncensored-app-beta-production.up.railway.app/api";
+// ============================================================
+// Delete Account Settings Page
+// ------------------------------------------------------------
+// Requirements:
+// - User must be logged in
+// - Checkbox + "DELETE" text required
+// - Confirmation popup before delete
+// - Calls backend DELETE endpoint
+// - On success: clears auth + redirects off platform
+// ============================================================
 
 class DeleteAccountPage {
   constructor() {
     this.confirmCheckbox = null;
     this.confirmTextInput = null;
     this.deleteButton = null;
+    this.statusEl = null;
   }
 
   init() {
-    // DOM cache
+    this.cacheDom();
+    this.bindEvents();
+    this.ensureAuthenticated();
+  }
+
+  cacheDom() {
     this.confirmCheckbox = document.getElementById("confirmCheckbox");
-    this.confirmTextInput = document.getElementById("confirmTextInput");
+    this.confirmTextInput = document.getElementById("confirmText");
     this.deleteButton = document.getElementById("deleteAccountButton");
+    this.statusEl = document.getElementById("deleteStatus");
+  }
 
-    // Require auth
-    const currentUser = this.getCurrentUserSafe();
-    if (!currentUser) {
-      // not logged in -> send to login
-      window.location.href = "login.html";
-      return;
-    }
-
-    // Events
+  bindEvents() {
     if (this.confirmCheckbox) {
-      this.confirmCheckbox.addEventListener("change", () =>
-        this.updateButtonState()
-      );
+      this.confirmCheckbox.addEventListener("change", () => this.updateButtonState());
     }
+
     if (this.confirmTextInput) {
-      this.confirmTextInput.addEventListener("input", () =>
-        this.updateButtonState()
-      );
+      this.confirmTextInput.addEventListener("input", () => this.updateButtonState());
     }
+
     if (this.deleteButton) {
-      this.deleteButton.addEventListener("click", () =>
-        this.handleDeleteClick()
-      );
+      this.deleteButton.addEventListener("click", () => this.handleDeleteClick());
     }
   }
 
-  /* ========= Auth helpers ========= */
-
-  getCurrentUserSafe() {
+  ensureAuthenticated() {
     try {
-      return typeof getCurrentUser === "function" ? getCurrentUser() : null;
-    } catch {
-      return null;
-    }
-  }
-
-  getAuthTokenSafe() {
-    try {
-      return typeof getAuthToken === "function" ? getAuthToken() : null;
-    } catch {
-      return null;
-    }
-  }
-
-  logoutLocal() {
-    // If auth.js exposes a logout function, use it; otherwise clear localStorage
-    try {
-      if (typeof logout === "function") {
-        logout();
-        return;
+      const loggedIn =
+        typeof isLoggedIn === "function" ? isLoggedIn() : !!this.getTokenFallback();
+      if (!loggedIn) {
+        this.setStatus("You must be logged in to delete your account.", "error");
+        setTimeout(() => {
+          window.location.href = "../login.html";
+        }, 1500);
       }
     } catch {
-      // ignore
-    }
-
-    try {
-      localStorage.removeItem("authToken");
-      localStorage.removeItem("currentUser");
-    } catch {
-      // ignore
+      // If auth helpers fail, we still try a naive redirect
     }
   }
 
-  /* ========= UI helpers ========= */
+  // --------- Helpers ---------
+
+  getTokenFallback() {
+    try {
+      if (typeof getAuthToken === "function") return getAuthToken();
+    } catch {}
+    try {
+      return localStorage.getItem("authToken");
+    } catch {
+      return null;
+    }
+  }
 
   updateButtonState() {
-    if (!this.deleteButton || !this.confirmCheckbox || !this.confirmTextInput) return;
+    if (!this.deleteButton) return;
 
-    const checked = this.confirmCheckbox.checked;
-    const textOk = this.confirmTextInput.value.trim().toUpperCase() === "DELETE";
+    const checkboxOk = this.confirmCheckbox?.checked;
+    const textOk =
+      (this.confirmTextInput?.value || "").trim().toUpperCase() === "DELETE";
 
-    this.deleteButton.disabled = !(checked && textOk);
+    this.deleteButton.disabled = !(checkboxOk && textOk);
   }
 
-  showToast(message, type = "info") {
-    if (!message) return;
-
-    const old = document.querySelector(".status-message");
-    if (old) old.remove();
-
-    const d = document.createElement("div");
-    d.className = `status-message status-${type}`;
-    d.textContent = message;
-    d.style.position = "fixed";
-    d.style.top = "70px";
-    d.style.left = "50%";
-    d.style.transform = "translateX(-50%)";
-    d.style.padding = "8px 14px";
-    d.style.borderRadius = "999px";
-    d.style.background =
-      type === "error"
-        ? "#3b0f0f"
-        : type === "success"
-        ? "#0f3b1f"
-        : "#111";
-    d.style.border = "1px solid #333";
-    d.style.color = "#fff";
-    d.style.zIndex = "9999";
-
-    document.body.appendChild(d);
-    setTimeout(() => d.remove(), 2500);
+  setStatus(message, type = "info") {
+    if (!this.statusEl) return;
+    this.statusEl.textContent = message || "";
+    this.statusEl.className = "delete-status-message";
+    if (type === "error") {
+      this.statusEl.style.color = "var(--error-color, #ff4444)";
+    } else if (type === "success") {
+      this.statusEl.style.color = "var(--success-color, #00C851)";
+    } else {
+      this.statusEl.style.color = "var(--text-muted, #6e767d)";
+    }
   }
 
-  /* ========= Delete logic ========= */
+  // --------- Delete Flow ---------
 
   async handleDeleteClick() {
     if (!this.deleteButton) return;
 
-    const token = this.getAuthTokenSafe();
+    const ok = window.confirm(
+      "Are you sure you want to permanently delete your account? This cannot be undone."
+    );
+    if (!ok) return;
+
+    const token = this.getTokenFallback();
     if (!token) {
-      this.showToast("Missing auth token.", "error");
+      this.setStatus("Missing auth token. Please log in again.", "error");
+      setTimeout(() => {
+        window.location.href = "../login.html";
+      }, 1500);
       return;
     }
 
-    // final confirmation
-    const sure = window.confirm(
-      "Are you absolutely sure you want to permanently delete your account and all associated data? This cannot be undone."
-    );
-    if (!sure) return;
-
     this.deleteButton.disabled = true;
     this.deleteButton.textContent = "Deleting...";
+    this.setStatus("Deleting your account…", "info");
 
     try {
-      // Adjust this endpoint to whatever you implement on the backend.
-      // Recommended backend route: DELETE /api/account
-      const res = await fetch(`${SETTINGS_API_BASE_URL}/account`, {
+      // 🔥 IMPORTANT:
+      // Adjust this endpoint to match your backend.
+      // Common patterns: DELETE /api/account or DELETE /api/users/me
+      const base = typeof API_BASE_URL !== "undefined"
+        ? API_BASE_URL
+        : "https://uncensored-app-beta-production.up.railway.app/api";
+
+      const res = await fetch(`${base}/account`, {
         method: "DELETE",
         headers: {
-          Authorization: `Bearer ${token}`,
-        },
+          Authorization: `Bearer ${token}`
+        }
       });
 
       let data = {};
@@ -160,30 +141,48 @@ class DeleteAccountPage {
       }
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to delete account");
+        const msg = data.error || "Failed to delete account.";
+        throw new Error(msg);
       }
 
-      // clear auth + redirect
-      this.logoutLocal();
-      this.showToast("Account deleted successfully.", "success");
-
-      // small delay so toast is visible, then send to signup/landing
-      setTimeout(() => {
-        window.location.href = "signup.html";
-      }, 800);
+      // Success: clear auth & redirect off the app
+      this.setStatus("Your account has been deleted.", "success");
+      this.clearAuthAndRedirect();
     } catch (err) {
-      console.error("Delete account error:", err);
-      this.showToast(err.message || "Failed to delete account.", "error");
+      console.error("delete account error:", err);
+      this.setStatus(err.message || "Something went wrong.", "error");
       this.deleteButton.disabled = false;
-      this.deleteButton.textContent = "Delete my account permanently";
+      this.deleteButton.textContent = "Delete my account forever";
     }
+  }
+
+  clearAuthAndRedirect() {
+    // Try using your existing auth utilities first
+    try {
+      if (typeof logout === "function") {
+        logout();
+      }
+    } catch {
+      // ignore
+    }
+
+    // Fallback: clear localStorage keys
+    try {
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("currentUser");
+    } catch {
+      // ignore
+    }
+
+    setTimeout(() => {
+      window.location.href = "../signup.html";
+    }, 1500);
   }
 }
 
-/* ========= Init ========= */
-
+// Initialize
 document.addEventListener("DOMContentLoaded", () => {
   const page = new DeleteAccountPage();
   page.init();
-  window.deleteAccountPage = page;
+  window.deleteAccountPage = page; // for debugging if you want
 });
