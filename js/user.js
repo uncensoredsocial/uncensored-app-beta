@@ -11,17 +11,12 @@
        - isLoggedIn()
        - getCurrentUser()
        - getAuthToken()
-   - Post cards are rendered to match feed.js exactly
  ============================================================ */
 
 const USER_API_BASE_URL =
   typeof API_BASE_URL !== "undefined"
     ? API_BASE_URL
     : "https://uncensored-app-beta-production.up.railway.app/api";
-
-/* =======================================================================
-   CLASS: UserProfilePage
-======================================================================= */
 
 class UserProfilePage {
   constructor() {
@@ -341,12 +336,12 @@ class UserProfilePage {
     // Title in header
     this.setHeaderTitle(displayName);
 
-    // Avatar
+    // Avatar - fallback to default-profile.PNG in root
     if (this.dom.avatarEl) {
       this.dom.avatarEl.src =
-        this.user.avatar_url || "assets/icons/default-profile.png";
+        this.user.avatar_url || "default-profile.PNG";
       this.dom.avatarEl.onerror = () => {
-        this.dom.avatarEl.src = "assets/icons/default-profile.png";
+        this.dom.avatarEl.src = "default-profile.PNG";
       };
     }
 
@@ -536,8 +531,15 @@ class UserProfilePage {
       this.viewUsername
     )}/posts`;
 
+    // IMPORTANT: include auth header so backend can send liked_by_me / saved_by_me
+    const headers = {};
+    const token = this.getAuthTokenSafe();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { headers });
       const data = await res.json().catch(() => []);
 
       if (!res.ok) {
@@ -574,7 +576,6 @@ class UserProfilePage {
       return;
     }
 
-    // Use the SAME markup as feed.js so styles match
     this.dom.postsList.innerHTML = this.posts
       .map((post) => this.renderPostHtml(post))
       .join("");
@@ -587,12 +588,12 @@ class UserProfilePage {
     const user = post.user || this.user || {};
     const username = user.username || this.viewUsername || "unknown";
     const displayName = user.display_name || username;
-    const avatar = user.avatar_url || "assets/icons/default-profile.png";
+    const avatar = user.avatar_url || "default-profile.PNG";
 
     const createdAt = post.created_at;
     const time = this.formatTime(createdAt);
 
-    // New backend flags: liked_by_me / saved_by_me
+    // liked / saved flags
     const liked =
       post.liked_by_me === true ||
       post.is_liked === true ||
@@ -602,7 +603,7 @@ class UserProfilePage {
       post.is_saved === true ||
       post.isSaved === true;
 
-    // Like count – prefer numeric `likes` from backend
+    // Like count
     let likeCount = 0;
     if (typeof post.likes === "number") {
       likeCount = post.likes;
@@ -612,7 +613,7 @@ class UserProfilePage {
       likeCount = post.likes.length;
     }
 
-    // Comment count – new field `comments_count`
+    // Comment count
     let commentCount = 0;
     if (typeof post.comments_count === "number") {
       commentCount = post.comments_count;
@@ -634,7 +635,8 @@ class UserProfilePage {
       <article class="post" data-post-id="${post.id}">
         <header class="post-header">
           <div class="post-user" data-username="${this.escape(username)}">
-            <img class="post-avatar" src="${avatar}" onerror="this.src='assets/icons/default-profile.png'">
+            <img class="post-avatar" src="${avatar}"
+                 onerror="this.src='default-profile.PNG'">
             <div class="post-user-meta">
               <span class="post-display-name">${this.escape(displayName)}</span>
               <span class="post-username">@${this.escape(username)}</span>
@@ -666,7 +668,7 @@ class UserProfilePage {
             </button>
 
             <button class="post-action share-btn"
-                    style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center;">
+                    style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center%;">
               <i class="fa-solid fa-arrow-up-from-bracket"></i>
             </button>
 
@@ -835,7 +837,6 @@ class UserProfilePage {
         countEl.textContent = String(serverLikes);
       }
 
-      // update local cache
       const post = this.posts.find((p) => String(p.id) === String(postId));
       if (post) {
         const nowLiked = data.liked === true ? true : !wasLiked;
