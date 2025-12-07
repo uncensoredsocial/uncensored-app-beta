@@ -66,6 +66,9 @@
   height: 120px;
   background: #111; /* default grey-ish banner */
   border-bottom: 1px solid var(--border-color, #222);
+
+  /* extra padding to help center avatar overlap */
+  padding-bottom: 12px;
 }
 
 /* When a real banner image is set from JS */
