@@ -20,7 +20,7 @@
     referrerpolicy="no-referrer"
   />
 
-  <!-- Match index.html bottom nav sizing / layout -->
+  <!-- Match index.html content width + bottom nav behavior -->
   <style>
     @media (min-width: 900px) {
       .content-wrapper {
@@ -173,13 +173,13 @@
           <p>Could not load posts.</p>
         </div>
 
-        <!-- posts from user.js (same card style as feed.js) -->
+        <!-- Posts injected from user.js (same card style as feed.js) -->
         <div id="userPostsList" class="profile-posts"></div>
       </section>
     </main>
   </div>
 
-  <!-- ===== BOTTOM NAV (same as index.html) ===== -->
+  <!-- ===== BOTTOM NAV (same style as index.html) ===== -->
   <nav class="bottom-nav" id="bottomNav">
     <a href="index.html" class="nav-item">
       <i class="fa-solid fa-house nav-icon"></i>
@@ -219,9 +219,16 @@
     >
       Block user
     </button>
+    <button
+      class="user-options-item"
+      data-action="report"
+      type="button"
+    >
+      Report user
+    </button>
   </div>
 
-  <!-- ===== BLOCK CONFIRM MODAL ===== -->
+  <!-- ===== BLOCK CONFIRM MODAL (you can wire this later if you want) ===== -->
   <div
     id="blockConfirmOverlay"
     class="block-modal-overlay"
@@ -230,7 +237,7 @@
     <div class="block-modal" id="blockConfirmModal">
       <h3 class="block-modal-title">Block this user?</h3>
       <p class="block-modal-text">
-        They won’t be able to see your profile or interact with you.  
+        They won’t be able to see your profile or interact with you.
         You can unblock them later in Settings.
       </p>
       <div class="block-modal-actions">
