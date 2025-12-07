@@ -80,7 +80,8 @@
   justify-content: space-between;
   align-items: flex-end;
   padding: 0 16px;
-  margin-top: -40px; /* pulls avatar into banner area */
+  /* Pull avatar slightly into banner but not too far up */
+  margin-top: -28px;
   gap: 12px;
 }
 
@@ -112,6 +113,12 @@
   border-radius: 999px;
   font-size: 0.9rem;
   white-space: nowrap;
+}
+
+/* Optional disabled style for follow when logged out */
+.profile-follow-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Text info block */
@@ -172,7 +179,7 @@
   font-weight: 600;
 }
 
-/* Reuse feed post styling but allow small tweaks */
+/* Keep feed card styling from feed-styles.css, only add outer margin */
 .profile-posts .post {
   margin: 8px 16px;
 }
@@ -244,7 +251,8 @@
 .user-options-item:hover {
   background: #222;
 }
-/* ===== Post header right side (time + options) ===== */
+
+/* ===== (Optional) Post header right side / post menu (if you use it later) ===== */
 
 .post-header {
   position: relative; /* allows the options menu to anchor to header */
@@ -305,4 +313,43 @@
 
 .post-options-item:hover {
   background: #222;
+}
+
+/* ===== (Optional) Block modal styling (if you hook it up) ===== */
+
+.block-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+}
+
+.block-modal {
+  background: #111;
+  border-radius: 12px;
+  border: 1px solid var(--border-color, #333);
+  padding: 16px 18px 14px;
+  width: 90%;
+  max-width: 360px;
+}
+
+.block-modal-title {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.block-modal-text {
+  margin: 0 0 14px;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.block-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
