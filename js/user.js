@@ -6,10 +6,12 @@
    - Loads profile from:   GET /api/users/:username
    - Loads posts from:     GET /api/users/:username/posts
    - Follow/unfollow via:  POST /api/users/:username/follow
+   - Like / save via:      POST /api/posts/:id/like, /save
    - Uses auth helpers from auth.js:
        - isLoggedIn()
        - getCurrentUser()
        - getAuthToken()
+   - Post cards are rendered to match feed.js exactly
  ============================================================ */
 
 const USER_API_BASE_URL =
@@ -275,7 +277,6 @@ class UserProfilePage {
       this.viewUsername
     )}`;
 
-    // 🔥 NEW: send Authorization header so backend can return `is_following`
     const headers = {};
     const token = this.getAuthTokenSafe();
     if (token) {
@@ -379,7 +380,6 @@ class UserProfilePage {
       );
     }
 
-    // Optional join date (if you want a "Joined" line somewhere later)
     if (createdAt) {
       const joinedTxt = this.formatJoinDate(createdAt);
       console.debug("Joined:", joinedTxt);
@@ -402,7 +402,7 @@ class UserProfilePage {
       return;
     }
 
-    // viewing yourself -> hide follow + message (you can change if you want)
+    // viewing yourself -> hide follow + message
     if (currentUser.username?.toLowerCase() === this.user.username?.toLowerCase()) {
       this.dom.followBtn.style.display = "none";
       if (this.dom.messageBtn) {
@@ -569,185 +569,327 @@ class UserProfilePage {
   renderPosts() {
     if (!this.dom.postsList) return;
 
-    this.dom.postsList.innerHTML = "";
+    if (!this.posts.length) {
+      this.dom.postsList.innerHTML = "";
+      return;
+    }
 
-    this.posts.forEach((post) => {
-      this.dom.postsList.appendChild(this.createPostElement(post));
+    // Use the SAME markup as feed.js so styles match
+    this.dom.postsList.innerHTML = this.posts
+      .map((post) => this.renderPostHtml(post))
+      .join("");
+
+    this.attachPostEvents();
+  }
+
+  renderPostHtml(post) {
+    // For user page, the backend may or may not include post.user
+    const user = post.user || this.user || {};
+    const username = user.username || this.viewUsername || "unknown";
+    const displayName = user.display_name || username;
+    const avatar = user.avatar_url || "assets/icons/default-profile.png";
+
+    const createdAt = post.created_at;
+    const time = this.formatTime(createdAt);
+
+    // New backend flags: liked_by_me / saved_by_me
+    const liked =
+      post.liked_by_me === true ||
+      post.is_liked === true ||
+      post.isLiked === true;
+    const saved =
+      post.saved_by_me === true ||
+      post.is_saved === true ||
+      post.isSaved === true;
+
+    // Like count – prefer numeric `likes` from backend
+    let likeCount = 0;
+    if (typeof post.likes === "number") {
+      likeCount = post.likes;
+    } else if (typeof post.like_count === "number") {
+      likeCount = post.like_count;
+    } else if (Array.isArray(post.likes)) {
+      likeCount = post.likes.length;
+    }
+
+    // Comment count – new field `comments_count`
+    let commentCount = 0;
+    if (typeof post.comments_count === "number") {
+      commentCount = post.comments_count;
+    } else if (typeof post.comment_count === "number") {
+      commentCount = post.comment_count;
+    } else if (Array.isArray(post.comments)) {
+      commentCount = post.comments.length;
+    } else if (typeof post.comments === "number") {
+      commentCount = post.comments;
+    }
+
+    const mediaUrl =
+      post.media_url || post.media || post.image_url || post.video_url || null;
+    const mediaType = post.media_type || "";
+
+    const mediaHtml = mediaUrl ? this.renderMediaHtml(mediaUrl, mediaType) : "";
+
+    return `
+      <article class="post" data-post-id="${post.id}">
+        <header class="post-header">
+          <div class="post-user" data-username="${this.escape(username)}">
+            <img class="post-avatar" src="${avatar}" onerror="this.src='assets/icons/default-profile.png'">
+            <div class="post-user-meta">
+              <span class="post-display-name">${this.escape(displayName)}</span>
+              <span class="post-username">@${this.escape(username)}</span>
+            </div>
+          </div>
+          <span class="post-time">${time}</span>
+        </header>
+
+        <div class="post-body">
+          <div class="post-text">${this.formatPostContent(
+            post.content || ""
+          )}</div>
+          ${mediaHtml}
+        </div>
+
+        <footer class="post-footer">
+          <div class="post-actions"
+               style="display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;">
+            <button class="post-action like-btn ${liked ? "liked" : ""}"
+                    style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center;">
+              <i class="fa-${liked ? "solid" : "regular"} fa-heart"></i>
+              <span class="like-count">${likeCount}</span>
+            </button>
+
+            <button class="post-action comment-btn"
+                    style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center;">
+              <i class="fa-regular fa-comment"></i>
+              <span class="comment-count">${commentCount}</span>
+            </button>
+
+            <button class="post-action share-btn"
+                    style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center;">
+              <i class="fa-solid fa-arrow-up-from-bracket"></i>
+            </button>
+
+            <button class="post-action save-btn ${saved ? "saved" : ""}"
+                    style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center%;">
+              <i class="fa-${saved ? "solid" : "regular"} fa-bookmark"></i>
+            </button>
+          </div>
+        </footer>
+      </article>
+    `;
+  }
+
+  renderMediaHtml(url, type) {
+    const lower = url.toLowerCase();
+    const isVideo =
+      (type && (type.startsWith("video/") || type === "video")) ||
+      lower.endsWith(".mp4") ||
+      lower.endsWith(".webm") ||
+      lower.endsWith(".ogg");
+
+    if (isVideo) {
+      return `
+        <div class="post-media">
+          <video controls playsinline preload="metadata">
+            <source src="${url}">
+            Your browser does not support video.
+          </video>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="post-media">
+        <a href="${url}" target="_blank" rel="noopener noreferrer">
+          <img src="${url}" loading="lazy">
+        </a>
+      </div>
+    `;
+  }
+
+  /* --------------------- POST EVENTS --------------------- */
+
+  attachPostEvents() {
+    const posts = this.dom.postsList
+      ? this.dom.postsList.querySelectorAll(".post")
+      : [];
+
+    posts.forEach((postEl) => {
+      const postId = postEl.dataset.postId;
+
+      // Click post -> open post page
+      postEl.addEventListener("click", (e) => {
+        if (e.target.closest(".post-actions") || e.target.closest(".post-user"))
+          return;
+        window.location.href = `post.html?id=${postId}`;
+      });
+
+      // User click
+      const userEl = postEl.querySelector(".post-user");
+      if (userEl) {
+        userEl.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const username = userEl.dataset.username;
+          const me = this.getCurrentUserSafe();
+          if (me && me.username === username)
+            window.location.href = "profile.html";
+          else
+            window.location.href = `user.html?user=${encodeURIComponent(
+              username
+            )}`;
+        });
+      }
+
+      // Like
+      const likeBtn = postEl.querySelector(".like-btn");
+      if (likeBtn) {
+        likeBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.handleLike(postId, likeBtn);
+        });
+      }
+
+      // Comment
+      const commentBtn = postEl.querySelector(".comment-btn");
+      if (commentBtn) {
+        commentBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          window.location.href = `post.html?id=${postId}#comments`;
+        });
+      }
+
+      // Share
+      const shareBtn = postEl.querySelector(".share-btn");
+      if (shareBtn) {
+        shareBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const postUrl = `${window.location.origin}/post.html?id=${postId}`;
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard
+              .writeText(postUrl)
+              .then(() => this.showToast("Link copied!", "success"))
+              .catch(() =>
+                this.showToast("Could not copy link to clipboard.", "error")
+              );
+          } else {
+            alert("Share this link:\n" + postUrl);
+          }
+        });
+      }
+
+      // Save
+      const saveBtn = postEl.querySelector(".save-btn");
+      if (saveBtn) {
+        saveBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.handleSave(postId, saveBtn);
+        });
+      }
     });
   }
 
-  createPostElement(post) {
-    // Posts from /api/users/:username/posts are:
-    // { id, content, created_at, likes_count?, comments_count? }
-    const article = document.createElement("article");
-    article.className = "post";
-    article.setAttribute("tabindex", "0");
-    article.dataset.postId = post.id;
-
-    const user        = this.user || {};
-    const avatar      = user.avatar_url || "assets/icons/default-profile.png";
-    const displayName = user.display_name || user.username || "Unknown";
-    const username    = user.username || "user";
-
-    const createdAt = post.created_at ? new Date(post.created_at) : null;
-    const timeLabel = createdAt ? createdAt.toLocaleString() : "";
-
-    const likeCount =
-      typeof post.likes_count === "number"
-        ? post.likes_count
-        : Array.isArray(post.likes)
-        ? post.likes.length
-        : 0;
-
-    const commentsCount =
-      typeof post.comments_count === "number" ? post.comments_count : 0;
-
-    article.innerHTML = `
-      <header class="post-header">
-        <img
-          src="${avatar}"
-          alt="${this.escape(displayName)}"
-          class="post-user-avatar"
-          onerror="this.src='assets/icons/default-profile.png'"
-        />
-        <div class="post-user-info">
-          <div class="post-display-name">${this.escape(displayName)}</div>
-          <div class="post-username">@${this.escape(username)}</div>
-        </div>
-        ${
-          timeLabel
-            ? `<div class="post-time">${this.escape(timeLabel)}</div>`
-            : ""
-        }
-      </header>
-
-      <div class="post-content">
-        <p>${this.formatContent(post.content || "")}</p>
-      </div>
-
-      <footer class="post-footer">
-        <div class="post-timestamp">
-          ${timeLabel ? this.escape(timeLabel) : ""}
-        </div>
-        <div class="post-actions">
-          <button class="post-action-btn post-like-btn" type="button">
-            <span class="post-action-icon">♥</span>
-            <span class="post-action-count like-count">${likeCount}</span>
-          </button>
-          <button class="post-action-btn post-comment-btn" type="button">
-            <span class="post-action-icon">💬</span>
-            <span class="post-action-count comment-count">${commentsCount}</span>
-          </button>
-          <button class="post-action-btn post-share-btn" type="button">
-            <span class="post-action-icon">⤴</span>
-          </button>
-        </div>
-      </footer>
-    `;
-
-    const likeBtn    = article.querySelector(".post-like-btn");
-    const commentBtn = article.querySelector(".post-comment-btn");
-    const shareBtn   = article.querySelector(".post-share-btn");
-
-    if (likeBtn) {
-      likeBtn.addEventListener("click", () => this.handleLike(post, likeBtn));
-    }
-    if (commentBtn) {
-      commentBtn.addEventListener("click", () => this.handleCommentClick(post));
-    }
-    if (shareBtn) {
-      shareBtn.addEventListener("click", () => this.handleSharePostClick(post));
-    }
-
-    return article;
-  }
-
-  formatContent(text) {
-    const safe = this.escape(text);
-
-    return safe
-      .replace(
-        /(https?:\/\/[^\s]+)/g,
-        '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
-      )
-      .replace(/#(\w+)/g, '<span class="hashtag">#$1</span>')
-      .replace(/@(\w+)/g, '<span class="mention">@$1</span>');
-  }
-
-  /* --------------------- POST ACTIONS --------------------- */
-
-  async handleLike(post, btn) {
+  async handleLike(postId, btn) {
     if (!this.isLoggedInSafe()) {
-      this.showToast("Please log in to like posts.", "error");
-      return;
+      return this.showToast("Log in to like posts", "error");
     }
 
     const token = this.getAuthTokenSafe();
-    if (!token) {
-      this.showToast("Missing auth token.", "error");
-      return;
+    if (!token) return this.showToast("Missing token", "error");
+
+    const countEl = btn.querySelector(".like-count");
+    const icon = btn.querySelector("i");
+
+    const wasLiked = btn.classList.contains("liked");
+    let newCount = parseInt(countEl.textContent || "0", 10);
+
+    // Optimistic UI
+    if (wasLiked) {
+      btn.classList.remove("liked");
+      icon.classList.replace("fa-solid", "fa-regular");
+      newCount--;
+    } else {
+      btn.classList.add("liked");
+      icon.classList.replace("fa-regular", "fa-solid");
+      newCount++;
+    }
+    countEl.textContent = String(Math.max(newCount, 0));
+
+    try {
+      const res = await fetch(`${USER_API_BASE_URL}/posts/${postId}/like`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to update like");
+
+      const serverLikes =
+        typeof data.likes === "number"
+          ? data.likes
+          : typeof data.like_count === "number"
+          ? data.like_count
+          : null;
+
+      if (serverLikes !== null) {
+        countEl.textContent = String(serverLikes);
+      }
+
+      // update local cache
+      const post = this.posts.find((p) => String(p.id) === String(postId));
+      if (post) {
+        const nowLiked = data.liked === true ? true : !wasLiked;
+        post.liked_by_me = nowLiked;
+        post.is_liked = nowLiked;
+        if (serverLikes !== null) {
+          post.likes = serverLikes;
+          post.like_count = serverLikes;
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      this.showToast("Failed to update like", "error");
+    }
+  }
+
+  async handleSave(postId, btn) {
+    if (!this.isLoggedInSafe()) {
+      return this.showToast("Log in to save posts", "error");
+    }
+
+    const token = this.getAuthTokenSafe();
+    if (!token) return this.showToast("Missing token", "error");
+
+    const icon = btn.querySelector("i");
+    const wasSaved = btn.classList.contains("saved");
+
+    // Optimistic UI
+    if (wasSaved) {
+      btn.classList.remove("saved");
+      icon.classList.replace("fa-solid", "fa-regular");
+    } else {
+      btn.classList.add("saved");
+      icon.classList.replace("fa-regular", "fa-solid");
     }
 
     try {
-      btn.disabled = true;
-
-      const res = await fetch(
-        `${USER_API_BASE_URL}/posts/${encodeURIComponent(post.id)}/like`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
+      const res = await fetch(`${USER_API_BASE_URL}/posts/${postId}/save`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to like post");
-      }
+      if (!res.ok) throw new Error(data.error || "Failed to update save");
 
-      const likeCountEl = btn.querySelector(".like-count");
-      if (likeCountEl) {
-        likeCountEl.textContent = data.likes ?? 0;
-      }
-
-      if (data.liked) {
-        btn.classList.add("liked");
-      } else {
-        btn.classList.remove("liked");
+      const post = this.posts.find((p) => String(p.id) === String(postId));
+      if (post) {
+        const nowSaved = data.saved === true ? true : !wasSaved;
+        post.saved_by_me = nowSaved;
+        post.is_saved = nowSaved;
       }
     } catch (err) {
-      console.error("handleLike error:", err);
-      this.showToast(err.message || "Failed to like post", "error");
-    } finally {
-      btn.disabled = false;
-    }
-  }
-
-  handleCommentClick(_post) {
-    this.showToast("Comments coming soon on user page!", "info");
-  }
-
-  handleSharePostClick(post) {
-    const url = `${window.location.origin}/index.html#post-${post.id}`;
-
-    if (navigator.share) {
-      navigator
-        .share({
-          title: "Uncensored Social Post",
-          text: post.content || "",
-          url
-        })
-        .catch(() => {});
-    } else if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard
-        .writeText(url)
-        .then(() => this.showToast("Post link copied!", "success"))
-        .catch(() =>
-          this.showToast("Could not copy link to clipboard.", "error")
-        );
-    } else {
-      alert("Share this link:\n" + url);
+      console.error(err);
+      this.showToast("Failed to update save", "error");
     }
   }
 
@@ -760,6 +902,18 @@ class UserProfilePage {
 
     const opts = { month: "long", year: "numeric" };
     return `Joined ${date.toLocaleDateString(undefined, opts)}`;
+  }
+
+  formatTime(ts) {
+    const d = new Date(ts);
+    if (isNaN(d)) return "";
+    const now = new Date();
+    const diff = (now - d) / 1000;
+    if (diff < 60) return "just now";
+    if (diff < 3600) return Math.floor(diff / 60) + "m";
+    if (diff < 86400) return Math.floor(diff / 3600) + "h";
+    if (diff < 604800) return Math.floor(diff / 86400) + "d";
+    return d.toLocaleDateString();
   }
 
   escape(str = "") {
@@ -781,12 +935,43 @@ class UserProfilePage {
     });
   }
 
+  formatPostContent(text) {
+    let t = this.escape(text);
+    t = t.replace(
+      /(https?:\/\/[^\s]+)/g,
+      '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
+    t = t.replace(/#(\w+)/g, '<span class="hashtag">#$1</span>');
+    t = t.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+    return t;
+  }
+
   showToast(message, type = "info") {
     if (!message) return;
+
+    const old = document.querySelector(".status-message");
+    if (old) old.remove();
 
     const div = document.createElement("div");
     div.className = `status-message status-${type}`;
     div.textContent = message;
+
+    div.style.position = "fixed";
+    div.style.top = "70px";
+    div.style.left = "50%";
+    div.style.transform = "translateX(-50%)";
+    div.style.padding = "8px 14px";
+    div.style.borderRadius = "999px";
+    div.style.background =
+      type === "error"
+        ? "#3b0f0f"
+        : type === "success"
+        ? "#0f3b1f"
+        : "#111";
+    div.style.border = "1px solid #333";
+    div.style.color = "#fff";
+    div.style.zIndex = "9999";
+
     document.body.appendChild(div);
     setTimeout(() => div.remove(), 2500);
   }
