@@ -80,7 +80,7 @@
   justify-content: space-between;
   align-items: flex-end;
   padding: 0 16px;
-  margin-top: -24px; /* adjust up/down if needed */
+  margin-top: -18px; /* adjust up/down if needed */
   gap: 12px;
 }
 
