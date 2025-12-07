@@ -80,8 +80,7 @@
   justify-content: space-between;
   align-items: flex-end;
   padding: 0 16px;
-  /* Pull avatar slightly into banner but not too far up */
-  margin-top: -28px;
+  margin-top: -24px; /* was -40px; less negative so circle isn't too high */
   gap: 12px;
 }
 
@@ -92,12 +91,18 @@
   border: 4px solid #000;
   overflow: hidden;
   background: #000;
+
+  /* NEW: center the image inside the circle */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .profile-avatar {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block; /* NEW: fixes Safari/iOS offset issues */
 }
 
 /* Right-side buttons (message + follow) */
@@ -113,12 +118,6 @@
   border-radius: 999px;
   font-size: 0.9rem;
   white-space: nowrap;
-}
-
-/* Optional disabled style for follow when logged out */
-.profile-follow-btn.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 /* Text info block */
@@ -179,7 +178,7 @@
   font-weight: 600;
 }
 
-/* Keep feed card styling from feed-styles.css, only add outer margin */
+/* Reuse feed post styling but allow small tweaks */
 .profile-posts .post {
   margin: 8px 16px;
 }
@@ -252,7 +251,7 @@
   background: #222;
 }
 
-/* ===== (Optional) Post header right side / post menu (if you use it later) ===== */
+/* ===== Post header right side (time + options) ===== */
 
 .post-header {
   position: relative; /* allows the options menu to anchor to header */
@@ -315,16 +314,16 @@
   background: #222;
 }
 
-/* ===== (Optional) Block modal styling (if you hook it up) ===== */
+/* ===== Block confirm modal (for blockConfirmOverlay) ===== */
 
 .block-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.75);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 60;
+  z-index: 100;
 }
 
 .block-modal {
