@@ -80,7 +80,7 @@
   justify-content: space-between;
   align-items: flex-end;
   padding: 0 16px;
-  margin-top: -24px; /* was -40px; less negative so circle isn't too high */
+  margin-top: -24px; /* adjust up/down if needed */
   gap: 12px;
 }
 
@@ -91,9 +91,7 @@
   border: 4px solid #000;
   overflow: hidden;
   background: #000;
-
-  /* NEW: center the image inside the circle */
-  display: flex;
+  display: flex;          /* center image */
   align-items: center;
   justify-content: center;
 }
@@ -102,7 +100,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block; /* NEW: fixes Safari/iOS offset issues */
+  display: block;         /* fixes iOS weirdness */
 }
 
 /* Right-side buttons (message + follow) */
