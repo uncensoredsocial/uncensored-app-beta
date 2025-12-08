@@ -386,7 +386,7 @@ app.post('/api/profile/upload-image', authMiddleware, async (req, res) => {
 
     const buffer = Buffer.from(imageData, 'base64');
     const folder = kind === 'avatar' ? 'avatars' : 'banners';
-    const fileName = `${folder}/${req.user.id}-${Date.now()}.jpg`;
+       const fileName = `${folder}/${req.user.id}-${Date.now()}.jpg`;
 
     const { error: uploadError } = await supabase.storage
       .from(USER_MEDIA_BUCKET)
@@ -502,44 +502,104 @@ app.get('/api/posts', async (req, res) => {
 
     const currentUserId = getUserIdFromAuthHeader(req);
 
-    const { data, error } = await supabase
+    // 1) Basic posts
+    const { data: posts, error: postsError } = await supabase
       .from('posts')
-      .select(
-        `
-        id,
-        content,
-        media_url,
-        media_type,
-        created_at,
-        user:users (
-          id,
-          username,
-          display_name,
-          avatar_url
-        ),
-        post_likes ( user_id ),
-        post_comments ( id ),
-        post_saves ( user_id )
-      `
-      )
+      .select('id, user_id, content, media_url, media_type, created_at')
       .order(orderOptions.column, { ascending: orderOptions.ascending })
       .limit(50);
 
-    if (error) {
-      console.error('Get posts error:', error);
+    if (postsError) {
+      console.error('Get posts error:', postsError);
       return res.status(500).json({ error: 'Failed to load posts' });
     }
 
-    const shaped = (data || []).map((p) => {
-      const likesArr = p.post_likes || [];
-      const commentsArr = p.post_comments || [];
-      const savesArr = p.post_saves || [];
+    if (!posts || posts.length === 0) {
+      return res.json([]);
+    }
+
+    const postIds = posts.map((p) => p.id);
+    const userIds = [...new Set(posts.map((p) => p.user_id))];
+
+    // 2) Related data in separate queries
+    const [
+      { data: users, error: usersError },
+      { data: likesRows, error: likesError },
+      { data: commentsRows, error: commentsError },
+      { data: savesRows, error: savesError }
+    ] = await Promise.all([
+      supabase
+        .from('users')
+        .select('id, username, display_name, avatar_url')
+        .in('id', userIds),
+
+      supabase
+        .from('post_likes')
+        .select('post_id, user_id')
+        .in('post_id', postIds),
+
+      supabase
+        .from('post_comments')
+        .select('id, post_id')
+        .in('post_id', postIds),
+
+      supabase
+        .from('post_saves')
+        .select('post_id, user_id')
+        .in('post_id', postIds)
+    ]);
+
+    if (usersError || likesError || commentsError || savesError) {
+      console.error('Related data errors:', {
+        usersError,
+        likesError,
+        commentsError,
+        savesError
+      });
+      return res.status(500).json({ error: 'Failed to load posts' });
+    }
+
+    // 3) Lookup maps
+    const userMap = new Map();
+    (users || []).forEach((u) => {
+      userMap.set(u.id, {
+        id: u.id,
+        username: u.username,
+        display_name: u.display_name,
+        avatar_url: u.avatar_url
+      });
+    });
+
+    const likesByPost = new Map();
+    (likesRows || []).forEach((row) => {
+      if (!likesByPost.has(row.post_id)) likesByPost.set(row.post_id, []);
+      likesByPost.get(row.post_id).push(row.user_id);
+    });
+
+    const commentsByPost = new Map();
+    (commentsRows || []).forEach((row) => {
+      const arr = commentsByPost.get(row.post_id) || [];
+      arr.push(row.id);
+      commentsByPost.set(row.post_id, arr);
+    });
+
+    const savesByPost = new Map();
+    (savesRows || []).forEach((row) => {
+      if (!savesByPost.has(row.post_id)) savesByPost.set(row.post_id, []);
+      savesByPost.get(row.post_id).push(row.user_id);
+    });
+
+    // 4) Final shape for feed.js
+    const shaped = posts.map((p) => {
+      const likesArr = likesByPost.get(p.id) || [];
+      const commentsArr = commentsByPost.get(p.id) || [];
+      const savesArr = savesByPost.get(p.id) || [];
 
       const likedByMe = currentUserId
-        ? likesArr.some((l) => l.user_id === currentUserId)
+        ? likesArr.includes(currentUserId)
         : false;
       const savedByMe = currentUserId
-        ? savesArr.some((s) => s.user_id === currentUserId)
+        ? savesArr.includes(currentUserId)
         : false;
 
       return {
@@ -548,7 +608,7 @@ app.get('/api/posts', async (req, res) => {
         media_url: p.media_url || null,
         media_type: p.media_type || null,
         created_at: p.created_at,
-        user: p.user,
+        user: userMap.get(p.user_id) || null,
         likes: likesArr.length,
         comments_count: commentsArr.length,
         saves_count: savesArr.length,
