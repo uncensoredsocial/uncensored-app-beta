@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Post - Uncensored Social</title>
 
-  <!-- Styles -->
+  <!-- Global styles -->
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/feed-styles.css" />
-  <link rel="stylesheet" href="css/post-styles.css" />
   <link rel="stylesheet" href="css/icons.css" />
+
+  <!-- Font Awesome for icons -->
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
@@ -17,136 +18,123 @@
     crossorigin="anonymous"
     referrerpolicy="no-referrer"
   />
+
+  <!-- Page layout tweaks for single post -->
+  <style>
+    @media (min-width: 900px) {
+      .post-page-main {
+        max-width: 700px;
+        margin: 0 auto;
+      }
+    }
+  </style>
 </head>
 
 <body class="post-page-body">
-  <!-- ================= HEADER ================= -->
-  <header class="header">
-    <div class="header-left">
-      <button
-        class="btn btn-ghost btn-icon back-btn"
-        onclick="history.back()"
-        title="Back"
-      >
-        <i class="fa-solid fa-arrow-left"></i>
-      </button>
+  <!-- ============== HEADER ============== -->
+  <header class="header post-header">
+    <button
+      class="btn btn-ghost btn-icon"
+      type="button"
+      onclick="history.back()"
+      aria-label="Back"
+    >
+      <i class="fa-solid fa-chevron-left"></i>
+    </button>
 
-      <!-- auth buttons (app.js will hide/show) -->
-      <div class="auth-buttons" id="authButtons">
-        <a href="login.html" class="btn btn-sm btn-login">Log In</a>
-        <a href="signup.html" class="btn btn-sm btn-signup">Sign Up</a>
-      </div>
-    </div>
+    <h1 class="page-title">Post</h1>
 
-    <!-- Centered page title -->
-    <h1 class="logo">Post</h1>
-
-    <div class="header-actions">
-      <button
-        class="btn btn-ghost btn-icon"
-        onclick="window.postPage && window.postPage.reloadAll && window.postPage.reloadAll()"
-        title="Refresh"
-      >
-        <i class="fa-solid fa-rotate-right"></i>
-      </button>
-    </div>
+    <!-- empty right side (we removed the weird refresh button) -->
+    <div class="header-actions"></div>
   </header>
 
-  <!-- ================= MAIN CONTENT ================= -->
-  <div class="content-wrapper">
-    <main class="post-main">
-      <!-- ===== SINGLE POST ===== -->
-      <section class="post-wrapper" id="postWrapper">
+  <!-- ============== MAIN CONTENT ============== -->
+  <main class="post-page-main">
+    <section class="post-page-section">
+      <!-- Single post container -->
+      <div id="postContainer" class="post-page-card">
         <div class="loading-indicator" id="postLoading">
           <div class="loading-spinner"></div>
           <span>Loading post...</span>
         </div>
-        <div id="postContainer"></div>
-      </section>
+        <div class="post-error-message" id="postError" style="display: none;">
+          Could not load this post.
+        </div>
+      </div>
+    </section>
 
-      <!-- ===== COMMENT COMPOSER / COMMENTS ===== -->
-      <section class="comments-section">
-        <!-- Composer -->
-        <div class="comment-composer auth-dependent" id="commentComposer">
-          <div class="comment-composer-inner">
-            <img
-              src="assets/icons/default-profile.PNG"
-              alt="You"
-              class="comment-avatar"
-              id="commentUserAvatar"
-            />
+    <!-- Comments -->
+    <section class="comments-section" id="commentsSection">
+      <h2 class="comments-title">Comments</h2>
 
-            <div class="comment-input-area">
-              <textarea
-                id="commentInput"
-                class="comment-input"
-                rows="3"
-                maxlength="280"
-                placeholder="Add a comment..."
-              ></textarea>
+      <!-- Comment box for logged-in users -->
+      <div class="comment-composer auth-dependent" id="commentComposer">
+        <img
+          src="assets/icons/default-avatar.png"
+          alt="You"
+          class="comment-avatar"
+          id="commentUserAvatar"
+        />
 
-              <div class="comment-actions-bar">
-                <span id="commentCharCounter" class="char-counter">
-                  0/280
-                </span>
-                <button
-                  class="btn btn-primary btn-sm"
-                  id="commentButton"
-                  disabled
-                >
-                  Comment
-                </button>
-              </div>
-            </div>
+        <div class="comment-input-wrapper">
+          <textarea
+            id="commentInput"
+            class="comment-input"
+            placeholder="Add a comment..."
+            maxlength="280"
+          ></textarea>
+
+          <div class="comment-actions-bar">
+            <span
+              id="commentCharCounter"
+              class="char-counter comment-char-counter"
+            >
+              0/280
+            </span>
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              id="commentSubmitBtn"
+              disabled
+            >
+              Comment
+            </button>
           </div>
         </div>
+      </div>
 
-        <!-- Guest message -->
-        <div class="comments-guest-message" id="commentsGuestMessage">
-          <p>Log in to join the conversation.</p>
-          <div class="guest-actions">
-            <a href="login.html" class="btn btn-secondary btn-sm">Log In</a>
-            <a href="signup.html" class="btn btn-primary btn-sm">Sign Up</a>
-          </div>
+      <!-- Guest message when not logged in -->
+      <div class="guest-message guest-message-small" id="commentGuestMessage">
+        <p>You need an account to comment.</p>
+        <div class="guest-actions">
+          <a href="signup.html" class="btn btn-primary btn-sm">Create account</a>
+          <a href="login.html" class="btn btn-secondary btn-sm">Log in</a>
         </div>
+      </div>
 
-        <!-- Header -->
-        <div class="comments-header">
-          <h2>Comments</h2>
-        </div>
+      <!-- List of comments -->
+      <div id="commentsList" class="comments-list">
+        <!-- post.js will inject comments here -->
+      </div>
+    </section>
+  </main>
 
-        <!-- List -->
-        <div class="comments-list" id="commentsList"></div>
-
-        <div class="loading-indicator small" id="commentsLoading">
-          <div class="loading-spinner"></div>
-          <span>Loading comments...</span>
-        </div>
-
-        <div class="comments-empty" id="commentsEmpty" style="display: none;">
-          <p>No comments yet. Be the first to comment.</p>
-        </div>
-      </section>
-    </main>
-  </div>
-
-  <!-- ================= BOTTOM NAV ================= -->
-  <!-- Same structure/icons as other pages -->
+  <!-- ============== BOTTOM NAV ============== -->
   <nav class="bottom-nav" id="bottomNav">
     <a href="index.html" class="nav-item">
-      <i class="fa-solid fa-house"></i>
+      <i class="fa-solid fa-house nav-icon"></i>
       <span class="nav-label">Home</span>
     </a>
     <a href="search.html" class="nav-item">
-      <i class="fa-solid fa-magnifying-glass"></i>
+      <i class="fa-solid fa-magnifying-glass nav-icon"></i>
       <span class="nav-label">Search</span>
     </a>
     <a href="notifications.html" class="nav-item">
-      <i class="fa-regular fa-bell"></i>
+      <i class="fa-regular fa-bell nav-icon"></i>
       <span class="nav-label">Alerts</span>
     </a>
     <a href="messages.html" class="nav-item">
-      <i class="fa-regular fa-envelope"></i>
+      <i class="fa-regular fa-envelope nav-icon"></i>
       <span class="nav-label">Messages</span>
     </a>
   </nav>
