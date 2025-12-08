@@ -31,22 +31,23 @@
         <i class="fa-solid fa-arrow-left"></i>
       </button>
 
-      <!-- NO profile photo in top-left on this page -->
+      <!-- auth buttons (app.js will hide/show) -->
       <div class="auth-buttons" id="authButtons">
         <a href="login.html" class="btn btn-sm btn-login">Log In</a>
         <a href="signup.html" class="btn btn-sm btn-signup">Sign Up</a>
       </div>
     </div>
 
+    <!-- Centered page title -->
     <h1 class="logo">Post</h1>
 
     <div class="header-actions">
       <button
         class="btn btn-ghost btn-icon"
-        onclick="window.postPage && window.postPage.reloadAll()"
+        onclick="window.postPage && window.postPage.reloadAll && window.postPage.reloadAll()"
         title="Refresh"
       >
-        <span class="icon icon-refresh"></span>
+        <i class="fa-solid fa-rotate-right"></i>
       </button>
     </div>
   </header>
@@ -69,7 +70,7 @@
         <div class="comment-composer auth-dependent" id="commentComposer">
           <div class="comment-composer-inner">
             <img
-              src="assets/icons/default-profile.png"
+              src="assets/icons/default-profile.PNG"
               alt="You"
               class="comment-avatar"
               id="commentUserAvatar"
@@ -130,22 +131,22 @@
   </div>
 
   <!-- ================= BOTTOM NAV ================= -->
-  <!-- NOTE: same markup as index.html / search.html / user.html -->
+  <!-- Same structure/icons as other pages -->
   <nav class="bottom-nav" id="bottomNav">
     <a href="index.html" class="nav-item">
-      <span class="icon icon-home"></span>
+      <i class="fa-solid fa-house"></i>
       <span class="nav-label">Home</span>
     </a>
     <a href="search.html" class="nav-item">
-      <span class="icon icon-search"></span>
+      <i class="fa-solid fa-magnifying-glass"></i>
       <span class="nav-label">Search</span>
     </a>
     <a href="notifications.html" class="nav-item">
-      <span class="icon icon-notifications"></span>
+      <i class="fa-regular fa-bell"></i>
       <span class="nav-label">Alerts</span>
     </a>
-    <a href="dms.html" class="nav-item">
-      <span class="icon icon-messages"></span>
+    <a href="messages.html" class="nav-item">
+      <i class="fa-regular fa-envelope"></i>
       <span class="nav-label">Messages</span>
     </a>
   </nav>
