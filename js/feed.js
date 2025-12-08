@@ -560,7 +560,7 @@ class FeedManager {
 
   // ============================================
   // CREATE POST (media upload via /posts/upload-media)
-// ============================================
+  // ============================================
 
   async handleCreatePost() {
     const user = this.getCurrentUser();
@@ -647,7 +647,7 @@ class FeedManager {
 
   // ============================================
   // MEDIA HELPERS (upload + validation)
-// ============================================
+  // ============================================
 
   async fileToBase64(file) {
     return new Promise((resolve, reject) => {
@@ -925,7 +925,7 @@ class FeedManager {
         : type === "success"
         ? "#0f3b1f"
         : "#111";
-    d.style.border = "1px solid #333";
+    d.style.border = "1px solid "#333";
     d.style.color = "#fff";
     d.style.zIndex = "9999";
 
