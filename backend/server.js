@@ -50,8 +50,8 @@ app.use(
   })
 );
 
-// allow larger JSON bodies for base64 images
-app.use(express.json({ limit: '10mb' }));
+// allow larger JSON bodies for base64 images + videos
+app.use(express.json({ limit: '75mb' }));
 
 // ======================================================
 //                    AUTH HELPERS
@@ -416,6 +416,76 @@ app.post('/api/profile/upload-image', authMiddleware, async (req, res) => {
   }
 });
 
+// ======================================================
+//            POST IMAGE / VIDEO MEDIA UPLOAD
+// ======================================================
+
+app.post('/api/posts/upload-media', authMiddleware, async (req, res) => {
+  try {
+    const { mediaData, mimeType } = req.body; // base64 (no data: prefix), e.g. image/jpeg or video/mp4
+
+    if (!mediaData || typeof mediaData !== 'string') {
+      return res.status(400).json({ error: 'Missing media data' });
+    }
+
+    if (!mimeType || typeof mimeType !== 'string') {
+      return res.status(400).json({ error: 'Missing mimeType' });
+    }
+
+    const isImage = mimeType.startsWith('image/');
+    const isVideo = mimeType.startsWith('video/');
+
+    if (!isImage && !isVideo) {
+      return res
+        .status(400)
+        .json({ error: 'Only image/* or video/* media are allowed' });
+    }
+
+    const buffer = Buffer.from(mediaData, 'base64');
+
+    // Derive file extension from mimeType
+    let ext = 'bin';
+    const parts = mimeType.split('/');
+    if (parts.length === 2) {
+      ext = parts[1].toLowerCase().split(';')[0];
+      if (ext === 'jpeg') ext = 'jpg';
+    }
+
+    const folder = isVideo ? 'videos' : 'images';
+    const fileName = `${folder}/${req.user.id}-${Date.now()}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(POST_MEDIA_BUCKET)
+      .upload(fileName, buffer, {
+        contentType: mimeType,
+        upsert: false
+      });
+
+    if (uploadError) {
+      console.error('Supabase post-media upload error:', uploadError);
+      return res.status(500).json({ error: 'Failed to upload media' });
+    }
+
+    const { data: publicData } = supabase.storage
+      .from(POST_MEDIA_BUCKET)
+      .getPublicUrl(fileName);
+
+    const publicUrl = publicData && publicData.publicUrl;
+    if (!publicUrl) {
+      return res.status(500).json({ error: 'Could not get media URL' });
+    }
+
+    const media_type = isVideo ? 'video' : 'image';
+
+    res.status(201).json({
+      url: publicUrl,
+      media_type
+    });
+  } catch (err) {
+    console.error('POST /posts/upload-media error:', err);
+    res.status(500).json({ error: 'Media upload failed' });
+  }
+});
 // ======================================================
 //                          POSTS
 // ======================================================
@@ -804,6 +874,7 @@ app.post('/api/posts/:id/save', authMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Failed to update save status' });
   }
 });
+
 // ======================================================
 //                   PROFILE / FOLLOWS
 // ======================================================
@@ -1117,6 +1188,7 @@ app.get('/api/search/history', authMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Failed to load search history' });
   }
 });
+
 // ======================================================
 //                          ADMIN
 // ======================================================
@@ -1283,7 +1355,6 @@ app.delete(
     }
   }
 );
-
 // ======================================================
 //                   PROFILE / FOLLOWS
 // ======================================================
