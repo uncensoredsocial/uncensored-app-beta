@@ -197,3 +197,57 @@
     padding-top: 72px;
   }
 }
+
+/* ===================================================== */
+/* EXTRA LAYOUT TWEAKS FOR POST PAGE (added)             */
+/* ===================================================== */
+
+/* Center header title "Post" regardless of left/right actions */
+.post-page-body .header {
+  position: relative;
+}
+
+.post-page-body .header .logo {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Center the post card and let it fill nicely on mobile + desktop */
+.post-wrapper {
+  margin-bottom: 16px;
+}
+
+.post-wrapper .post {
+  margin: 0 auto 16px;
+  width: 100%;
+  max-width: 720px;
+}
+
+/* Make media sit in a nice frame, like the feed */
+.post-wrapper .post-media {
+  margin-top: 12px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+  max-height: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.post-wrapper .post-media img,
+.post-wrapper .post-media video {
+  width: 100%;
+  height: 100%;
+  max-height: 420px;
+  object-fit: contain; /* show whole image/video without breaking layout */
+  display: block;
+}
+
+/* Mobile padding feels a bit nicer */
+@media (max-width: 768px) {
+  .post-main {
+    padding: 12px 8px 80px;
+  }
+}
