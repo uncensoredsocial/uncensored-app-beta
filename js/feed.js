@@ -456,9 +456,11 @@ class FeedManager {
   }
 
   renderMediaHtml(url, type) {
-    const lower = url.toLowerCase();
+    const lower = (url || "").toLowerCase();
+    const lowerType = (type || "").toLowerCase();
+
     const isVideo =
-      (type && (type.startsWith("video/") || type === "video")) ||
+      (lowerType && (lowerType.startsWith("video/") || lowerType === "video")) ||
       lower.endsWith(".mp4") ||
       lower.endsWith(".webm") ||
       lower.endsWith(".ogg");
@@ -560,7 +562,7 @@ class FeedManager {
 
   // ============================================
   // CREATE POST (media upload via /posts/upload-media)
-// ============================================
+  // ============================================
 
   async handleCreatePost() {
     const user = this.getCurrentUser();
@@ -598,12 +600,16 @@ class FeedManager {
       let mediaType = null;
 
       if (hasMedia) {
+        console.log("[Feed] Uploading media file:", this.selectedMediaFile);
         const uploadResult = await this.uploadMediaFile(this.selectedMediaFile);
-        if (!uploadResult) {
+        if (!uploadResult || !uploadResult.url) {
           throw new Error("Media upload failed");
         }
         mediaUrl = uploadResult.url;
-        mediaType = uploadResult.media_type; // "image" | "video"
+        mediaType =
+          uploadResult.media_type ||
+          this.selectedMediaFile.type ||
+          "image"; // fallback
       }
 
       const endpoint = `${FEED_API_BASE_URL}/posts`;
@@ -612,20 +618,28 @@ class FeedManager {
       };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
+      const payload = {
+        content,
+        media_url: mediaUrl,
+        media_type: mediaType,
+      };
+
+      console.log("[Feed] Creating post with payload:", payload);
+
       const res = await fetch(endpoint, {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          content,
-          media_url: mediaUrl,
-          media_type: mediaType,
-        }),
+        body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not create post.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.error("[Feed] Create post error status:", res.status, data);
+        throw new Error(data.error || "Could not create post.");
+      }
 
       // Prepend new post to the feed
+      // Backend returns shaped post with `user`, `media_url`, `media_type`, etc.
       this.posts.unshift(data);
       this.renderPosts();
 
@@ -647,7 +661,7 @@ class FeedManager {
 
   // ============================================
   // MEDIA HELPERS (upload + validation)
-// ============================================
+  // ============================================
 
   async fileToBase64(file) {
     return new Promise((resolve, reject) => {
@@ -672,23 +686,32 @@ class FeedManager {
       };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
+      // IMPORTANT: backend expects mediaData + mediaType (we send both)
+      const body = {
+        mediaData: base64,
+        mediaType: file.type || "application/octet-stream",
+      };
+
+      console.log("[Feed] /posts/upload-media payload:", {
+        size: base64.length,
+        mediaType: body.mediaType,
+      });
+
       const res = await fetch(`${FEED_API_BASE_URL}/posts/upload-media`, {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          mediaData: base64,
-          mimeType: file.type,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
-        const body = await res.text();
-        console.error("Media upload failed:", body);
+        const text = await res.text();
+        console.error("Media upload failed:", res.status, text);
         this.showToast("Failed to upload media.", "error");
         return null;
       }
 
-      const json = await res.json();
+      const json = await res.json().catch(() => ({}));
+      console.log("[Feed] Media upload success:", json);
       // { url, media_type }
       return json;
     } catch (err) {
