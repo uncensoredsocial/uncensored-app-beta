@@ -4,7 +4,7 @@
 .messages-page .header {
   display: flex;
   align-items: center;
-  justify-content: center; /* perfect centering */
+  justify-content: center;
 }
 
 .messages-page .header-left,
@@ -12,11 +12,24 @@
   display: none !important;
 }
 
-/* ===== MAIN MESSAGES LAYOUT ===== */
+/* ===== LAYOUT: MAKE IT FILL THE PAGE ON DESKTOP ===== */
 
+.messages-page .content-wrapper {
+  /* override global max-width from inline <style> in HTML */
+  max-width: 1200px !important;
+  margin: 0 auto;
+  padding-top: 72px !important;
+  padding-bottom: 72px !important;
+}
+
+.messages-page .main-content.main-messages {
+  max-width: none !important;
+}
+
+/* main messages section */
 .main-messages {
-  padding-top: 72px;
-  padding-bottom: 72px;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 /* Wrapper for conversations list + chat side-by-side */
@@ -25,16 +38,20 @@
   gap: 0;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: radial-gradient(circle at top left, rgba(29, 155, 240, 0.22), rgba(0, 0, 0, 1));
-  min-height: 520px;
+  background: radial-gradient(
+    circle at top left,
+    rgba(29, 155, 240, 0.22),
+    rgba(0, 0, 0, 1)
+  );
+  min-height: calc(100vh - 160px); /* header + bottom nav + padding */
   overflow: hidden;
 }
 
-/* LEFT: CONVERSATIONS PANEL (like IG/Signal list) */
+/* LEFT: CONVERSATIONS PANEL */
 .conversations-panel {
   width: 34%;
-  min-width: 240px;
-  max-width: 320px;
+  min-width: 260px;
+  max-width: 360px;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(8, 8, 8, 0.96);
   display: flex;
@@ -97,13 +114,16 @@
   font-size: 14px;
 }
 
-/* Conversation row (like IG DM item) */
+/* Conversation row */
 .conversation-item {
   display: flex;
   padding: 10px 12px;
   gap: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   cursor: pointer;
+  background: transparent;
+  width: 100%;
+  text-align: left;
   transition: background 0.15s ease, transform 0.06s ease;
 }
 
@@ -119,23 +139,21 @@
   background: rgba(29, 155, 240, 0.14);
 }
 
-.conversation-avatar {
+/* avatar wrapper + img (matches your JS markup) */
+.conversation-avatar-wrapper {
   width: 40px;
   height: 40px;
   border-radius: 999px;
   overflow: hidden;
   background: linear-gradient(135deg, #444, #111);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 15px;
+  flex-shrink: 0;
 }
 
-.conversation-avatar img {
+.conversation-avatar {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
 
 .conversation-main {
@@ -172,19 +190,12 @@
   color: rgba(255, 255, 255, 0.55);
 }
 
-.conversation-last-message {
+.conversation-snippet {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.7);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.conversation-unread-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: rgb(29, 155, 240);
 }
 
 /* RIGHT: CHAT PANEL */
@@ -195,7 +206,7 @@
   background: transparent;
 }
 
-/* Chat header like IG DM top bar */
+/* Chat header */
 .chat-header {
   display: flex;
   align-items: center;
@@ -242,18 +253,22 @@
   justify-content: flex-end;
 }
 
-/* Encryption pill */
-.chat-encrypted-pill {
-  display: none; /* we turn it on in JS when chat opens */
+/* Encryption note w/ Font Awesome */
+.chat-encrypted-note {
+  display: flex;
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(0, 200, 83, 0.8);
-  background: rgba(0, 200, 83, 0.12);
+  border: 1px solid rgba(0, 200, 83, 0.6);
+  background: rgba(0, 200, 83, 0.10);
   font-size: 11px;
-  text-align: right;
   line-height: 1.3;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.chat-encrypted-note i {
+  font-size: 13px;
 }
 
 /* Chat body */
@@ -293,20 +308,16 @@
   font-size: 13px;
 }
 
-/* Messages (bubbles) */
-.message-row {
+/* Messages (bubbles) — matches messages.js classes */
+.chat-message {
   display: flex;
 }
 
-.message-row.own {
+.chat-message-out {
   justify-content: flex-end;
 }
 
-.message-row.other {
-  justify-content: flex-start;
-}
-
-.message-bubble {
+.chat-bubble {
   max-width: 82%;
   padding: 8px 11px;
   border-radius: 18px;
@@ -316,33 +327,34 @@
   white-space: pre-wrap;
 }
 
-.message-row.own .message-bubble {
+.chat-message-out .chat-bubble {
   background: rgb(29, 155, 240);
   color: #fff;
   border-bottom-right-radius: 4px;
 }
 
-.message-row.other .message-bubble {
+.chat-message:not(.chat-message-out) .chat-bubble {
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
   border-bottom-left-radius: 4px;
 }
 
-.message-meta {
+.chat-meta {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.5);
   margin-top: 2px;
+  display: block;
+  text-align: left;
 }
 
-.message-row.own .message-meta {
+.chat-message-out .chat-meta {
   text-align: right;
 }
 
-.message-system {
-  align-self: center;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.6);
-  margin: 4px 0;
+.chat-error {
+  font-size: 12px;
+  color: #ff6b6b;
+  margin: 6px 0;
 }
 
 /* Composer (bottom input) */
@@ -356,9 +368,13 @@
   backdrop-filter: blur(14px);
 }
 
-/* hidden state: before a conversation is selected */
-.chat-composer.hidden {
-  display: none;
+/* Disabled state (before conversation is selected) */
+.chat-composer.chat-composer-disabled {
+  opacity: 0.8;
+}
+
+.chat-composer.chat-composer-disabled textarea {
+  cursor: not-allowed;
 }
 
 .chat-composer textarea {
@@ -399,6 +415,32 @@
   cursor: default;
 }
 
+/* GUEST SECTION */
+.guest-message {
+  display: none;
+  min-height: calc(100vh - 160px);
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.guest-content h2 {
+  font-size: 22px;
+  margin-bottom: 8px;
+}
+
+.guest-content p {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 16px;
+}
+
+.guest-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
 /* RESPONSIVE */
 @media (max-width: 800px) {
   .messages-layout {
@@ -417,8 +459,8 @@
     min-height: 380px;
   }
 
-  .main-messages {
-    padding-top: 68px;
-    padding-bottom: 68px;
+  .messages-page .content-wrapper {
+    padding-top: 68px !important;
+    padding-bottom: 68px !important;
   }
 }
