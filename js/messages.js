@@ -2,17 +2,16 @@
 /* ============================================================
    MESSAGES PAGE
    ------------------------------------------------------------
-   - DOES NOT REDIRECT TO LOGIN
    - If NOT logged in  -> shows guest message section
    - If logged in      -> shows conversations + chat UI
    - Uses helpers from auth.js:
        isLoggedIn(), getCurrentUser(), getAuthToken()
-   - Backend (same as before – adjust URLs only if yours differ):
+   - Backend endpoints (must exist on your server):
        GET  /api/messages/conversations
        GET  /api/messages/:conversationId/messages
        POST /api/messages/:conversationId/messages
        POST /api/messages/start   { recipientId }
- ============================================================ */
+   ============================================================ */
 
 const MESSAGES_API_BASE_URL =
   typeof API_BASE_URL !== "undefined"
@@ -73,7 +72,6 @@ function cacheDom() {
   dom.chatHeaderName = document.getElementById("chatHeaderName");
   dom.chatHeaderUsername = document.getElementById("chatHeaderUsername");
   dom.chatHeaderStatus = document.getElementById("chatHeaderStatus");
-  dom.chatEncryptedPill = document.getElementById("chatEncryptedPill");
 
   dom.chatBody = document.getElementById("chatBody");
   dom.chatPlaceholder = document.getElementById("chatPlaceholder");
@@ -105,7 +103,7 @@ async function initMessagesPage() {
 
   // LOGGED IN -> show full messages UI
   if (dom.guestSection) dom.guestSection.style.display = "none";
-  if (dom.layout) dom.layout.style.display = "grid"; // two-panel layout
+  if (dom.layout) dom.layout.style.display = "flex";
 
   setupComposer();
   setupSearch();
@@ -125,7 +123,6 @@ async function initMessagesPage() {
 function getUserIdFromUrl() {
   try {
     const params = new URLSearchParams(window.location.search);
-    // SUPPORT BOTH: ?userId=<id> and ?to=<id>
     const id = params.get("userId") || params.get("to");
     return id ? id.trim() : null;
   } catch {
@@ -219,7 +216,7 @@ function renderConversationList(list) {
           <span class="conversation-snippet">${escapeHtml(lastSnippet)}</span>
         </div>
       </div>
-    `;
+    """
 
     item.addEventListener("click", () => {
       messagesState.activeConversationId = conv.id;
@@ -285,7 +282,6 @@ async function openOrStartConversationWithUser(userId) {
       throw new Error(data.error || "Could not start conversation");
     }
 
-    // Expect conversation object back
     const conv = data.conversation || data;
     if (!conv || !conv.id) return;
 
@@ -335,7 +331,8 @@ async function loadMessages(conversationId) {
     renderMessages(messages);
   } catch (err) {
     console.error("loadMessages error:", err);
-    dom.messageList.innerHTML = `<div class="chat-error">Could not load messages.</div>`;
+    dom.messageList.innerHTML =
+      '<div class="chat-error">Could not load messages.</div>';
   } finally {
     dom.messagesLoading.style.display = "none";
     messagesState.loadingMessages = false;
@@ -346,31 +343,36 @@ async function loadMessages(conversationId) {
 function renderMessages(messages) {
   dom.messageList.innerHTML = "";
 
+  messages.forEach((msg) => {
+    appendMessage(msg);
+  });
+}
+
+function appendMessage(msg) {
   const currentUser = getCurrentUserSafe();
   const currentId = currentUser ? currentUser.id : null;
+  const mine = currentId && String(msg.sender_id) === String(currentId);
 
-  messages.forEach((msg) => {
-    const mine = currentId && String(msg.sender_id) === String(currentId);
+  const bubble = document.createElement("div");
+  bubble.className = mine
+    ? "chat-message chat-message-out"
+    : "chat-message";
 
-    const bubble = document.createElement("div");
-    bubble.className = mine ? "chat-message chat-message-out" : "chat-message";
+  const time = msg.created_at
+    ? new Date(msg.created_at).toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : "";
 
-    const time = msg.created_at
-      ? new Date(msg.created_at).toLocaleTimeString([], {
-          hour: "numeric",
-          minute: "2-digit",
-        })
-      : "";
+  bubble.innerHTML = `
+    <div class="chat-bubble">
+      <p>${escapeHtml(msg.content || "")}</p>
+      <span class="chat-meta">${escapeHtml(time)}</span>
+    </div>
+  `;
 
-    bubble.innerHTML = `
-      <div class="chat-bubble">
-        <p>${escapeHtml(msg.content || "")}</p>
-        <span class="chat-meta">${escapeHtml(time)}</span>
-      </div>
-    `;
-
-    dom.messageList.appendChild(bubble);
-  });
+  dom.messageList.appendChild(bubble);
 }
 
 function scrollMessagesToBottom() {
@@ -383,7 +385,6 @@ function scrollMessagesToBottom() {
 function setupComposer() {
   if (!dom.chatComposer || !dom.messageInput || !dom.sendMessageButton) return;
 
-  // Initially disabled until a conversation is selected
   showComposerDisabled();
 
   dom.messageInput.addEventListener("input", () => {
@@ -430,7 +431,6 @@ async function handleSendMessage() {
   const text = (dom.messageInput.value || "").trim();
   if (!text) return;
 
-  // optimistic append
   const now = new Date();
   const currentUser = getCurrentUserSafe();
 
@@ -441,15 +441,8 @@ async function handleSendMessage() {
     created_at: now.toISOString(),
   };
 
-  const oldScroll = dom.messageList.scrollHeight;
-  const wasAtBottom =
-    dom.messageList.scrollTop + dom.messageList.clientHeight >= oldScroll - 5;
-
-  const existingHtml = dom.messageList.innerHTML;
-  renderMessages([tempMessage]); // or append; here we re-render only this
-  dom.messageList.innerHTML = existingHtml + dom.messageList.innerHTML;
-
-  if (wasAtBottom) scrollMessagesToBottom();
+  appendMessage(tempMessage);
+  scrollMessagesToBottom();
 
   dom.messageInput.value = "";
   dom.messageCharCounter.textContent = "0/1000";
@@ -475,11 +468,10 @@ async function handleSendMessage() {
       throw new Error(data.error || "Could not send message");
     }
 
-    // reload messages to sync
+    // Reload messages from server to sync final order / timestamps
     await loadMessages(messagesState.activeConversationId);
   } catch (err) {
     console.error("handleSendMessage error:", err);
-    // show simple error in chat
     const errDiv = document.createElement("div");
     errDiv.className = "chat-error";
     errDiv.textContent = "Failed to send message.";
@@ -530,8 +522,12 @@ function showNoConversationSelected() {
 
   if (dom.chatHeaderStatus) {
     dom.chatHeaderStatus.innerHTML =
-      '<span class="chat-encrypted-note">🔒 All messages are end-to-end encrypted. Only you and the other person can read them.</span>';
+      '<span class="chat-encrypted-note">' +
+      '<i class="fa-solid fa-shield-halved"></i>' +
+      '<span>All messages are end-to-end encrypted. Only you and the other person can read them.</span>' +
+      "</span>";
   }
+
   showComposerDisabled();
 }
 
@@ -561,7 +557,10 @@ function updateChatHeaderForPartner(partner) {
 
   if (dom.chatHeaderStatus) {
     dom.chatHeaderStatus.innerHTML =
-      '<span class="chat-encrypted-note">🔒 Encrypted chat · Only you and this user can read these messages.</span>';
+      '<span class="chat-encrypted-note">' +
+      '<i class="fa-solid fa-shield-halved"></i>' +
+      '<span>Encrypted chat · Only you and this user can read these messages.</span>' +
+      "</span>";
   }
 }
 
