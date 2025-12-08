@@ -3,11 +3,11 @@
 // With image & video upload + limits
 // ============================================
 
-// Prefer global API_BASE_URL from auth.js
-const FEED_API_BASE_URL =
-  typeof API_BASE_URL !== "undefined"
-    ? API_BASE_URL
-    : "https://uncensored-app-beta-production.up.railway.app/api";
+// Fixed API_BASE_URL for production
+const FEED_API_BASE_URL = "https://uncensored-app-beta-production.up.railway.app/api";
+
+// Make it globally available
+window.API_BASE_URL = FEED_API_BASE_URL;
 
 class FeedManager {
   constructor() {
@@ -292,7 +292,7 @@ class FeedManager {
   }
 
   // ============================================
-  // LOAD POSTS
+  // LOAD POSTS - FIXED VERSION
   // ============================================
 
   async loadPosts(reset = false) {
@@ -302,12 +302,16 @@ class FeedManager {
     if (reset) {
       if (this.feedLoading) this.feedLoading.style.display = "flex";
       if (this.feedContainer) this.feedContainer.innerHTML = "";
+      this.posts = [];
     }
+
+    console.log('Loading posts, page:', this.page, 'mode:', this.currentMode);
 
     try {
       const url = new URL(`${FEED_API_BASE_URL}/posts`);
-      // backend currently ignores these but it's fine to send
-      url.searchParams.set("mode", this.currentMode);
+      
+      // Remove mode parameter if not supported by backend yet
+      // url.searchParams.set("mode", this.currentMode);
       url.searchParams.set("page", this.page);
       url.searchParams.set("pageSize", this.pageSize);
 
@@ -315,24 +319,37 @@ class FeedManager {
       const headers = {};
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
+      console.log('Fetching from:', url.toString());
+
       const res = await fetch(url, { headers });
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Fetch error:', res.status, errorText);
+        throw new Error(`HTTP ${res.status}: ${errorText}`);
+      }
+      
       const data = await res.json();
+      console.log('Received posts data:', data);
 
-      const posts = Array.isArray(data)
-        ? data
-        : Array.isArray(data.posts)
-        ? data.posts
-        : [];
-
+      const posts = Array.isArray(data) ? data : [];
+      
       if (reset) this.posts = posts;
       else this.posts = this.posts.concat(posts);
 
-      if (posts.length < this.pageSize) this.hasMore = false;
-      else this.page++;
+      console.log('Total posts now:', this.posts.length);
+
+      if (posts.length < this.pageSize) {
+        this.hasMore = false;
+        console.log('No more posts to load');
+      } else {
+        this.page++;
+      }
 
       this.renderPosts();
     } catch (err) {
-      console.error("loadPosts error:", err);
+      console.error('loadPosts error:', err);
+      this.showToast('Failed to load posts: ' + err.message, 'error');
     }
 
     this.isLoading = false;
@@ -348,7 +365,14 @@ class FeedManager {
 
     if (this.posts.length === 0) {
       this.feedContainer.innerHTML = "";
+      if (this.feedEmpty) {
+        this.feedEmpty.style.display = "flex";
+      }
       return;
+    }
+
+    if (this.feedEmpty) {
+      this.feedEmpty.style.display = "none";
     }
 
     this.feedContainer.innerHTML = this.posts
@@ -446,7 +470,7 @@ class FeedManager {
             </button>
 
             <button class="post-action save-btn ${saved ? "saved" : ""}"
-                    style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center%;">
+                    style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center;">
               <i class="fa-${saved ? "solid" : "regular"} fa-bookmark"></i>
             </button>
           </div>
@@ -566,7 +590,7 @@ class FeedManager {
     const user = this.getCurrentUser();
     if (!user) {
       this.showToast("Please log in to post.", "error");
-      // still let backend enforce; we just show message
+      return;
     }
 
     if (this.isPosting) return;
@@ -587,7 +611,7 @@ class FeedManager {
     const token = this.getAuthToken();
     if (!token) {
       this.showToast("Missing auth token.", "error");
-      // still attempt; backend may block
+      return;
     }
 
     this.isPosting = true;
@@ -633,12 +657,13 @@ class FeedManager {
       if (this.postInput) this.postInput.value = "";
       this.selectedMediaFile = null;
       if (this.mediaFileName) this.mediaFileName.textContent = "";
+      if (this.postMediaInput) this.postMediaInput.value = "";
       this.updateCharCounter();
 
       this.showToast("Posted!", "success");
     } catch (err) {
       console.error("Create post failed:", err);
-      this.showToast("Failed to create post.", "error");
+      this.showToast("Failed to create post: " + err.message, "error");
     }
 
     this.isPosting = false;
@@ -646,7 +671,7 @@ class FeedManager {
   }
 
   // ============================================
-  // MEDIA HELPERS (upload + validation)
+  // MEDIA HELPERS (upload + validation) - FIXED
   // ============================================
 
   async fileToBase64(file) {
@@ -664,13 +689,20 @@ class FeedManager {
 
   async uploadMediaFile(file) {
     try {
+      console.log('Uploading media file:', file.name, file.type, file.size);
+      
       const base64 = await this.fileToBase64(file);
       const token = this.getAuthToken();
 
+      if (!token) {
+        this.showToast("Please log in to upload media.", "error");
+        return null;
+      }
+
       const headers = {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
       };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
 
       const res = await fetch(`${FEED_API_BASE_URL}/posts/upload-media`, {
         method: "POST",
@@ -682,18 +714,19 @@ class FeedManager {
       });
 
       if (!res.ok) {
-        const body = await res.text();
-        console.error("Media upload failed:", body);
-        this.showToast("Failed to upload media.", "error");
+        const errorText = await res.text();
+        console.error("Media upload failed:", res.status, errorText);
+        this.showToast("Failed to upload media: " + errorText, "error");
         return null;
       }
 
       const json = await res.json();
+      console.log('Media upload successful:', json);
       // { url, media_type }
       return json;
     } catch (err) {
       console.error("uploadMediaFile error:", err);
-      this.showToast("Failed to upload media.", "error");
+      this.showToast("Failed to upload media: " + err.message, "error");
       return null;
     }
   }
@@ -822,6 +855,16 @@ class FeedManager {
     } catch (err) {
       console.error(err);
       this.showToast("Failed to update like", "error");
+      // Revert optimistic update
+      if (wasLiked) {
+        btn.classList.add("liked");
+        icon.classList.replace("fa-regular", "fa-solid");
+        countEl.textContent = String(parseInt(countEl.textContent) + 1);
+      } else {
+        btn.classList.remove("liked");
+        icon.classList.replace("fa-solid", "fa-regular");
+        countEl.textContent = String(Math.max(parseInt(countEl.textContent) - 1, 0));
+      }
     }
   }
 
@@ -862,6 +905,14 @@ class FeedManager {
     } catch (err) {
       console.error(err);
       this.showToast("Failed to update save", "error");
+      // Revert optimistic update
+      if (wasSaved) {
+        btn.classList.add("saved");
+        icon.classList.replace("fa-regular", "fa-solid");
+      } else {
+        btn.classList.remove("saved");
+        icon.classList.replace("fa-solid", "fa-regular");
+      }
     }
   }
 
@@ -925,7 +976,7 @@ class FeedManager {
         : type === "success"
         ? "#0f3b1f"
         : "#111";
-    d.style.border = "1px solid "#333";
+    d.style.border = "1px solid #333";
     d.style.color = "#fff";
     d.style.zIndex = "9999";
 
