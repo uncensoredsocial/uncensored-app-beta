@@ -21,6 +21,13 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   console.error('❌ Missing SUPABASE_URL or SUPABASE_SERVICE_KEY in .env');
+  process.exit(1);
+}
+
+// Add JWT_SECRET check
+if (!process.env.JWT_SECRET) {
+  console.error('❌ Missing JWT_SECRET in .env');
+  process.exit(1);
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
@@ -46,7 +53,8 @@ app.use(
       'https://uncensored-app-beta-production.up.railway.app' // backend (for tests / tools)
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
   })
 );
 
@@ -422,7 +430,9 @@ app.post('/api/profile/upload-image', authMiddleware, async (req, res) => {
 
 app.post('/api/posts/upload-media', authMiddleware, async (req, res) => {
   try {
-    const { mediaData, mimeType } = req.body; // base64 (no data: prefix)
+    const { mediaData, mimeType } = req.body;
+
+    console.log('Media upload request:', { mimeType, dataLength: mediaData?.length });
 
     if (!mediaData || typeof mediaData !== 'string') {
       return res.status(400).json({ error: 'Missing media data' });
@@ -432,27 +442,36 @@ app.post('/api/posts/upload-media', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Missing mimeType' });
     }
 
+    // Clean the base64 string (remove data:image/jpeg;base64, prefix if present)
+    let cleanBase64 = mediaData;
+    if (mediaData.includes('base64,')) {
+      cleanBase64 = mediaData.split('base64,')[1];
+    }
+
+    const buffer = Buffer.from(cleanBase64, 'base64');
+    
+    console.log('Buffer created, size:', buffer.length);
+
     const isImage = mimeType.startsWith('image/');
     const isVideo = mimeType.startsWith('video/');
 
     if (!isImage && !isVideo) {
-      return res
-        .status(400)
-        .json({ error: 'Only image/* or video/* media are allowed' });
+      return res.status(400).json({ error: 'Only image/* or video/* media are allowed' });
     }
 
-    const buffer = Buffer.from(mediaData, 'base64');
-
-    // Derive file extension from mimeType
+    // Derive file extension
     let ext = 'bin';
     const parts = mimeType.split('/');
     if (parts.length === 2) {
       ext = parts[1].toLowerCase().split(';')[0];
       if (ext === 'jpeg') ext = 'jpg';
+      if (ext === 'quicktime') ext = 'mov';
     }
 
     const folder = isVideo ? 'videos' : 'images';
     const fileName = `${folder}/${req.user.id}-${Date.now()}.${ext}`;
+
+    console.log('Uploading to:', fileName);
 
     const { error: uploadError } = await supabase.storage
       .from(POST_MEDIA_BUCKET)
@@ -462,8 +481,8 @@ app.post('/api/posts/upload-media', authMiddleware, async (req, res) => {
       });
 
     if (uploadError) {
-      console.error('Supabase post-media upload error:', uploadError);
-      return res.status(500).json({ error: 'Failed to upload media' });
+      console.error('Supabase upload error:', uploadError);
+      return res.status(500).json({ error: 'Failed to upload media: ' + uploadError.message });
     }
 
     const { data: publicData } = supabase.storage
@@ -472,8 +491,10 @@ app.post('/api/posts/upload-media', authMiddleware, async (req, res) => {
 
     const publicUrl = publicData && publicData.publicUrl;
     if (!publicUrl) {
-      return res.status(500).json({ error: 'Could not get media URL' });
+      return res.status(500).json({ error: 'Could not get public URL' });
     }
+
+    console.log('Upload successful, URL:', publicUrl);
 
     const media_type = isVideo ? 'video' : 'image';
 
@@ -483,7 +504,7 @@ app.post('/api/posts/upload-media', authMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error('POST /posts/upload-media error:', err);
-    res.status(500).json({ error: 'Media upload failed' });
+    res.status(500).json({ error: 'Media upload failed: ' + err.message });
   }
 });
 
@@ -491,27 +512,37 @@ app.post('/api/posts/upload-media', authMiddleware, async (req, res) => {
 //                          POSTS
 // ======================================================
 
-// Global feed – includes like/comment/save counts + liked/saved by me
+// Global feed – FIXED VERSION
 app.get('/api/posts', async (req, res) => {
   try {
     const sort = (req.query.sort || 'recent').toLowerCase();
-    const orderOptions =
-      sort === 'popular'
-        ? { column: 'created_at', ascending: false } // later could use likes
-        : { column: 'created_at', ascending: false };
+    const orderOptions = { column: 'created_at', ascending: false };
 
     const currentUserId = getUserIdFromAuthHeader(req);
 
-    // 1) Basic posts
+    // FIXED: Use proper Supabase join syntax with users table
     const { data: posts, error: postsError } = await supabase
       .from('posts')
-      .select('id, user_id, content, media_url, media_type, created_at')
-      .order(orderOptions.column, { ascending: orderOptions.ascending })
+      .select(`
+        id, 
+        user_id, 
+        content, 
+        media_url, 
+        media_type, 
+        created_at,
+        users!inner (
+          id,
+          username,
+          display_name,
+          avatar_url
+        )
+      `)
+      .order('created_at', { ascending: false })
       .limit(50);
 
     if (postsError) {
       console.error('Get posts error:', postsError);
-      return res.status(500).json({ error: 'Failed to load posts' });
+      return res.status(500).json({ error: 'Failed to load posts: ' + postsError.message });
     }
 
     if (!posts || posts.length === 0) {
@@ -519,57 +550,34 @@ app.get('/api/posts', async (req, res) => {
     }
 
     const postIds = posts.map((p) => p.id);
-    const userIds = [...new Set(posts.map((p) => p.user_id))];
 
-    // 2) Related data in separate queries
+    // Get counts using separate queries (more reliable)
     const [
-      { data: users, error: usersError },
       { data: likesRows, error: likesError },
       { data: commentsRows, error: commentsError },
       { data: savesRows, error: savesError }
     ] = await Promise.all([
       supabase
-        .from('users')
-        .select('id, username, display_name, avatar_url')
-        .in('id', userIds),
-
-      supabase
         .from('post_likes')
         .select('post_id, user_id')
         .in('post_id', postIds),
-
       supabase
         .from('post_comments')
         .select('id, post_id')
         .in('post_id', postIds),
-
       supabase
         .from('post_saves')
         .select('post_id, user_id')
         .in('post_id', postIds)
     ]);
 
-    if (usersError || likesError || commentsError || savesError) {
-      console.error('Related data errors:', {
-        usersError,
-        likesError,
-        commentsError,
-        savesError
-      });
-      return res.status(500).json({ error: 'Failed to load posts' });
-    }
+    // DEBUG: Log what we're getting
+    console.log('Posts loaded:', posts.length);
+    console.log('Likes rows:', likesRows?.length || 0);
+    console.log('Comments rows:', commentsRows?.length || 0);
+    console.log('Saves rows:', savesRows?.length || 0);
 
-    // 3) Lookup maps
-    const userMap = new Map();
-    (users || []).forEach((u) => {
-      userMap.set(u.id, {
-        id: u.id,
-        username: u.username,
-        display_name: u.display_name,
-        avatar_url: u.avatar_url
-      });
-    });
-
+    // Create maps
     const likesByPost = new Map();
     (likesRows || []).forEach((row) => {
       if (!likesByPost.has(row.post_id)) likesByPost.set(row.post_id, []);
@@ -589,18 +597,14 @@ app.get('/api/posts', async (req, res) => {
       savesByPost.get(row.post_id).push(row.user_id);
     });
 
-    // 4) Final shape for feed.js
+    // Shape the response
     const shaped = posts.map((p) => {
       const likesArr = likesByPost.get(p.id) || [];
       const commentsArr = commentsByPost.get(p.id) || [];
       const savesArr = savesByPost.get(p.id) || [];
 
-      const likedByMe = currentUserId
-        ? likesArr.includes(currentUserId)
-        : false;
-      const savedByMe = currentUserId
-        ? savesArr.includes(currentUserId)
-        : false;
+      const likedByMe = currentUserId ? likesArr.includes(currentUserId) : false;
+      const savedByMe = currentUserId ? savesArr.includes(currentUserId) : false;
 
       return {
         id: p.id,
@@ -608,7 +612,7 @@ app.get('/api/posts', async (req, res) => {
         media_url: p.media_url || null,
         media_type: p.media_type || null,
         created_at: p.created_at,
-        user: userMap.get(p.user_id) || null,
+        user: p.users || null,
         likes: likesArr.length,
         comments_count: commentsArr.length,
         saves_count: savesArr.length,
@@ -617,10 +621,11 @@ app.get('/api/posts', async (req, res) => {
       };
     });
 
+    console.log('Sending shaped posts:', shaped.length);
     res.json(shaped);
   } catch (err) {
-    console.error('GET /api/posts error:', err);
-    res.status(500).json({ error: 'Failed to load posts' });
+    console.error('GET /api/posts error:', err.message, err.stack);
+    res.status(500).json({ error: 'Failed to load posts: ' + err.message });
   }
 });
 
