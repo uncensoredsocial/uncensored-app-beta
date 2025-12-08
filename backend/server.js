@@ -1863,6 +1863,83 @@ app.delete(
 );
 
 // ======================================================
+//             POST MEDIA UPLOAD (IMAGES / VIDEOS)
+// ======================================================
+
+app.post('/api/posts/upload-media', authMiddleware, async (req, res) => {
+  try {
+    const { mediaData, mediaType } = req.body; // base64 string (no "data:" prefix), mediaType can be "image", "video", or a MIME type
+
+    if (!mediaData || !mediaType) {
+      return res
+        .status(400)
+        .json({ error: 'Missing media data or media type' });
+    }
+
+    // Convert base64 to Buffer
+    const buffer = Buffer.from(mediaData, 'base64');
+
+    // Optional size guard (roughly 25MB)
+    const MAX_BYTES = 25 * 1024 * 1024;
+    if (buffer.length > MAX_BYTES) {
+      return res
+        .status(413)
+        .json({ error: 'Media file too large (limit ~25MB)' });
+    }
+
+    // Normalize type and extension
+    let finalType = mediaType.toLowerCase();
+    if (finalType === 'image') finalType = 'image/jpeg';
+    if (finalType === 'video') finalType = 'video/mp4';
+
+    let folder = 'images';
+    if (finalType.startsWith('video/')) {
+      folder = 'videos';
+    }
+
+    let ext = 'bin';
+    if (finalType.includes('jpeg') || finalType.includes('jpg')) ext = 'jpg';
+    else if (finalType.includes('png')) ext = 'png';
+    else if (finalType.includes('webp')) ext = 'webp';
+    else if (finalType.includes('mp4')) ext = 'mp4';
+    else if (finalType.includes('quicktime') || finalType.includes('mov'))
+      ext = 'mov';
+    else if (finalType.includes('webm')) ext = 'webm';
+
+    const fileName = `${folder}/${req.user.id}-${Date.now()}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(POST_MEDIA_BUCKET)
+      .upload(fileName, buffer, {
+        contentType: finalType,
+        upsert: false
+      });
+
+    if (uploadError) {
+      console.error('Supabase post-media upload error:', uploadError);
+      return res.status(500).json({ error: 'Failed to upload media' });
+    }
+
+    const { data: publicData } = supabase.storage
+      .from(POST_MEDIA_BUCKET)
+      .getPublicUrl(fileName);
+
+    const publicUrl = publicData && publicData.publicUrl;
+    if (!publicUrl) {
+      return res.status(500).json({ error: 'Could not get public media URL' });
+    }
+
+    return res.status(201).json({
+      url: publicUrl,
+      media_type: finalType
+    });
+  } catch (err) {
+    console.error('POST /api/posts/upload-media error:', err);
+    res.status(500).json({ error: 'Media upload failed' });
+  }
+});
+
+// ======================================================
 //                      START SERVER
 // ======================================================
 
