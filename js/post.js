@@ -50,6 +50,9 @@ class PostPage {
     this.profileSection = document.getElementById("profileSection");
     this.authButtons = document.getElementById("authButtons");
     this.headerProfileImg = document.getElementById("headerProfileImg");
+
+    // comments section root (for scrolling)
+    this.commentsSection = document.querySelector(".comments-section");
   }
 
   bindEvents() {
@@ -70,6 +73,15 @@ class PostPage {
         this.handleCreateComment()
       );
     }
+
+    // optional keyboard shortcut: "c" to focus comment box when on post page
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "c" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (this.commentInput && this.isLoggedIn()) {
+          this.commentInput.focus();
+        }
+      }
+    });
   }
 
   getPostIdFromUrl() {
@@ -121,7 +133,7 @@ class PostPage {
       this.commentUserAvatar.src =
         user && user.avatar_url
           ? user.avatar_url
-          : "assets/icons/default-profile.png";
+          : "assets/icons/default-profile.PNG";
     }
 
     if (this.profileSection && this.authButtons) {
@@ -192,17 +204,14 @@ class PostPage {
     const user = p.user || {};
     const username = user.username || "unknown";
     const displayName = user.display_name || username;
-    const avatar = user.avatar_url || "assets/icons/default-profile.png";
+    const avatar =
+      user.avatar_url || "assets/icons/default-profile.PNG";
 
     const liked =
-      p.liked_by_me === true ||
-      p.is_liked === true ||
-      p.isLiked === true;
+      p.liked_by_me === true || p.is_liked === true || p.isLiked === true;
 
     const saved =
-      p.saved_by_me === true ||
-      p.is_saved === true ||
-      p.isSaved === true;
+      p.saved_by_me === true || p.is_saved === true || p.isSaved === true;
 
     const likeCount =
       typeof p.likes === "number"
@@ -224,8 +233,8 @@ class PostPage {
       <article class="post" data-post-id="${p.id}">
         <header class="post-header">
           <div class="post-user" data-username="${this.escape(username)}">
-            <img class="post-avatar" src="${avatar}">
-            <div>
+            <img class="post-avatar" src="${avatar}" onerror="this.src='assets/icons/default-profile.PNG'">
+            <div class="post-user-info">
               <span class="post-display-name">${this.escape(displayName)}</span>
               <span class="post-username">@${this.escape(username)}</span>
             </div>
@@ -267,15 +276,20 @@ class PostPage {
 
   renderMedia(url, type) {
     if (!url) return "";
+    const lower = url.toLowerCase();
     const isVideo =
       (type && type.startsWith("video/")) ||
-      url.endsWith(".mp4") ||
-      url.endsWith(".webm");
+      lower.endsWith(".mp4") ||
+      lower.endsWith(".webm") ||
+      lower.endsWith(".ogg");
 
     return isVideo
       ? `
       <div class="post-media">
-        <video controls playsinline><source src="${url}"></video>
+        <video controls playsinline preload="metadata">
+          <source src="${url}">
+          Your browser does not support video.
+        </video>
       </div>`
       : `
       <div class="post-media">
@@ -333,6 +347,15 @@ class PostPage {
         this.toggleSave(postId, saveBtn);
       });
     }
+
+    // COMMENT BUTTON: scroll to comments + focus box
+    const commentBtn = postEl.querySelector(".comment-btn");
+    if (commentBtn) {
+      commentBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.scrollToComments();
+      });
+    }
   }
 
   // ========= LIKE =========
@@ -345,7 +368,7 @@ class PostPage {
     const icon = btn.querySelector("i");
 
     const wasLiked = btn.classList.contains("liked");
-    let count = parseInt(countEl.textContent);
+    let count = parseInt(countEl.textContent || "0", 10);
 
     // optimistic UI
     if (wasLiked) {
@@ -357,7 +380,7 @@ class PostPage {
       icon.classList.replace("fa-regular", "fa-solid");
       count++;
     }
-    countEl.textContent = count;
+    countEl.textContent = String(Math.max(count, 0));
 
     try {
       const res = await fetch(`${POST_API_BASE_URL}/posts/${postId}/like`, {
@@ -366,10 +389,10 @@ class PostPage {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error || "Failed to update like");
 
       if (typeof data.likes === "number") {
-        countEl.textContent = data.likes;
+        countEl.textContent = String(data.likes);
       }
     } catch (err) {
       console.error(err);
@@ -421,10 +444,17 @@ class PostPage {
       );
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error || "Failed to load comments");
 
       this.comments = Array.isArray(data) ? data : data.comments || [];
       this.renderComments();
+
+      // also sync comment count on main post card with server
+      if (this.post) {
+        this.post.comments_count = this.comments.length;
+        this.post.comment_count = this.comments.length;
+        this.renderPost();
+      }
     } catch (err) {
       console.error(err);
       this.showToast("Could not load comments", "error");
@@ -456,8 +486,8 @@ class PostPage {
     return `
       <article class="comment" data-username="${user.username}">
         <img class="comment-avatar-small" src="${
-          user.avatar_url || "assets/icons/default-profile.png"
-        }">
+          user.avatar_url || "assets/icons/default-profile.PNG"
+        }" onerror="this.src='assets/icons/default-profile.PNG'">
         <div class="comment-body">
           <div class="comment-header">
             <span class="comment-display-name">${this.escape(
@@ -480,6 +510,7 @@ class PostPage {
 
   attachCommentEvents() {
     const comments = this.commentsList.querySelectorAll(".comment");
+    if (!comments || !comments.length) return;
 
     comments.forEach((c) => {
       const username = c.dataset.username;
@@ -506,7 +537,7 @@ class PostPage {
   async handleCreateComment() {
     const token = this.getAuthToken();
     if (!token) return this.showToast("Login required", "error");
-    if (!this.commentInput) return;
+    if (!this.commentInput || !this.commentButton) return;
 
     const content = this.commentInput.value.trim();
     if (!content) return this.showToast("Type something first", "error");
@@ -528,7 +559,7 @@ class PostPage {
       );
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error || "Failed to add comment");
 
       this.comments.unshift(data);
       this.renderComments();
@@ -550,6 +581,25 @@ class PostPage {
     }
 
     this.commentButton.disabled = false;
+  }
+
+  // ========= EXTRA HELPERS =========
+
+  scrollToComments() {
+    // Scroll to comments section; if logged in, focus textarea
+    if (this.commentsSection) {
+      this.commentsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    if (this.isLoggedIn() && this.commentInput) {
+      setTimeout(() => this.commentInput.focus(), 350);
+    }
+  }
+
+  reloadAll() {
+    // Used by header refresh button
+    if (!this.postId) return;
+    this.loadPost();
+    this.loadComments();
   }
 
   // ========= UTILITIES =========
@@ -609,6 +659,7 @@ class PostPage {
   }
 
   showError(msg) {
+    if (!this.postContainer) return;
     this.postContainer.innerHTML = `<p>${this.escape(msg)}</p>`;
   }
 }
