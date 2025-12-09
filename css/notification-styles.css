@@ -4,32 +4,86 @@
   padding: var(--space-4);
 }
 
-/* Row layout for Likes / Comments / Followers */
-.notifications-sections-row {
-  display: flex;
-  gap: var(--space-4);
-  align-items: flex-start;
-}
-
-/* each section shares the row equally */
-.notifications-section {
-  flex: 1;
-}
-
-/* Titles */
-.notifications-title {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--font-size-lg);
+/* Page title */
+.notifications-page-title {
+  font-size: 1.25rem;
+  font-weight: 600;
   margin-bottom: var(--space-3);
 }
 
-.notifications-title i {
-  color: var(--primary-color);
+/* Filter bar (All / Likes / Comments / Followers) */
+.notifications-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  margin-bottom: var(--space-3);
+  overflow-x: auto;
 }
 
-/* Lists */
+/* Reset native button styling + pill look */
+.notif-filter-btn {
+  -webkit-appearance: none;
+  appearance: none;
+  border: none;
+  background: transparent;
+  outline: none;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  border-radius: 999px;
+  padding: 6px 14px;
+
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-muted);
+
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.notif-filter-btn i {
+  font-size: 0.9rem;
+}
+
+/* Hover / focus */
+.notif-filter-btn:hover:not(.active) {
+  background-color: var(--hover-color);
+  color: var(--text-color);
+}
+
+.notif-filter-btn:focus-visible {
+  box-shadow: 0 0 0 2px rgba(29,161,242,0.8);
+}
+
+/* Active pill */
+.notif-filter-btn.active {
+  background: linear-gradient(
+    135deg,
+    rgba(29,161,242,1),
+    rgba(29,161,242,0.6)
+  );
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+}
+
+.notif-filter-btn.active i {
+  color: #ffffff;
+}
+
+/* Single list */
 .notifications-list {
   border-radius: var(--radius-lg);
   overflow: hidden;
@@ -54,6 +108,33 @@
 
 .notification-item:hover {
   background-color: var(--hover-color);
+}
+
+/* Left type icon (heart / comment / follow) */
+.notification-type-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 0.9rem;
+}
+
+.notification-type-icon.like {
+  background-color: rgba(249, 24, 128, 0.18);
+  color: #f91880;
+}
+
+.notification-type-icon.comment {
+  background-color: rgba(29, 161, 242, 0.18);
+  color: var(--primary-color);
+}
+
+.notification-type-icon.follow {
+  background-color: rgba(0, 186, 124, 0.18);
+  color: #00ba7c;
 }
 
 /* Avatar */
@@ -119,13 +200,6 @@
 }
 
 /* Responsive tweaks */
-@media (max-width: 900px) {
-  /* stack sections on smaller screens so each has full width */
-  .notifications-sections-row {
-    flex-direction: column;
-  }
-}
-
 @media (max-width: 767px) {
   .notifications-main {
     padding: var(--space-3);
