@@ -15,7 +15,7 @@ class FeedManager {
     this.posts = [];
     this.isLoading = false;
     this.isPosting = false;
-    this.currentMode = "recent"; // "recent" | "following"
+    this.currentMode = "recent"; // "recent" | "following" | "trending"
     this.hasMore = true;
     this.page = 1;
     this.pageSize = 20;
@@ -35,7 +35,7 @@ class FeedManager {
 
   async init() {
     this.cacheDom();
-    this.setupTabsLabel(); // turn "Popular" into "Following"
+    this.setupTabsLabel(); // make tabs: Recent / Following / Trending
     this.bindEvents();
     this.updateAuthUI();
     this.updateCharCounter();
@@ -101,16 +101,28 @@ class FeedManager {
     this.headerProfileImg = document.getElementById("headerProfileImg");
   }
 
-  // change the Popular tab to Following
+  // Turn "Popular" tab into "Following" and add a "Trending" tab if missing
   setupTabsLabel() {
     if (!this.feedTabs) return;
 
+    // Change Popular -> Following
     const popularBtn = this.feedTabs.querySelector("[data-tab='popular']");
     if (popularBtn) {
       popularBtn.dataset.tab = "following";
       popularBtn.textContent = "Following";
     }
-    // refresh the NodeList now that we might have changed data-tab
+
+    // Make sure we have a Trending tab
+    let trendingBtn = this.feedTabs.querySelector("[data-tab='trending']");
+    if (!trendingBtn) {
+      trendingBtn = document.createElement("button");
+      trendingBtn.className = "feed-tab-btn";
+      trendingBtn.dataset.tab = "trending";
+      trendingBtn.textContent = "Trending";
+      this.feedTabs.appendChild(trendingBtn);
+    }
+
+    // Refresh NodeList now that we might have changed / added buttons
     this.tabButtons = this.feedTabs.querySelectorAll(".feed-tab-btn");
   }
 
@@ -174,7 +186,7 @@ class FeedManager {
     if (this.tabButtons.length > 0) {
       this.tabButtons.forEach((btn) => {
         btn.addEventListener("click", () => {
-          const mode = btn.dataset.tab; // "recent" or "following"
+          const mode = btn.dataset.tab; // "recent" | "following" | "trending"
           if (!mode || mode === this.currentMode) return;
           this.switchMode(mode);
         });
@@ -244,7 +256,7 @@ class FeedManager {
 
         if (this.headerProfileImg) {
           this.headerProfileImg.src =
-            user.avatar_url || "assets/icons/default-avatar.png";
+            user.avatar_url || "assets/icons/default-profile.png";
         }
       } else {
         this.profileSection.style.display = "none";
@@ -257,7 +269,7 @@ class FeedManager {
       this.postUserAvatar.src =
         user && user.avatar_url
           ? user.avatar_url
-          : "assets/icons/default-avatar.png";
+          : "assets/icons/default-profile.png";
     }
   }
 
@@ -290,7 +302,7 @@ class FeedManager {
   // ============================================
 
   switchMode(mode) {
-    this.currentMode = mode; // "recent" or "following"
+    this.currentMode = mode; // "recent" | "following" | "trending"
     this.page = 1;
     this.hasMore = true;
 
@@ -316,8 +328,10 @@ class FeedManager {
 
     try {
       const url = new URL(`${FEED_API_BASE_URL}/posts`);
-      // backend currently ignores these but it's fine to send
-      url.searchParams.set("mode", this.currentMode);
+
+      // Tell backend what kind of feed we want
+      url.searchParams.set("sort", this.currentMode); // <- server should use this
+      url.searchParams.set("mode", this.currentMode); // extra, in case old code uses mode
       url.searchParams.set("page", this.page);
       url.searchParams.set("pageSize", this.pageSize);
 
@@ -372,7 +386,7 @@ class FeedManager {
     const user = post.user || {};
     const username = user.username || "unknown";
     const displayName = user.display_name || username;
-    const avatar = user.avatar_url || "assets/icons/default-avatar.png";
+    const avatar = user.avatar_url || "default-profile.PNG";
 
     const createdAt = post.created_at;
     const time = this.formatTime(createdAt);
@@ -419,7 +433,7 @@ class FeedManager {
       <article class="post" data-post-id="${post.id}">
         <header class="post-header">
           <div class="post-user" data-username="${this.escape(username)}">
-            <img class="post-avatar" src="${avatar}" onerror="this.src='assets/icons/default-avatar.png'">
+            <img class="post-avatar" src="${avatar}" onerror="this.src='default-profile.PNG'">
             <div class="post-user-meta">
               <span class="post-display-name">${this.escape(displayName)}</span>
               <span class="post-username">@${this.escape(username)}</span>
@@ -698,8 +712,7 @@ class FeedManager {
 
       const mimeType = file.type || "application/octet-stream";
 
-      // IMPORTANT: backend expects `mediaData` + `mimeType`
-      // (we also send `mediaType` for compatibility with any older code)
+      // Backend expects mediaData + mimeType (we also send mediaType for compatibility)
       const body = {
         mediaData: base64,
         mimeType,
