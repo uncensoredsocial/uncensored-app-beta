@@ -79,12 +79,9 @@
 
 .post-creation {
   border-radius: 18px;
-  background: radial-gradient(
-      circle at top left,
-      rgba(29, 161, 242, 0.2),
-      transparent 55%
-    ),
-    var(--feed-card-bg);
+  /* removed gradient, solid dark card instead */
+  background: var(--feed-card-bg);
+  background-image: none;
   border: 1px solid var(--feed-border);
   padding: 12px 14px 10px;
   margin-bottom: 10px;
