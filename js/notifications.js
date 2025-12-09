@@ -13,10 +13,17 @@ class NotificationsManager {
     this.pollTimer = null;
     this.currentUser = null;
 
-    this.likesList = document.getElementById("likesList");
-    this.commentsList = document.getElementById("commentsList");
-    this.followersList = document.getElementById("followersList");
+    // unified list + filter bar
+    this.listEl = document.getElementById("notificationsList");
     this.emptyState = document.getElementById("notificationsEmpty");
+    this.filterButtons = document.querySelectorAll(".notif-filter-btn");
+
+    // store raw arrays + unified
+    this.likes = [];
+    this.comments = [];
+    this.followers = [];
+    this.unified = [];
+    this.currentFilter = "all";
 
     this.init();
   }
@@ -34,6 +41,7 @@ class NotificationsManager {
       return;
     }
 
+    this.setupFilterBar();
     this.setupEventDelegation();
     await this.loadAllNotifications();
 
@@ -45,9 +53,7 @@ class NotificationsManager {
   }
 
   showLoggedOutState() {
-    if (this.likesList) this.likesList.innerHTML = "";
-    if (this.commentsList) this.commentsList.innerHTML = "";
-    if (this.followersList) this.followersList.innerHTML = "";
+    if (this.listEl) this.listEl.innerHTML = "";
 
     if (this.emptyState) {
       this.emptyState.style.display = "block";
@@ -58,47 +64,60 @@ class NotificationsManager {
     }
   }
 
+  // --------- Filter bar (All / Likes / Comments / Followers) ---------
+
+  setupFilterBar() {
+    if (!this.filterButtons || !this.filterButtons.length) return;
+
+    this.filterButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const filter = btn.dataset.filter || "all";
+        this.currentFilter = filter;
+
+        this.filterButtons.forEach((b) =>
+          b.classList.toggle("active", b === btn)
+        );
+
+        this.renderUnified(); // re-render with new filter
+      });
+    });
+  }
+
   // Delegated click handling so re-rendering is safe
   setupEventDelegation() {
-    if (this.likesList) {
-      this.likesList.addEventListener("click", (e) => {
-        const item = e.target.closest(".notification-item");
-        if (!item) return;
-        const postId = item.dataset.postId;
-        if (postId) {
-          window.location.href = `post.html?id=${encodeURIComponent(postId)}`;
-        }
-      });
-    }
+    if (!this.listEl) return;
 
-    if (this.commentsList) {
-      this.commentsList.addEventListener("click", (e) => {
-        const item = e.target.closest(".notification-item");
-        if (!item) return;
+    this.listEl.addEventListener("click", (e) => {
+      const item = e.target.closest(".notification-item");
+      if (!item) return;
+
+      const type = item.dataset.type;
+
+      // follow/unfollow button for follower notifications
+      if (type === "followers" && e.target.closest(".notification-follow-btn")) {
+        const userId = item.dataset.userId;
+        this.handleFollow(userId, e.target.closest("button"));
+        return;
+      }
+
+      if (type === "likes" || type === "comments") {
         const postId = item.dataset.postId;
-        if (postId) {
+        if (!postId) return;
+
+        if (type === "comments") {
           window.location.href = `post.html?id=${encodeURIComponent(
             postId
           )}#comments`;
+        } else {
+          window.location.href = `post.html?id=${encodeURIComponent(postId)}`;
         }
-      });
-    }
+        return;
+      }
 
-    if (this.followersList) {
-      this.followersList.addEventListener("click", (e) => {
-        const card = e.target.closest(".notification-item");
-        if (!card) return;
-
-        const username = card.dataset.username;
-        const userId = card.dataset.userId;
-
-        // follow/unfollow button
-        if (e.target.closest(".notification-follow-btn")) {
-          this.handleFollow(userId, e.target.closest("button"));
-          return;
-        }
-
+      if (type === "followers") {
+        const username = item.dataset.username;
         if (!username) return;
+
         const me = this.currentUser;
         if (me && me.username === username) {
           window.location.href = "profile.html";
@@ -107,8 +126,8 @@ class NotificationsManager {
             username
           )}`;
         }
-      });
-    }
+      }
+    });
   }
 
   async loadAllNotifications() {
@@ -123,14 +142,23 @@ class NotificationsManager {
         this.fetchFollowers(userId),
       ]);
 
-      this.renderLikes(likes);
-      this.renderComments(comments);
-      this.renderFollowers(followers);
+      this.likes = likes;
+      this.comments = comments;
+      this.followers = followers;
 
-      const hasAny =
-        (likes && likes.length) ||
-        (comments && comments.length) ||
-        (followers && followers.length);
+      // Build unified stream, newest first
+      this.unified = [
+        ...likes.map((n) => ({ ...n, type: "likes" })),
+        ...comments.map((n) => ({ ...n, type: "comments" })),
+        ...followers.map((n) => ({ ...n, type: "followers" })),
+      ].sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      this.renderUnified();
+
+      const hasAny = this.unified.length > 0;
 
       if (this.emptyState) {
         this.emptyState.style.display = hasAny ? "none" : "block";
@@ -146,7 +174,7 @@ class NotificationsManager {
     }
   }
 
-  // ========== FETCH HELPERS (bump limits so you see a lot of alerts) ==========
+  // ========== FETCH HELPERS (limits bumped so you see a lot of alerts) ==========
 
   async fetchFollowers(userId) {
     const { data, error } = await NOTIF_SUPABASE
@@ -186,7 +214,7 @@ class NotificationsManager {
             id: u.id,
             username: u.username,
             displayName: u.display_name || u.username,
-            avatar: u.avatar_url || "assets/icons/default-profile.png",
+            avatar: u.avatar_url || "default-profile.PNG",
           },
         };
       })
@@ -246,7 +274,7 @@ class NotificationsManager {
             id: actor.id,
             username: actor.username,
             displayName: actor.display_name || actor.username,
-            avatar: actor.avatar_url || "assets/icons/default-profile.png",
+            avatar: actor.avatar_url || "default-profile.PNG",
           },
         };
       })
@@ -307,108 +335,120 @@ class NotificationsManager {
             id: actor.id,
             username: actor.username,
             displayName: actor.display_name || actor.username,
-            avatar: actor.avatar_url || "assets/icons/default-profile.png",
+            avatar: actor.avatar_url || "default-profile.PNG",
           },
         };
       })
       .filter(Boolean);
   }
 
-  // ========== RENDER ==========
+  // ========== RENDER UNIFIED LIST ==========
 
-  renderLikes(likes) {
-    if (!this.likesList) return;
+  renderUnified() {
+    if (!this.listEl) return;
 
-    if (!likes.length) {
-      this.likesList.innerHTML =
-        '<div class="notification-item"><div class="notification-body"><div class="notification-text">No likes yet.</div></div></div>';
-      return;
+    let items = this.unified;
+    if (this.currentFilter !== "all") {
+      items = items.filter((n) => n.type === this.currentFilter);
     }
 
-    this.likesList.innerHTML = likes
-      .map((n) => {
-        const postPreview =
-          n.postContent && n.postContent.length > 60
-            ? n.postContent.slice(0, 57) + "..."
-            : n.postContent;
-        return `
-        <div class="notification-item" data-post-id="${n.postId}">
-          <div class="notification-avatar-wrapper">
-            <img src="${n.user.avatar}" class="notification-avatar"
-              onerror="this.src='assets/icons/default-profile.png'">
-          </div>
+    if (!items.length) {
+      const labelMap = {
+        all: "notifications",
+        likes: "likes",
+        comments: "comments",
+        followers: "followers",
+      };
+      const label = labelMap[this.currentFilter] || "notifications";
+      this.listEl.innerHTML = `
+        <div class="notification-item">
           <div class="notification-body">
-            <div class="notification-text">
-              <strong>${this.escape(n.user.displayName)}</strong>
-              liked your post
-            </div>
-            <div class="notification-meta">
-              ${postPreview ? `"${this.escape(postPreview)}" · ` : ""}
-              ${this.formatTime(n.created_at)}
-            </div>
+            <div class="notification-text">No ${this.escape(
+              label
+            )} yet.</div>
           </div>
         </div>
       `;
-      })
-      .join("");
-  }
-
-  renderComments(comments) {
-    if (!this.commentsList) return;
-
-    if (!comments.length) {
-      this.commentsList.innerHTML =
-        '<div class="notification-item"><div class="notification-body"><div class="notification-text">No comments yet.</div></div></div>';
       return;
     }
 
-    this.commentsList.innerHTML = comments
+    this.listEl.innerHTML = items
       .map((n) => {
-        const commentPreview =
-          n.commentText && n.commentText.length > 60
-            ? n.commentText.slice(0, 57) + "..."
-            : n.commentText;
-        return `
-        <div class="notification-item" data-post-id="${n.postId}">
-          <div class="notification-avatar-wrapper">
-            <img src="${n.user.avatar}" class="notification-avatar"
-              onerror="this.src='assets/icons/default-profile.png'">
-          </div>
-          <div class="notification-body">
-            <div class="notification-text">
-              <strong>${this.escape(n.user.displayName)}</strong>
-              commented on your post
+        if (n.type === "likes") {
+          const postPreview =
+            n.postContent && n.postContent.length > 60
+              ? n.postContent.slice(0, 57) + "..."
+              : n.postContent;
+
+          return `
+          <div class="notification-item"
+               data-type="likes"
+               data-post-id="${n.postId}">
+            <div class="notification-type-icon like">
+              <i class="fa-regular fa-heart"></i>
             </div>
-            <div class="notification-meta">
-              "${this.escape(commentPreview)}" · ${this.formatTime(
-          n.created_at
-        )}
+            <div class="notification-avatar-wrapper">
+              <img src="${n.user.avatar}" class="notification-avatar"
+                   onerror="this.src='default-profile.PNG'">
+            </div>
+            <div class="notification-body">
+              <div class="notification-text">
+                <strong>${this.escape(n.user.displayName)}</strong>
+                liked your post
+              </div>
+              <div class="notification-meta">
+                ${postPreview ? `"${this.escape(postPreview)}" · ` : ""}
+                ${this.formatTime(n.created_at)}
+              </div>
             </div>
           </div>
-        </div>
-      `;
-      })
-      .join("");
-  }
+        `;
+        }
 
-  renderFollowers(followers) {
-    if (!this.followersList) return;
+        if (n.type === "comments") {
+          const commentPreview =
+            n.commentText && n.commentText.length > 60
+              ? n.commentText.slice(0, 57) + "..."
+              : n.commentText;
 
-    if (!followers.length) {
-      this.followersList.innerHTML =
-        '<div class="notification-item"><div class="notification-body"><div class="notification-text">No new followers yet.</div></div></div>';
-      return;
-    }
+          return `
+          <div class="notification-item"
+               data-type="comments"
+               data-post-id="${n.postId}">
+            <div class="notification-type-icon comment">
+              <i class="fa-regular fa-comment"></i>
+            </div>
+            <div class="notification-avatar-wrapper">
+              <img src="${n.user.avatar}" class="notification-avatar"
+                   onerror="this.src='default-profile.PNG'">
+            </div>
+            <div class="notification-body">
+              <div class="notification-text">
+                <strong>${this.escape(n.user.displayName)}</strong>
+                commented on your post
+              </div>
+              <div class="notification-meta">
+                "${this.escape(commentPreview)}" · ${this.formatTime(
+            n.created_at
+          )}
+              </div>
+            </div>
+          </div>
+        `;
+        }
 
-    this.followersList.innerHTML = followers
-      .map((n) => {
+        // followers
         return `
         <div class="notification-item follower-item"
+             data-type="followers"
              data-user-id="${n.user.id}"
              data-username="${this.escape(n.user.username)}">
+          <div class="notification-type-icon follow">
+            <i class="fa-solid fa-user-plus"></i>
+          </div>
           <div class="notification-avatar-wrapper">
             <img src="${n.user.avatar}" class="notification-avatar"
-              onerror="this.src='assets/icons/default-profile.png'">
+                 onerror="this.src='default-profile.PNG'">
           </div>
           <div class="notification-body">
             <div class="notification-text">
@@ -434,7 +474,7 @@ class NotificationsManager {
   // ========== FOLLOW HANDLER ==========
 
   async handleFollow(targetUserId, buttonEl) {
-    if (!this.currentUser) return;
+    if (!this.currentUser || !targetUserId || !buttonEl) return;
     const meId = this.currentUser.id;
 
     try {
