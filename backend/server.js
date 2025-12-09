@@ -1118,6 +1118,53 @@ app.get('/api/search/history', authMiddleware, async (req, res) => {
   }
 });
 // ======================================================
+//          DELETE A POST (OWNER PERMISSION)
+// ======================================================
+
+app.delete('/api/posts/:id', authMiddleware, async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const userId = req.user.id;
+
+    // 1) Make sure the post exists and belongs to this user
+    const { data: post, error: postError } = await supabase
+      .from('posts')
+      .select('id,user_id')
+      .eq('id', postId)
+      .single();
+
+    if (postError || !post) {
+      console.error('Delete post: post not found', postError);
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    if (post.user_id !== userId) {
+      return res.status(403).json({ error: 'You can only delete your own posts' });
+    }
+
+    // 2) Delete related rows
+    await supabase.from('post_likes').delete().eq('post_id', postId);
+    await supabase.from('post_comments').delete().eq('post_id', postId);
+    await supabase.from('post_saves').delete().eq('post_id', postId);
+
+    // 3) Delete the post itself
+    const { error: deleteError } = await supabase
+      .from('posts')
+      .delete()
+      .eq('id', postId);
+
+    if (deleteError) {
+      console.error('Delete post error:', deleteError);
+      return res.status(500).json({ error: 'Failed to delete post' });
+    }
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /api/posts/:id error:', err);
+    return res.status(500).json({ error: 'Failed to delete post' });
+  }
+});
+// ======================================================
 //                          ADMIN
 // ======================================================
 
