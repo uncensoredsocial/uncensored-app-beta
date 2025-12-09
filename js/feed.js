@@ -183,6 +183,15 @@ class FeedManager {
 
     // Infinite scrolling
     window.addEventListener("scroll", () => this.handleScroll());
+
+    // When user comes back from post.html via back (bfcache), refresh counts
+    window.addEventListener("pageshow", (event) => {
+      if (event.persisted && window.feedManager === this) {
+        this.page = 1;
+        this.hasMore = true;
+        this.loadPosts(true);
+      }
+    });
   }
 
   // ============================================
@@ -233,8 +242,9 @@ class FeedManager {
         this.profileSection.style.display = "flex";
         this.authButtons.style.display = "none";
 
-        if (this.headerProfileImg && user.avatar_url) {
-          this.headerProfileImg.src = user.avatar_url;
+        if (this.headerProfileImg) {
+          this.headerProfileImg.src =
+            user.avatar_url || "assets/icons/default-avatar.png";
         }
       } else {
         this.profileSection.style.display = "none";
@@ -247,7 +257,7 @@ class FeedManager {
       this.postUserAvatar.src =
         user && user.avatar_url
           ? user.avatar_url
-          : "assets/icons/default-profile.png";
+          : "assets/icons/default-avatar.png";
     }
   }
 
@@ -362,7 +372,7 @@ class FeedManager {
     const user = post.user || {};
     const username = user.username || "unknown";
     const displayName = user.display_name || username;
-    const avatar = user.avatar_url || "assets/icons/default-profile.png";
+    const avatar = user.avatar_url || "assets/icons/default-avatar.png";
 
     const createdAt = post.created_at;
     const time = this.formatTime(createdAt);
@@ -409,7 +419,7 @@ class FeedManager {
       <article class="post" data-post-id="${post.id}">
         <header class="post-header">
           <div class="post-user" data-username="${this.escape(username)}">
-            <img class="post-avatar" src="${avatar}" onerror="this.src='assets/icons/default-profile.png'">
+            <img class="post-avatar" src="${avatar}" onerror="this.src='assets/icons/default-avatar.png'">
             <div class="post-user-meta">
               <span class="post-display-name">${this.escape(displayName)}</span>
               <span class="post-username">@${this.escape(username)}</span>
@@ -686,10 +696,14 @@ class FeedManager {
       };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      // IMPORTANT: backend expects mediaData + mediaType (we send both)
+      const mimeType = file.type || "application/octet-stream";
+
+      // IMPORTANT: backend expects `mediaData` + `mimeType`
+      // (we also send `mediaType` for compatibility with any older code)
       const body = {
         mediaData: base64,
-        mediaType: file.type || "application/octet-stream",
+        mimeType,
+        mediaType: mimeType,
       };
 
       console.log("[Feed] /posts/upload-media payload:", {
