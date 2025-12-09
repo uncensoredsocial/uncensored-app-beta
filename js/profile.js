@@ -126,9 +126,12 @@ class ProfilePage {
 
   async fetchCurrentUser() {
     try {
+      const token = typeof getAuthToken === "function" ? getAuthToken() : null;
+      if (!token) return;
+
       const res = await fetch(`${PROFILE_API_BASE_URL}/auth/me`, {
         headers: {
-          Authorization: `Bearer ${getAuthToken()}`
+          Authorization: `Bearer ${token}`
         }
       });
 
@@ -306,7 +309,7 @@ class ProfilePage {
 
     // Prefer real author data from API if present
     const author = post.user || post.author || this.user || {};
-    const avatar = author.avatar_url || "assets/icons/default-profile.png";
+    const avatar = author.avatar_url || "default-profile.png";
     const username = author.username || "unknown";
     const displayName = author.display_name || username;
 
@@ -358,7 +361,7 @@ class ProfilePage {
     article.innerHTML = `
       <header class="post-header">
         <div class="post-user" data-username="${this.escapeHtml(username)}">
-          <img class="post-avatar" src="${avatar}" onerror="this.src='assets/icons/default-profile.png'">
+          <img class="post-avatar" src="${avatar}" onerror="this.src='default-profile.png'">
           <div class="post-user-meta">
             <span class="post-display-name">${this.escapeHtml(displayName)}</span>
             <span class="post-username">@${this.escapeHtml(username)}</span>
@@ -519,6 +522,13 @@ class ProfilePage {
 
   async confirmDeletePost(post, articleEl) {
     if (!post || !post.id) return;
+
+    const token = typeof getAuthToken === "function" ? getAuthToken() : null;
+    if (!token) {
+      alert("You must be logged in to delete posts.");
+      return;
+    }
+
     const ok = window.confirm("Delete this post? This can’t be undone.");
     if (!ok) return;
 
@@ -528,14 +538,22 @@ class ProfilePage {
         {
           method: "DELETE",
           headers: {
-            Authorization: `Bearer ${getAuthToken()}`
+            Authorization: `Bearer ${token}`
           }
         }
       );
 
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to delete post");
+        // Try JSON, then text
+        let msg = "Failed to delete post";
+        try {
+          const data = await res.json();
+          if (data && data.error) msg = data.error;
+        } catch {
+          const text = await res.text().catch(() => "");
+          if (text) msg = text;
+        }
+        throw new Error(msg);
       }
 
       // remove from local arrays and UI
@@ -568,7 +586,7 @@ class ProfilePage {
   async handleLike(post, btn) {
     if (!post || !post.id || !btn) return;
 
-    const token = getAuthToken();
+    const token = typeof getAuthToken === "function" ? getAuthToken() : null;
     if (!token) {
       alert("Please log in to like posts.");
       return;
@@ -654,7 +672,7 @@ class ProfilePage {
   async handleSave(post, btn) {
     if (!post || !post.id || !btn) return;
 
-    const token = getAuthToken();
+    const token = typeof getAuthToken === "function" ? getAuthToken() : null;
     if (!token) {
       alert("Please log in to save posts.");
       return;
@@ -770,8 +788,10 @@ class ProfilePage {
     if (this.joinEl) this.joinEl.textContent = this.formatJoinDate(createdAt);
 
     if (this.avatarEl) {
-      this.avatarEl.src =
-        this.user.avatar_url || "assets/icons/default-profile.png";
+      this.avatarEl.src = this.user.avatar_url || "default-profile.png";
+      this.avatarEl.onerror = () => {
+        this.avatarEl.src = "default-profile.png";
+      };
     }
 
     if (this.bannerEl) {
@@ -857,11 +877,14 @@ class ProfilePage {
         );
       }
 
+      const token = typeof getAuthToken === "function" ? getAuthToken() : null;
+      if (!token) throw new Error("Missing auth token");
+
       const res = await fetch(`${PROFILE_API_BASE_URL}/auth/me`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${getAuthToken()}`
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
           display_name,
@@ -902,11 +925,14 @@ class ProfilePage {
   async uploadImageFile(file, kind) {
     const base64 = await this.readFileAsBase64(file);
 
+    const token = typeof getAuthToken === "function" ? getAuthToken() : null;
+    if (!token) throw new Error("Missing auth token");
+
     const res = await fetch(`${PROFILE_API_BASE_URL}/profile/upload-image`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${getAuthToken()}`
+        Authorization: `Bearer ${token}`
       },
       body: JSON.stringify({
         imageData: base64,
