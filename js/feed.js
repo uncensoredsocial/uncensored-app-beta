@@ -256,7 +256,7 @@ class FeedManager {
 
         if (this.headerProfileImg) {
           this.headerProfileImg.src =
-            user.avatar_url || "assets/icons/default-profile.png";
+            user.avatar_url || "default-profile.PNG";
         }
       } else {
         this.profileSection.style.display = "none";
@@ -269,7 +269,7 @@ class FeedManager {
       this.postUserAvatar.src =
         user && user.avatar_url
           ? user.avatar_url
-          : "assets/icons/default-profile.png";
+          : "default-profile.PNG";
     }
   }
 
