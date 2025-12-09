@@ -147,7 +147,7 @@ class App {
         img.src = currentUser.avatar_url;
       } else if (img.id === "postUserAvatar") {
         // Fallback to your default avatar for composer
-        img.src = "assets/icons/default-profile.png";
+        img.src = "default-profile.PNG";
       }
     });
 
