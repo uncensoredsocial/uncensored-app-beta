@@ -67,35 +67,30 @@
   <!-- ================= MAIN CONTENT ================= -->
   <div class="content-wrapper">
     <main class="main-content notifications-main">
-      <!-- Row of 3 sections -->
-      <div class="notifications-sections-row">
-        <!-- Likes -->
-        <section class="notifications-section" id="likesSection">
-          <h2 class="notifications-title">
-            <i class="fa-regular fa-heart"></i>
-            Likes
-          </h2>
-          <div id="likesList" class="notifications-list"></div>
-        </section>
+      <h2 class="notifications-page-title">Alerts</h2>
 
-        <!-- Comments -->
-        <section class="notifications-section" id="commentsSection">
-          <h2 class="notifications-title">
-            <i class="fa-regular fa-comment"></i>
-            Comments
-          </h2>
-          <div id="commentsList" class="notifications-list"></div>
-        </section>
-
-        <!-- New Followers -->
-        <section class="notifications-section" id="followersSection">
-          <h2 class="notifications-title">
-            <i class="fa-solid fa-user-plus"></i>
-            New Followers
-          </h2>
-          <div id="followersList" class="notifications-list"></div>
-        </section>
+      <!-- Filter tabs (All / Likes / Comments / Followers) -->
+      <div class="notifications-filter-bar" id="notificationsFilterBar">
+        <button class="notif-filter-btn active" data-filter="all">
+          <i class="fa-solid fa-fire"></i>
+          <span>All</span>
+        </button>
+        <button class="notif-filter-btn" data-filter="likes">
+          <i class="fa-regular fa-heart"></i>
+          <span>Likes</span>
+        </button>
+        <button class="notif-filter-btn" data-filter="comments">
+          <i class="fa-regular fa-comment"></i>
+          <span>Comments</span>
+        </button>
+        <button class="notif-filter-btn" data-filter="followers">
+          <i class="fa-solid fa-user-plus"></i>
+          <span>Followers</span>
+        </button>
       </div>
+
+      <!-- Single unified notifications list -->
+      <div id="notificationsList" class="notifications-list"></div>
 
       <!-- Empty state -->
       <div class="notifications-empty" id="notificationsEmpty">
