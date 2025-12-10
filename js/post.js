@@ -12,11 +12,21 @@ class PostPage {
 
     this.post = null;
     this.comments = [];
+    this.currentUser = null;
   }
 
   async init() {
     this.cacheDom();
     this.bindEvents();
+
+    // current user (from auth.js)
+    try {
+      this.currentUser =
+        typeof getCurrentUser === "function" ? getCurrentUser() : null;
+    } catch {
+      this.currentUser = null;
+    }
+
     this.updateAuthUI();
 
     if (!this.postId) {
@@ -45,14 +55,24 @@ class PostPage {
     // comment composer
     this.commentForm = document.getElementById("commentForm");
     this.commentInput = document.getElementById("commentInput");
-    this.commentSubmitBtn = document.getElementById("commentSubmitBtn");
+    this.commentSubmitBtn =
+      document.getElementById("commentSubmitBtn") ||
+      document.getElementById("commentButton"); // just in case
     this.commentCharCounter = document.getElementById("commentCharCounter");
 
-    // guest message (if you have one)
     this.guestMessage = document.getElementById("guestCommentMessage");
+
+    this.backButton = document.getElementById("backButton");
   }
 
   bindEvents() {
+    if (this.backButton) {
+      this.backButton.addEventListener("click", () => {
+        if (window.history.length > 1) window.history.back();
+        else window.location.href = "index.html";
+      });
+    }
+
     // comment char counter
     if (this.commentInput && this.commentCharCounter) {
       this.commentInput.addEventListener("input", () => {
@@ -69,17 +89,36 @@ class PostPage {
       });
     }
 
-    // submit comment
+    // submit on form submit
     if (this.commentForm) {
       this.commentForm.addEventListener("submit", (e) =>
         this.handleCommentSubmit(e)
       );
     }
+
+    // ALSO submit when the button is clicked (in case type="button")
+    if (this.commentSubmitBtn) {
+      this.commentSubmitBtn.addEventListener("click", (e) =>
+        this.handleCommentSubmit(e)
+      );
+    }
+
+    // comment delete via event delegation
+    if (this.commentsList) {
+      this.commentsList.addEventListener("click", (e) => {
+        const delBtn = e.target.closest(".comment-delete-btn");
+        if (delBtn) {
+          const commentId = delBtn.dataset.commentId;
+          this.handleDeleteComment(commentId);
+        }
+      });
+    }
   }
 
   updateAuthUI() {
-    const loggedIn =
-      typeof isLoggedIn === "function" ? isLoggedIn() : !!getAuthToken?.();
+    const token =
+      typeof getAuthToken === "function" ? getAuthToken() : null;
+    const loggedIn = !!token;
 
     if (!loggedIn) {
       if (this.guestMessage) this.guestMessage.classList.remove("hidden");
@@ -126,7 +165,8 @@ class PostPage {
 
     try {
       const headers = {};
-      const token = typeof getAuthToken === "function" ? getAuthToken() : null;
+      const token =
+        typeof getAuthToken === "function" ? getAuthToken() : null;
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
       const res = await fetch(
@@ -135,7 +175,7 @@ class PostPage {
       );
 
       if (!res.ok) {
-        const text = await res.text();
+        const text = await res.text().catch(() => "");
         console.error("loadPost error:", res.status, text);
         this.showError("Failed to load post.");
         this.hidePostLoading();
@@ -162,7 +202,7 @@ class PostPage {
 
     const author = post.user || {};
     const avatar =
-      author.avatar_url || "default-profile.PNG"; // fallback
+      author.avatar_url || "default-profile.PNG";
     const username = author.username || "unknown";
     const displayName = author.display_name || username;
     const createdAt = post.created_at;
@@ -176,14 +216,18 @@ class PostPage {
       typeof post.comments_count === "number" ? post.comments_count : 0;
 
     const mediaUrl =
-      post.media_url || post.media || post.image_url || post.video_url || null;
+      post.media_url ||
+      post.media ||
+      post.image_url ||
+      post.video_url ||
+      null;
     const mediaType = post.media_type || "";
     const mediaHtml = mediaUrl ? this.renderMediaHtml(mediaUrl, mediaType) : "";
 
     article.innerHTML = `
       <header class="post-header">
         <div class="post-user" data-username="${this.escape(username)}">
-          <img class="post-avatar" src="${avatar}" 
+          <img class="post-avatar" src="${avatar}"
                onerror="this.src='default-profile.PNG'">
           <div class="post-user-meta">
             <span class="post-display-name">${this.escape(displayName)}</span>
@@ -241,7 +285,6 @@ class PostPage {
     if (commentBtn) {
       commentBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        // scroll down to comments
         if (this.commentsSection) {
           this.commentsSection.scrollIntoView({ behavior: "smooth" });
           if (this.commentInput) this.commentInput.focus();
@@ -280,7 +323,8 @@ class PostPage {
       (type && (String(type).startsWith("video/") || type === "video")) ||
       lower.endsWith(".mp4") ||
       lower.endsWith(".webm") ||
-      lower.endsWith(".ogg");
+      lower.endsWith(".ogg") ||
+      lower.endsWith(".mov");
 
     if (isVideo) {
       return `
@@ -316,7 +360,7 @@ class PostPage {
       );
 
       if (!res.ok) {
-        const txt = await res.text();
+        const txt = await res.text().catch(() => "");
         console.error("loadComments error:", res.status, txt);
         this.hideCommentsLoading();
         return;
@@ -352,8 +396,11 @@ class PostPage {
         const displayName = user.display_name || username;
         const time = c.created_at ? this.formatTime(c.created_at) : "";
 
+        const canDelete =
+          this.currentUser && user.id && user.id === this.currentUser.id;
+
         return `
-          <article class="comment">
+          <article class="comment" data-comment-id="${c.id}">
             <img class="comment-avatar"
                  src="${avatar}"
                  onerror="this.src='default-profile.PNG'">
@@ -370,21 +417,32 @@ class PostPage {
               <div class="comment-text">${this.formatContent(
                 c.content || ""
               )}</div>
+              ${
+                canDelete
+                  ? `<div class="comment-actions-row">
+                       <button class="comment-delete-btn" 
+                               type="button"
+                               data-comment-id="${c.id}">
+                         Delete
+                       </button>
+                     </div>`
+                  : ""
+              }
             </div>
           </article>
         `;
       })
       .join("");
 
-    // click on comment avatar/name -> profile
+    // avatar / name -> profile
     this.commentsList
       .querySelectorAll(".comment-avatar, .comment-display-name, .comment-username")
       .forEach((el) => {
         el.addEventListener("click", (e) => {
           const article = e.target.closest(".comment");
           if (!article) return;
-          const idx = Array.from(this.commentsList.children).indexOf(article);
-          const comment = this.comments[idx];
+          const commentId = article.dataset.commentId;
+          const comment = this.comments.find((c) => c.id === commentId);
           if (!comment || !comment.user) return;
           const uname = comment.user.username;
           if (!uname) return;
@@ -405,10 +463,13 @@ class PostPage {
   // ========= COMMENT SUBMIT =========
 
   async handleCommentSubmit(e) {
-    e.preventDefault();
+    if (e && typeof e.preventDefault === "function") {
+      e.preventDefault();
+    }
     if (!this.commentInput || !this.commentSubmitBtn) return;
 
-    const token = typeof getAuthToken === "function" ? getAuthToken() : null;
+    const token =
+      typeof getAuthToken === "function" ? getAuthToken() : null;
     if (!token) {
       alert("Please log in to comment.");
       return;
@@ -426,7 +487,9 @@ class PostPage {
 
     try {
       const res = await fetch(
-        `${POST_API_BASE_URL}/posts/${encodeURIComponent(this.postId)}/comments`,
+        `${POST_API_BASE_URL}/posts/${encodeURIComponent(
+          this.postId
+        )}/comments`,
         {
           method: "POST",
           headers: {
@@ -468,12 +531,63 @@ class PostPage {
     }
   }
 
+  // ========= COMMENT DELETE =========
+
+  async handleDeleteComment(commentId) {
+    if (!commentId) return;
+
+    const token =
+      typeof getAuthToken === "function" ? getAuthToken() : null;
+    if (!token) {
+      alert("Please log in.");
+      return;
+    }
+
+    const ok = confirm("Delete this comment?");
+    if (!ok) return;
+
+    try {
+      const res = await fetch(
+        `${POST_API_BASE_URL}/comments/${encodeURIComponent(commentId)}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to delete comment");
+      }
+
+      // remove from array
+      this.comments = this.comments.filter((c) => c.id !== commentId);
+      this.renderComments();
+
+      // update count on header card
+      const card = this.postContainer?.querySelector(".post");
+      const countEl = card?.querySelector(".comment-count");
+      if (countEl) {
+        let current = parseInt(countEl.textContent || "0", 10);
+        if (Number.isNaN(current)) current = 0;
+        if (current > 0) current -= 1;
+        countEl.textContent = String(current);
+      }
+    } catch (err) {
+      console.error("handleDeleteComment error:", err);
+      alert(err.message || "Could not delete comment.");
+    }
+  }
+
   // ========= LIKE / SAVE / SHARE =========
 
   async handleLike(post, btn) {
     if (!post || !post.id || !btn) return;
 
-    const token = typeof getAuthToken === "function" ? getAuthToken() : null;
+    const token =
+      typeof getAuthToken === "function" ? getAuthToken() : null;
     if (!token) {
       alert("Please log in to like posts.");
       return;
@@ -488,7 +602,7 @@ class PostPage {
     const wasLiked =
       btn.classList.contains("liked") || post.liked_by_me === true;
 
-    // optimistic
+    // optimistic update
     let newCount = currentCount + (wasLiked ? -1 : 1);
     if (newCount < 0) newCount = 0;
 
@@ -528,21 +642,21 @@ class PostPage {
       };
     } catch (err) {
       console.error("handleLike error:", err);
-      // revert
+      // revert UI silently (no popup)
       btn.classList.toggle("liked", wasLiked);
       if (icon) {
         icon.classList.remove(wasLiked ? "fa-regular" : "fa-solid");
         icon.classList.add(wasLiked ? "fa-solid" : "fa-regular");
       }
       if (countEl) countEl.textContent = String(currentCount);
-      alert(err.message || "Could not update like.");
     }
   }
 
   async handleSave(post, btn) {
     if (!post || !post.id || !btn) return;
 
-    const token = typeof getAuthToken === "function" ? getAuthToken() : null;
+    const token =
+      typeof getAuthToken === "function" ? getAuthToken() : null;
     if (!token) {
       alert("Please log in to save posts.");
       return;
@@ -580,13 +694,12 @@ class PostPage {
       };
     } catch (err) {
       console.error("handleSave error:", err);
-      // revert
+      // revert UI silently
       btn.classList.toggle("saved", wasSaved);
       if (icon) {
         icon.classList.remove(wasSaved ? "fa-regular" : "fa-solid");
         icon.classList.add(wasSaved ? "fa-solid" : "fa-regular");
       }
-      alert(err.message || "Could not update save.");
     }
   }
 
