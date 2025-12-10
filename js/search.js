@@ -230,14 +230,6 @@ class SearchManager {
             typeof post.comments === "number"
               ? post.comments
               : post.comment_count || post.comments_count || 0,
-          // NEW: normalize saves count
-          saves:
-            typeof post.saves === "number"
-              ? post.saves
-              : post.save_count ||
-                post.saves_count ||
-                post.bookmarks_count ||
-                0,
           media_url: post.media_url,
           media_type: post.media_type,
           liked_by_me:
@@ -334,27 +326,10 @@ class SearchManager {
       return;
     }
 
-    const currentUser =
-      typeof getCurrentUser === "function" ? getCurrentUser() : null;
-
     section.style.display = "block";
     list.innerHTML = users
-      .map((user) => {
-        const isMe = currentUser && currentUser.id === user.id;
-
-        const followButtonHtml = isMe
-          ? `<span class="you-pill">You</span>`
-          : `<button
-          class="btn btn-sm ${
-            user.isFollowing ? "btn-secondary" : "btn-primary"
-          } follow-btn"
-          onclick="searchManager.handleFollow('${user.id}', this)"
-          ${!getCurrentUser ? "disabled" : ""}
-        >
-          ${user.isFollowing ? "Following" : "Follow"}
-        </button>`;
-
-        return `
+      .map(
+        (user) => `
       <div class="user-card" data-username="${user.username}">
         <img src="${user.avatar}" alt="${this.escapeHtml(
           user.displayName
@@ -372,10 +347,18 @@ class SearchManager {
             <span class="follower-count">${user.followersCount.toLocaleString()} followers</span>
           </div>
         </div>
-        ${followButtonHtml}
+        <button
+          class="btn btn-sm ${
+            user.isFollowing ? "btn-secondary" : "btn-primary"
+          } follow-btn"
+          onclick="searchManager.handleFollow('${user.id}', this)"
+          ${!getCurrentUser ? "disabled" : ""}
+        >
+          ${user.isFollowing ? "Following" : "Follow"}
+        </button>
       </div>
-    `;
-      })
+    `
+      )
       .join("");
 
     // Clicking card -> go to user.html/profile
@@ -430,8 +413,6 @@ class SearchManager {
           typeof post.comments === "number"
             ? post.comments
             : post.comments || 0;
-        const saveCount =
-          typeof post.saves === "number" ? post.saves : post.saves || 0;
 
         const mediaHtml = this.renderMediaHtml(
           post.media_url,
@@ -484,7 +465,6 @@ class SearchManager {
             <button class="post-action save-btn ${saved ? "saved" : ""}"
                     style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center;">
               <i class="fa-${saved ? "solid" : "regular"} fa-bookmark"></i>
-              <span class="save-count">${saveCount}</span>
             </button>
           </div>
         </footer>
@@ -902,13 +882,12 @@ class SearchManager {
         }
       );
 
-      const list = document.querySelector(".trending-list");
-      if (!list) return;
-
-      if (!error && trending && trending.length) {
-        list.innerHTML = trending
-          .map(
-            (item, index) => `
+      if (!error && trending) {
+        const list = document.querySelector(".trending-list");
+        if (list) {
+          list.innerHTML = trending
+            .map(
+              (item, index) => `
             <div class="trending-item" onclick="searchManager.searchHashtag('${
               item.tag
             }')">
@@ -919,24 +898,17 @@ class SearchManager {
               </div>
             </div>
           `
-          )
-          .join("");
+            )
+            .join("");
+        }
       } else {
-        // no fake data – just show empty state
-        list.innerHTML =
-          '<div class="trending-empty">No trending hashtags yet</div>';
+        this.loadMockTrendingHashtags();
       }
     } catch (err) {
       console.error("Error loading trending hashtags:", err);
-      const list = document.querySelector(".trending-list");
-      if (list) {
-        list.innerHTML =
-          '<div class="trending-empty">No trending hashtags yet</div>';
-      }
+      this.loadMockTrendingHashtags();
     }
   }
-
-  // (loadMockTrendingHashtags left here but no longer used – no fake tags shown)
 
   loadMockTrendingHashtags() {
     const mock = [
