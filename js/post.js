@@ -34,599 +34,604 @@ class PostPage {
     this.postWrapper = document.getElementById("postWrapper");
     this.postContainer = document.getElementById("postContainer");
     this.postLoading = document.getElementById("postLoading");
+    this.postErrorEl = document.getElementById("postError");
 
+    // comments
+    this.commentsSection = document.getElementById("commentsSection");
     this.commentsList = document.getElementById("commentsList");
     this.commentsLoading = document.getElementById("commentsLoading");
     this.commentsEmpty = document.getElementById("commentsEmpty");
 
-    this.commentComposer = document.getElementById("commentComposer");
-    this.commentsGuestMessage = document.getElementById("commentsGuestMessage");
-    this.commentUserAvatar = document.getElementById("commentUserAvatar");
+    // comment composer
+    this.commentForm = document.getElementById("commentForm");
     this.commentInput = document.getElementById("commentInput");
+    this.commentSubmitBtn = document.getElementById("commentSubmitBtn");
     this.commentCharCounter = document.getElementById("commentCharCounter");
-    this.commentButton = document.getElementById("commentButton");
 
-    // header bits (may not exist)
-    this.profileSection = document.getElementById("profileSection");
-    this.authButtons = document.getElementById("authButtons");
-    this.headerProfileImg = document.getElementById("headerProfileImg");
-
-    // comments section root (for scrolling)
-    this.commentsSection = document.querySelector(".comments-section");
+    // guest message (if you have one)
+    this.guestMessage = document.getElementById("guestCommentMessage");
   }
 
   bindEvents() {
-    if (this.commentInput) {
-      this.commentInput.addEventListener("input", () =>
-        this.updateCommentCharCounter()
-      );
-      this.commentInput.addEventListener("keydown", (e) => {
-        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-          e.preventDefault();
-          this.handleCreateComment();
-        }
+    // comment char counter
+    if (this.commentInput && this.commentCharCounter) {
+      this.commentInput.addEventListener("input", () => {
+        const len = this.commentInput.value.length;
+        this.commentCharCounter.textContent = `${len}/${this.maxCommentChars}`;
+        this.commentCharCounter.classList.toggle(
+          "warning",
+          len > this.maxCommentChars - 40 && len <= this.maxCommentChars
+        );
+        this.commentCharCounter.classList.toggle(
+          "error",
+          len > this.maxCommentChars
+        );
       });
     }
 
-    if (this.commentButton) {
-      this.commentButton.addEventListener("click", () =>
-        this.handleCreateComment()
+    // submit comment
+    if (this.commentForm) {
+      this.commentForm.addEventListener("submit", (e) =>
+        this.handleCommentSubmit(e)
       );
-    }
-
-    // optional keyboard shortcut: "c" to focus comment box when on post page
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "c" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        if (this.commentInput && this.isLoggedIn()) {
-          this.commentInput.focus();
-        }
-      }
-    });
-  }
-
-  getPostIdFromUrl() {
-    try {
-      const url = new URL(window.location.href);
-      return url.searchParams.get("id");
-    } catch {
-      return null;
-    }
-  }
-
-  isLoggedIn() {
-    try {
-      return typeof isLoggedIn === "function" ? isLoggedIn() : false;
-    } catch {
-      return false;
-    }
-  }
-
-  getCurrentUser() {
-    try {
-      return typeof getCurrentUser === "function" ? getCurrentUser() : null;
-    } catch {
-      return null;
-    }
-  }
-
-  getAuthToken() {
-    try {
-      return typeof getAuthToken === "function"
-        ? getAuthToken()
-        : localStorage.getItem("authToken");
-    } catch {
-      return null;
     }
   }
 
   updateAuthUI() {
-    const user = this.getCurrentUser();
-    const loggedIn = !!user;
+    const loggedIn =
+      typeof isLoggedIn === "function" ? isLoggedIn() : !!getAuthToken?.();
 
-    if (this.commentComposer)
-      this.commentComposer.style.display = loggedIn ? "block" : "none";
-
-    if (this.commentsGuestMessage)
-      this.commentsGuestMessage.style.display = loggedIn ? "none" : "block";
-
-    if (this.commentUserAvatar) {
-      this.commentUserAvatar.src =
-        user && user.avatar_url
-          ? user.avatar_url
-          : "assets/icons/default-profile.PNG";
-    }
-
-    if (this.profileSection && this.authButtons) {
-      if (loggedIn) {
-        this.profileSection.style.display = "flex";
-        this.authButtons.style.display = "none";
-        if (this.headerProfileImg && user.avatar_url)
-          this.headerProfileImg.src = user.avatar_url;
-      } else {
-        this.profileSection.style.display = "none";
-        this.authButtons.style.display = "flex";
-      }
+    if (!loggedIn) {
+      if (this.guestMessage) this.guestMessage.classList.remove("hidden");
+      if (this.commentForm) this.commentForm.classList.add("hidden");
+    } else {
+      if (this.guestMessage) this.guestMessage.classList.add("hidden");
+      if (this.commentForm) this.commentForm.classList.remove("hidden");
     }
   }
 
-  // ========= COMMENT CHAR COUNTER =========
+  // ========= URL / ERROR HELPERS =========
 
-  updateCommentCharCounter() {
-    if (!this.commentInput || !this.commentCharCounter) return;
-    const text = this.commentInput.value || "";
-    const length = text.length;
+  getPostIdFromUrl() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("id");
+    } catch {
+      return null;
+    }
+  }
 
-    this.commentCharCounter.textContent = `${length}/280`;
-    this.commentCharCounter.classList.remove("warning", "error");
+  showError(msg) {
+    if (this.postErrorEl) {
+      this.postErrorEl.textContent = msg || "Something went wrong.";
+      this.postErrorEl.classList.remove("hidden");
+    }
+  }
 
-    if (length > 280) this.commentCharCounter.classList.add("error");
-    else if (length > 240) this.commentCharCounter.classList.add("warning");
+  hidePostLoading() {
+    if (this.postLoading) this.postLoading.classList.add("hidden");
+  }
 
-    const canComment = this.isLoggedIn() && length > 0 && length <= 280;
-    if (this.commentButton) this.commentButton.disabled = !canComment;
+  hideCommentsLoading() {
+    if (this.commentsLoading) this.commentsLoading.classList.add("hidden");
   }
 
   // ========= LOAD POST =========
 
   async loadPost() {
-    if (!this.postId || !this.postContainer) return;
+    if (!this.postContainer) return;
 
-    if (this.postLoading) this.postLoading.style.display = "flex";
+    this.postContainer.innerHTML = "";
+    if (this.postLoading) this.postLoading.classList.remove("hidden");
 
     try {
-      const token = this.getAuthToken();
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const headers = {};
+      const token = typeof getAuthToken === "function" ? getAuthToken() : null;
+      if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const res = await fetch(`${POST_API_BASE_URL}/posts/${this.postId}`, {
-        headers,
-      });
+      const res = await fetch(
+        `${POST_API_BASE_URL}/posts/${encodeURIComponent(this.postId)}`,
+        { headers }
+      );
+
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("loadPost error:", res.status, text);
+        this.showError("Failed to load post.");
+        this.hidePostLoading();
+        return;
+      }
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to load post.");
+      this.post = data;
 
-      this.post = data.post || data;
-      this.comments = data.comments || this.comments;
-
-      this.renderPost();
+      const article = this.renderPostCard(data);
+      this.postContainer.appendChild(article);
     } catch (err) {
-      console.error(err);
-      this.showError("Could not load post.");
+      console.error("loadPost exception:", err);
+      this.showError("Failed to load post.");
+    } finally {
+      this.hidePostLoading();
     }
-
-    if (this.postLoading) this.postLoading.style.display = "none";
   }
 
-  renderPost() {
-    if (!this.post) return;
+  renderPostCard(post) {
+    const article = document.createElement("article");
+    article.className = "post post-page-card";
+    article.dataset.postId = post.id;
 
-    const p = this.post;
-
-    const user = p.user || {};
-    const username = user.username || "unknown";
-    const displayName = user.display_name || username;
+    const author = post.user || {};
     const avatar =
-      user.avatar_url || "assets/icons/default-profile.PNG";
+      author.avatar_url || "default-profile.PNG"; // fallback
+    const username = author.username || "unknown";
+    const displayName = author.display_name || username;
+    const createdAt = post.created_at;
+    const time = createdAt ? this.formatTime(createdAt) : "";
 
-    const liked =
-      p.liked_by_me === true || p.is_liked === true || p.isLiked === true;
+    const liked = !!post.liked_by_me;
+    const saved = !!post.saved_by_me;
 
-    const saved =
-      p.saved_by_me === true || p.is_saved === true || p.isSaved === true;
+    let likeCount = typeof post.likes === "number" ? post.likes : 0;
+    let commentCount =
+      typeof post.comments_count === "number" ? post.comments_count : 0;
 
-    const likeCount =
-      typeof p.likes === "number"
-        ? p.likes
-        : Array.isArray(p.likes)
-        ? p.likes.length
-        : p.like_count || 0;
+    const mediaUrl =
+      post.media_url || post.media || post.image_url || post.video_url || null;
+    const mediaType = post.media_type || "";
+    const mediaHtml = mediaUrl ? this.renderMediaHtml(mediaUrl, mediaType) : "";
 
-    const commentCount =
-      typeof p.comments_count === "number"
-        ? p.comments_count
-        : p.comment_count || (Array.isArray(p.comments) ? p.comments.length : 0);
-
-    const time = this.formatTime(p.created_at);
-
-    const mediaHtml = this.renderMedia(p.media_url, p.media_type);
-
-    this.postContainer.innerHTML = `
-      <article class="post" data-post-id="${p.id}">
-        <header class="post-header">
-          <div class="post-user" data-username="${this.escape(username)}">
-            <img class="post-avatar" src="${avatar}" onerror="this.src='assets/icons/default-profile.PNG'">
-            <div class="post-user-info">
-              <span class="post-display-name">${this.escape(displayName)}</span>
-              <span class="post-username">@${this.escape(username)}</span>
-            </div>
+    article.innerHTML = `
+      <header class="post-header">
+        <div class="post-user" data-username="${this.escape(username)}">
+          <img class="post-avatar" src="${avatar}" 
+               onerror="this.src='default-profile.PNG'">
+          <div class="post-user-meta">
+            <span class="post-display-name">${this.escape(displayName)}</span>
+            <span class="post-username">@${this.escape(username)}</span>
           </div>
-          <span class="post-time">${time}</span>
-        </header>
-
-        <div class="post-body">
-          <div class="post-text">${this.formatPostContent(p.content)}</div>
-          ${mediaHtml}
         </div>
+        <span class="post-time">${this.escape(time)}</span>
+      </header>
 
-        <footer class="post-footer">
-          <div class="post-actions">
-            <button class="post-action like-btn ${liked ? "liked" : ""}">
-              <i class="fa-${liked ? "solid" : "regular"} fa-heart"></i>
-              <span class="like-count">${likeCount}</span>
-            </button>
+      <div class="post-body">
+        <div class="post-text">${this.formatContent(post.content || "")}</div>
+        ${mediaHtml}
+      </div>
 
-            <button class="post-action comment-btn">
-              <i class="fa-regular fa-comment"></i>
-              <span class="comment-count">${commentCount}</span>
-            </button>
-
-            <button class="post-action share-btn">
-              <i class="fa-solid fa-arrow-up-from-bracket"></i>
-            </button>
-
-            <button class="post-action save-btn ${saved ? "saved" : ""}">
-              <i class="fa-${saved ? "solid" : "regular"} fa-bookmark"></i>
-            </button>
-          </div>
-        </footer>
-      </article>
+      <footer class="post-footer">
+        <div class="post-actions">
+          <button class="post-action like-btn ${liked ? "liked" : ""}" type="button">
+            <i class="fa-${liked ? "solid" : "regular"} fa-heart"></i>
+            <span class="like-count">${likeCount}</span>
+          </button>
+          <button class="post-action comment-btn" type="button">
+            <i class="fa-regular fa-comment"></i>
+            <span class="comment-count">${commentCount}</span>
+          </button>
+          <button class="post-action share-btn" type="button">
+            <i class="fa-solid fa-arrow-up-from-bracket"></i>
+          </button>
+          <button class="post-action save-btn ${saved ? "saved" : ""}" type="button">
+            <i class="fa-${saved ? "solid" : "regular"} fa-bookmark"></i>
+          </button>
+        </div>
+      </footer>
     `;
 
-    this.attachPostEvents();
+    const likeBtn = article.querySelector(".like-btn");
+    const commentBtn = article.querySelector(".comment-btn");
+    const shareBtn = article.querySelector(".share-btn");
+    const saveBtn = article.querySelector(".save-btn");
+    const userEl = article.querySelector(".post-user");
+
+    if (likeBtn) {
+      likeBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.handleLike(post, likeBtn);
+      });
+    }
+
+    if (saveBtn) {
+      saveBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.handleSave(post, saveBtn);
+      });
+    }
+
+    if (commentBtn) {
+      commentBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        // scroll down to comments
+        if (this.commentsSection) {
+          this.commentsSection.scrollIntoView({ behavior: "smooth" });
+          if (this.commentInput) this.commentInput.focus();
+        }
+      });
+    }
+
+    if (shareBtn) {
+      shareBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.handleSharePostClick(post);
+      });
+    }
+
+    if (userEl) {
+      userEl.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const uname = userEl.dataset.username;
+        const me =
+          typeof getCurrentUser === "function" ? getCurrentUser() : null;
+
+        if (me && me.username === uname) {
+          window.location.href = "profile.html";
+        } else {
+          window.location.href = `user.html?user=${encodeURIComponent(uname)}`;
+        }
+      });
+    }
+
+    return article;
   }
 
-  renderMedia(url, type) {
-    if (!url) return "";
-    const lower = url.toLowerCase();
+  renderMediaHtml(url, type) {
+    const lower = (url || "").toLowerCase();
     const isVideo =
-      (type && type.startsWith("video/")) ||
+      (type && (String(type).startsWith("video/") || type === "video")) ||
       lower.endsWith(".mp4") ||
       lower.endsWith(".webm") ||
       lower.endsWith(".ogg");
 
-    return isVideo
-      ? `
+    if (isVideo) {
+      return `
+        <div class="post-media">
+          <video controls playsinline preload="metadata">
+            <source src="${url}">
+            Your browser does not support video.
+          </video>
+        </div>
+      `;
+    }
+
+    return `
       <div class="post-media">
-        <video controls playsinline preload="metadata">
-          <source src="${url}">
-          Your browser does not support video.
-        </video>
-      </div>`
-      : `
-      <div class="post-media">
-        <img src="${url}" loading="lazy">
-      </div>`;
+        <a href="${url}" target="_blank" rel="noopener noreferrer">
+          <img src="${url}" loading="lazy">
+        </a>
+      </div>
+    `;
   }
 
-  attachPostEvents() {
-    const postEl = this.postContainer.querySelector(".post");
-    if (!postEl) return;
-    const postId = this.post.id;
-
-    // Profile click
-    const userEl = postEl.querySelector(".post-user");
-    if (userEl) {
-      userEl.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const username = userEl.dataset.username;
-        const me = this.getCurrentUser();
-
-        if (me && me.username === username)
-          window.location.href = "profile.html";
-        else
-          window.location.href = `user.html?user=${encodeURIComponent(
-            username
-          )}`;
-      });
-    }
-
-    // SHARE
-    const shareBtn = postEl.querySelector(".share-btn");
-    if (shareBtn) {
-      shareBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const url = `${location.origin}/post.html?id=${postId}`;
-        navigator.clipboard.writeText(url);
-        this.showToast("Link copied!", "success");
-      });
-    }
-
-    // LIKE
-    const likeBtn = postEl.querySelector(".like-btn");
-    if (likeBtn) {
-      likeBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        this.toggleLike(postId, likeBtn);
-      });
-    }
-
-    // SAVE
-    const saveBtn = postEl.querySelector(".save-btn");
-    if (saveBtn) {
-      saveBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        this.toggleSave(postId, saveBtn);
-      });
-    }
-
-    // COMMENT BUTTON: scroll to comments + focus box
-    const commentBtn = postEl.querySelector(".comment-btn");
-    if (commentBtn) {
-      commentBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        this.scrollToComments();
-      });
-    }
-  }
-
-  // ========= LIKE =========
-
-  async toggleLike(postId, btn) {
-    const token = this.getAuthToken();
-    if (!token) return this.showToast("Login required", "error");
-
-    const countEl = btn.querySelector(".like-count");
-    const icon = btn.querySelector("i");
-
-    const wasLiked = btn.classList.contains("liked");
-    let count = parseInt(countEl.textContent || "0", 10);
-
-    // optimistic UI
-    if (wasLiked) {
-      btn.classList.remove("liked");
-      icon.classList.replace("fa-solid", "fa-regular");
-      count--;
-    } else {
-      btn.classList.add("liked");
-      icon.classList.replace("fa-regular", "fa-solid");
-      count++;
-    }
-    countEl.textContent = String(Math.max(count, 0));
-
-    try {
-      const res = await fetch(`${POST_API_BASE_URL}/posts/${postId}/like`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update like");
-
-      if (typeof data.likes === "number") {
-        countEl.textContent = String(data.likes);
-      }
-    } catch (err) {
-      console.error(err);
-      this.showToast("Failed to update like", "error");
-    }
-  }
-
-  // ========= SAVE =========
-
-  async toggleSave(postId, btn) {
-    const token = this.getAuthToken();
-    if (!token) return this.showToast("Login required", "error");
-
-    const icon = btn.querySelector("i");
-    const wasSaved = btn.classList.contains("saved");
-
-    if (wasSaved) {
-      btn.classList.remove("saved");
-      icon.classList.replace("fa-solid", "fa-regular");
-    } else {
-      btn.classList.add("saved");
-      icon.classList.replace("fa-regular", "fa-solid");
-    }
-
-    try {
-      await fetch(`${POST_API_BASE_URL}/posts/${postId}/save`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-    } catch (err) {
-      console.error(err);
-      this.showToast("Failed to update save", "error");
-    }
-  }
-
-  // ========= COMMENTS =========
+  // ========= LOAD COMMENTS =========
 
   async loadComments() {
-    const token = this.getAuthToken();
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    if (!this.commentsList) return;
 
-    if (this.commentsLoading) this.commentsLoading.style.display = "flex";
-    if (this.commentsEmpty) this.commentsEmpty.style.display = "none";
+    this.commentsList.innerHTML = "";
+    if (this.commentsLoading) this.commentsLoading.classList.remove("hidden");
 
     try {
       const res = await fetch(
-        `${POST_API_BASE_URL}/posts/${this.postId}/comments`,
-        { headers }
+        `${POST_API_BASE_URL}/posts/${encodeURIComponent(this.postId)}/comments`
       );
-      const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error || "Failed to load comments");
-
-      this.comments = Array.isArray(data) ? data : data.comments || [];
-      this.renderComments();
-
-      // also sync comment count on main post card with server
-      if (this.post) {
-        this.post.comments_count = this.comments.length;
-        this.post.comment_count = this.comments.length;
-        this.renderPost();
+      if (!res.ok) {
+        const txt = await res.text();
+        console.error("loadComments error:", res.status, txt);
+        this.hideCommentsLoading();
+        return;
       }
-    } catch (err) {
-      console.error(err);
-      this.showToast("Could not load comments", "error");
-    }
 
-    if (this.commentsLoading) this.commentsLoading.style.display = "none";
+      const data = await res.json();
+      this.comments = data || [];
+      this.renderComments();
+    } catch (err) {
+      console.error("loadComments exception:", err);
+    } finally {
+      this.hideCommentsLoading();
+    }
   }
 
   renderComments() {
     if (!this.commentsList) return;
 
-    if (this.comments.length === 0) {
+    if (!this.comments || !this.comments.length) {
       this.commentsList.innerHTML = "";
-      if (this.commentsEmpty) this.commentsEmpty.style.display = "block";
+      if (this.commentsEmpty) this.commentsEmpty.classList.remove("hidden");
       return;
     }
 
-    if (this.commentsEmpty) this.commentsEmpty.style.display = "none";
+    if (this.commentsEmpty) this.commentsEmpty.classList.add("hidden");
 
     this.commentsList.innerHTML = this.comments
-      .map((c) => this.renderCommentHTML(c))
+      .map((c) => {
+        const user = c.user || {};
+        const avatar =
+          user.avatar_url || "default-profile.PNG";
+        const username = user.username || "unknown";
+        const displayName = user.display_name || username;
+        const time = c.created_at ? this.formatTime(c.created_at) : "";
+
+        return `
+          <article class="comment">
+            <img class="comment-avatar"
+                 src="${avatar}"
+                 onerror="this.src='default-profile.PNG'">
+            <div class="comment-body">
+              <div class="comment-header">
+                <span class="comment-display-name">${this.escape(
+                  displayName
+                )}</span>
+                <span class="comment-username">@${this.escape(
+                  username
+                )}</span>
+                <span class="comment-time">${this.escape(time)}</span>
+              </div>
+              <div class="comment-text">${this.formatContent(
+                c.content || ""
+              )}</div>
+            </div>
+          </article>
+        `;
+      })
       .join("");
 
-    this.attachCommentEvents();
+    // click on comment avatar/name -> profile
+    this.commentsList
+      .querySelectorAll(".comment-avatar, .comment-display-name, .comment-username")
+      .forEach((el) => {
+        el.addEventListener("click", (e) => {
+          const article = e.target.closest(".comment");
+          if (!article) return;
+          const idx = Array.from(this.commentsList.children).indexOf(article);
+          const comment = this.comments[idx];
+          if (!comment || !comment.user) return;
+          const uname = comment.user.username;
+          if (!uname) return;
+
+          const me =
+            typeof getCurrentUser === "function" ? getCurrentUser() : null;
+          if (me && me.username === uname) {
+            window.location.href = "profile.html";
+          } else {
+            window.location.href = `user.html?user=${encodeURIComponent(
+              uname
+            )}`;
+          }
+        });
+      });
   }
 
-  renderCommentHTML(comment) {
-    const user = comment.user || {};
-    return `
-      <article class="comment" data-username="${user.username}">
-        <img class="comment-avatar-small" src="${
-          user.avatar_url || "assets/icons/default-profile.PNG"
-        }" onerror="this.src='assets/icons/default-profile.PNG'">
-        <div class="comment-body">
-          <div class="comment-header">
-            <span class="comment-display-name">${this.escape(
-              user.display_name || user.username
-            )}</span>
-            <span class="comment-username">@${this.escape(
-              user.username
-            )}</span>
-            <span class="comment-time">${this.formatTime(
-              comment.created_at
-            )}</span>
-          </div>
-          <div class="comment-text">${this.formatPostContent(
-            comment.content
-          )}</div>
-        </div>
-      </article>
-    `;
-  }
+  // ========= COMMENT SUBMIT =========
 
-  attachCommentEvents() {
-    const comments = this.commentsList.querySelectorAll(".comment");
-    if (!comments || !comments.length) return;
+  async handleCommentSubmit(e) {
+    e.preventDefault();
+    if (!this.commentInput || !this.commentSubmitBtn) return;
 
-    comments.forEach((c) => {
-      const username = c.dataset.username;
-
-      const go = (e) => {
-        e.stopPropagation();
-        const me = this.getCurrentUser();
-        if (me && me.username === username)
-          window.location.href = "profile.html";
-        else
-          window.location.href = `user.html?user=${encodeURIComponent(
-            username
-          )}`;
-      };
-
-      c.addEventListener("click", go);
-      c.querySelector(".comment-avatar-small")?.addEventListener("click", go);
-      c.querySelector(".comment-header")?.addEventListener("click", go);
-    });
-  }
-
-  // ========= ADD COMMENT =========
-
-  async handleCreateComment() {
-    const token = this.getAuthToken();
-    if (!token) return this.showToast("Login required", "error");
-    if (!this.commentInput || !this.commentButton) return;
+    const token = typeof getAuthToken === "function" ? getAuthToken() : null;
+    if (!token) {
+      alert("Please log in to comment.");
+      return;
+    }
 
     const content = this.commentInput.value.trim();
-    if (!content) return this.showToast("Type something first", "error");
-    if (content.length > 280) return;
+    if (!content) return;
+    if (content.length > this.maxCommentChars) {
+      alert(`Comment must be ${this.maxCommentChars} characters or less.`);
+      return;
+    }
 
-    this.commentButton.disabled = true;
+    this.commentSubmitBtn.disabled = true;
+    this.commentSubmitBtn.textContent = "Posting...";
 
     try {
       const res = await fetch(
-        `${POST_API_BASE_URL}/posts/${this.postId}/comments`,
+        `${POST_API_BASE_URL}/posts/${encodeURIComponent(this.postId)}/comments`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ content }),
         }
       );
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to add comment");
-
-      this.comments.unshift(data);
-      this.renderComments();
-
-      // Update comment count on UI
-      if (this.post) {
-        if (typeof this.post.comments_count === "number")
-          this.post.comments_count++;
-        else this.post.comment_count = (this.post.comment_count || 0) + 1;
-        this.renderPost();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to post comment");
       }
 
+      // add new comment and re-render
+      this.comments.push(data);
+      this.renderComments();
+
+      // clear input
       this.commentInput.value = "";
-      this.updateCommentCharCounter();
-      this.showToast("Comment added!", "success");
+      if (this.commentCharCounter)
+        this.commentCharCounter.textContent = `0/${this.maxCommentChars}`;
+
+      // bump comment count on header card
+      const card = this.postContainer?.querySelector(".post");
+      const countEl = card?.querySelector(".comment-count");
+      if (countEl) {
+        let current = parseInt(countEl.textContent || "0", 10);
+        if (Number.isNaN(current)) current = 0;
+        countEl.textContent = String(current + 1);
+      }
     } catch (err) {
-      console.error(err);
-      this.showToast("Failed to add comment", "error");
-    }
-
-    this.commentButton.disabled = false;
-  }
-
-  // ========= EXTRA HELPERS =========
-
-  scrollToComments() {
-    // Scroll to comments section; if logged in, focus textarea
-    if (this.commentsSection) {
-      this.commentsSection.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-    if (this.isLoggedIn() && this.commentInput) {
-      setTimeout(() => this.commentInput.focus(), 350);
+      console.error("handleCommentSubmit error:", err);
+      alert(err.message || "Could not post comment.");
+    } finally {
+      this.commentSubmitBtn.disabled = false;
+      this.commentSubmitBtn.textContent = "Comment";
     }
   }
 
-  reloadAll() {
-    // Used by header refresh button
-    if (!this.postId) return;
-    this.loadPost();
-    this.loadComments();
+  // ========= LIKE / SAVE / SHARE =========
+
+  async handleLike(post, btn) {
+    if (!post || !post.id || !btn) return;
+
+    const token = typeof getAuthToken === "function" ? getAuthToken() : null;
+    if (!token) {
+      alert("Please log in to like posts.");
+      return;
+    }
+
+    const countEl = btn.querySelector(".like-count");
+    const icon = btn.querySelector("i");
+
+    let currentCount = parseInt(countEl?.textContent || "0", 10);
+    if (Number.isNaN(currentCount)) currentCount = 0;
+
+    const wasLiked =
+      btn.classList.contains("liked") || post.liked_by_me === true;
+
+    // optimistic
+    let newCount = currentCount + (wasLiked ? -1 : 1);
+    if (newCount < 0) newCount = 0;
+
+    btn.classList.toggle("liked", !wasLiked);
+    if (icon) {
+      icon.classList.remove(wasLiked ? "fa-solid" : "fa-regular");
+      icon.classList.add(wasLiked ? "fa-regular" : "fa-solid");
+    }
+    if (countEl) countEl.textContent = String(newCount);
+
+    try {
+      const res = await fetch(
+        `${POST_API_BASE_URL}/posts/${encodeURIComponent(post.id)}/like`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to update like");
+
+      const serverLikes =
+        typeof data.likes === "number" ? data.likes : null;
+      const nowLiked = data.liked === true ? true : !wasLiked;
+
+      if (serverLikes !== null && countEl) {
+        countEl.textContent = String(serverLikes);
+      }
+
+      this.post = {
+        ...this.post,
+        liked_by_me: nowLiked,
+        likes: serverLikes !== null ? serverLikes : newCount,
+      };
+    } catch (err) {
+      console.error("handleLike error:", err);
+      // revert
+      btn.classList.toggle("liked", wasLiked);
+      if (icon) {
+        icon.classList.remove(wasLiked ? "fa-regular" : "fa-solid");
+        icon.classList.add(wasLiked ? "fa-solid" : "fa-regular");
+      }
+      if (countEl) countEl.textContent = String(currentCount);
+      alert(err.message || "Could not update like.");
+    }
   }
 
-  // ========= UTILITIES =========
+  async handleSave(post, btn) {
+    if (!post || !post.id || !btn) return;
 
-  escape(str) {
-    return String(str)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+    const token = typeof getAuthToken === "function" ? getAuthToken() : null;
+    if (!token) {
+      alert("Please log in to save posts.");
+      return;
+    }
+
+    const icon = btn.querySelector("i");
+    const wasSaved =
+      btn.classList.contains("saved") || post.saved_by_me === true;
+
+    // optimistic
+    btn.classList.toggle("saved", !wasSaved);
+    if (icon) {
+      icon.classList.remove(wasSaved ? "fa-solid" : "fa-regular");
+      icon.classList.add(wasSaved ? "fa-regular" : "fa-solid");
+    }
+
+    try {
+      const res = await fetch(
+        `${POST_API_BASE_URL}/posts/${encodeURIComponent(post.id)}/save`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to update save");
+
+      const nowSaved = data.saved === true ? true : !wasSaved;
+      this.post = {
+        ...this.post,
+        saved_by_me: nowSaved,
+      };
+    } catch (err) {
+      console.error("handleSave error:", err);
+      // revert
+      btn.classList.toggle("saved", wasSaved);
+      if (icon) {
+        icon.classList.remove(wasSaved ? "fa-regular" : "fa-solid");
+        icon.classList.add(wasSaved ? "fa-solid" : "fa-regular");
+      }
+      alert(err.message || "Could not update save.");
+    }
   }
 
-  formatPostContent(text = "") {
-    let t = this.escape(text);
-    t = t.replace(
-      /(https?:\/\/[^\s]+)/g,
-      `<a href="$1" target="_blank">$1</a>`
-    );
-    t = t.replace(/#(\w+)/g, '<span class="hashtag">#$1</span>');
-    t = t.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
-    return t;
+  handleSharePostClick(post) {
+    if (!post || !post.id) return;
+
+    const url = `${window.location.origin}/post.html?id=${encodeURIComponent(
+      post.id
+    )}`;
+
+    if (navigator.share) {
+      navigator
+        .share({
+          title: "Check out this post",
+          url,
+        })
+        .catch(() => {});
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard
+        .writeText(url)
+        .then(() => alert("Post link copied to clipboard"))
+        .catch(() => alert("Post link: " + url));
+    } else {
+      alert("Post link: " + url);
+    }
+  }
+
+  // ========= HELPERS =========
+
+  formatContent(text) {
+    const safe = this.escape(text || "");
+    return safe
+      .replace(
+        /(https?:\/\/[^\s]+)/g,
+        '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+      )
+      .replace(/#(\w+)/g, '<span class="hashtag">#$1</span>')
+      .replace(/@(\w+)/g, '<span class="mention">@$1</span>');
   }
 
   formatTime(ts) {
     const d = new Date(ts);
     if (isNaN(d)) return "";
-    const diff = (Date.now() - d) / 1000;
-
+    const now = new Date();
+    const diff = (now - d) / 1000;
     if (diff < 60) return "just now";
     if (diff < 3600) return Math.floor(diff / 60) + "m";
     if (diff < 86400) return Math.floor(diff / 3600) + "h";
@@ -634,38 +639,23 @@ class PostPage {
     return d.toLocaleDateString();
   }
 
-  showToast(msg, type = "info") {
-    const old = document.querySelector(".status-message");
-    if (old) old.remove();
-
-    const div = document.createElement("div");
-    div.className = `status-message status-${type}`;
-    div.textContent = msg;
-
-    div.style.position = "fixed";
-    div.style.top = "70px";
-    div.style.left = "50%";
-    div.style.transform = "translateX(-50%)";
-    div.style.padding = "8px 14px";
-    div.style.borderRadius = "999px";
-    div.style.background =
-      type === "error" ? "#3b0f0f" : type === "success" ? "#0f3b1f" : "#111";
-    div.style.border = "1px solid #333";
-    div.style.color = "#fff";
-    div.style.zIndex = "9999";
-
-    document.body.appendChild(div);
-    setTimeout(() => div.remove(), 2500);
-  }
-
-  showError(msg) {
-    if (!this.postContainer) return;
-    this.postContainer.innerHTML = `<p>${this.escape(msg)}</p>`;
+  escape(str = "") {
+    return String(str).replace(/[&<>"']/g, (m) => {
+      return {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;",
+      }[m];
+    });
   }
 }
 
-// ======= Initialize =======
+// ========= INIT =========
+
 document.addEventListener("DOMContentLoaded", () => {
-  window.postPage = new PostPage();
-  window.postPage.init();
+  const page = new PostPage();
+  page.init();
+  window.postPage = page;
 });
