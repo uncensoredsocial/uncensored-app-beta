@@ -353,3 +353,42 @@
   justify-content: flex-end;
   gap: 8px;
 }
+
+.profile-header-bar {
+  position: sticky;
+  top: 60px; /* same as other pages */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 12px;
+  background: var(--bg-color);
+  border-bottom: 1px solid var(--border-light);
+  z-index: 90;
+}
+
+.profile-title {
+  flex: 1;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* back button lives on the left */
+.profile-back-btn {
+  margin-right: auto;
+}
+
+/* settings button stays on the right */
+#settingsButton {
+  margin-left: auto;
+}
