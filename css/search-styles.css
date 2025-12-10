@@ -3,7 +3,7 @@
 /* Search Header */
 .search-header {
   /* UPDATED: more bottom padding to separate from filters */
-  padding: var(--space-3) var(--space-4) var(--space-5);
+  padding: var(--space-3) var(--space-4) var(--space-7);
   border-bottom: 1px solid var(--border-light);
   background-color: var(--bg-color);
   position: sticky;
@@ -83,7 +83,7 @@
 
   /* more spacing relative to search bar & Recent */
   margin-top: var(--space-3);
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-5);
 }
 
 .filter-tabs {
@@ -143,7 +143,7 @@
 .search-default-state {
   /* UPDATED: padding + margin-top so "Recent searches" is clearly below sticky header/filters */
   padding: var(--space-3) var(--space-4) var(--space-4);
-  margin-top: var(--space-3);
+  margin-top: var(--space-5);
 }
 
 .trending-section,
