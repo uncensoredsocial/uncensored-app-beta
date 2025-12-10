@@ -2,8 +2,8 @@
 
 /* Search Header */
 .search-header {
-  /* UPDATED: tighten vertical padding */
-  padding: var(--space-3) var(--space-4) var(--space-3);
+  /* UPDATED: more bottom padding to separate from filters */
+  padding: var(--space-3) var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--border-light);
   background-color: var(--bg-color);
   position: sticky;
@@ -21,7 +21,7 @@
   align-items: center;
   background-color: var(--bg-secondary);
   border-radius: var(--radius-xl);
-  /* UPDATED: slightly smaller vertical padding */
+  /* slightly smaller vertical padding */
   padding: var(--space-1) var(--space-3);
   border: 1px solid var(--border-light);
   transition: all var(--transition-fast);
@@ -73,7 +73,7 @@
 
 /* Search Filters */
 .search-filters {
-  /* UPDATED: less padding + much smaller margins */
+  /* UPDATED: more spacing above/below filters row */
   padding: var(--space-2) var(--space-4) var(--space-2);
   border-bottom: 1px solid var(--border-light);
   background-color: var(--bg-color);
@@ -81,9 +81,9 @@
   top: 120px;
   z-index: 90;
 
-  /* smaller spacing relative to search bar & Recent */
-  margin-top: var(--space-1);
-  margin-bottom: var(--space-2);
+  /* more spacing relative to search bar & Recent */
+  margin-top: var(--space-3);
+  margin-bottom: var(--space-3);
 }
 
 .filter-tabs {
@@ -101,7 +101,7 @@
   background: none;
   border: none;
   color: var(--text-muted);
-  /* UPDATED: smaller vertical padding so the row isn’t so tall */
+  /* smaller vertical padding so the row isn’t so tall */
   padding: var(--space-1) var(--space-3);
   font-size: var(--font-size-base);
   font-weight: 500;
@@ -141,8 +141,9 @@
 
 /* Default State */
 .search-default-state {
-  /* UPDATED: remove huge top padding so "Recent searches" shows sooner */
+  /* UPDATED: padding + margin-top so "Recent searches" is clearly below sticky header/filters */
   padding: var(--space-3) var(--space-4) var(--space-4);
+  margin-top: var(--space-3);
 }
 
 .trending-section,
