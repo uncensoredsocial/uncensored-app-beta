@@ -8,12 +8,10 @@
     />
     <title>Search - Uncensored Social</title>
 
-    <!-- Font Awesome for icons (same as other pages) -->
+    <!-- Font Awesome (FIXED: no broken integrity hash) -->
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-      integrity="sha512-DTOQ0sTZr7e/oD2vE5SDa7Vnn1H6E2ZqFj3l8vZlqC2D1ks9Nv8TdyZR6JqqPiR+jYwIV/pY5Pja/qPL5T8Kjw=="
-      crossorigin="anonymous"
       referrerpolicy="no-referrer"
     />
 
@@ -24,7 +22,7 @@
     <link rel="stylesheet" href="css/icons.css" />
   </head>
   <body class="app-body">
-    <!-- Top navigation: same structure as other pages, title = Search -->
+    <!-- Top navigation, title = Search -->
     <header class="top-nav">
       <button
         class="icon-button back-button"
@@ -40,18 +38,10 @@
       </div>
 
       <div class="top-nav-actions">
-        <a
-          href="alerts.html"
-          class="icon-button"
-          aria-label="Alerts"
-        >
+        <a href="alerts.html" class="icon-button" aria-label="Alerts">
           <i class="fa-regular fa-bell"></i>
         </a>
-        <a
-          href="messages.html"
-          class="icon-button"
-          aria-label="Messages"
-        >
+        <a href="messages.html" class="icon-button" aria-label="Messages">
           <i class="fa-regular fa-envelope"></i>
         </a>
       </div>
@@ -74,7 +64,7 @@
               autocomplete="off"
             />
 
-            <!-- NO X BUTTON any more -->
+            <!-- No X button -->
 
             <button
               id="searchButton"
@@ -91,47 +81,23 @@
       <section class="search-filters">
         <div class="search-container">
           <div class="filter-tabs">
-            <button
-              class="filter-tab active"
-              data-filter="all"
-            >
+            <button class="filter-tab active" data-filter="all">
               All
             </button>
-            <button
-              class="filter-tab"
-              data-filter="users"
-            >
-              Users
-            </button>
-            <button
-              class="filter-tab"
-              data-filter="posts"
-            >
-              Posts
-            </button>
-            <button
-              class="filter-tab"
-              data-filter="hashtags"
-            >
-              Hashtags
-            </button>
+            <button class="filter-tab" data-filter="users">Users</button>
+            <button class="filter-tab" data-filter="posts">Posts</button>
+            <button class="filter-tab" data-filter="hashtags">Hashtags</button>
           </div>
         </div>
       </section>
 
       <section class="search-results">
-        <!-- Default state: Recent + Trending -->
-        <section
-          id="searchDefault"
-          class="search-default-state"
-        >
+        <!-- Default state (Recent + Trending) -->
+        <section id="searchDefault" class="search-default-state">
           <div class="search-container">
             <section class="recent-searches">
               <h3>Recent</h3>
-              <div
-                id="recentList"
-                class="recent-list"
-              ></div>
+              <div id="recentList" class="recent-list"></div>
               <button
                 id="recentSeeMore"
                 class="btn btn-ghost"
@@ -145,13 +111,13 @@
             <section class="trending-section">
               <h3>Trending now</h3>
               <div class="trending-list">
-                <!-- Filled by search.js with real trending hashtags -->
+                <!-- populated by search.js -->
               </div>
             </section>
           </div>
         </section>
 
-        <!-- Loading state -->
+        <!-- Loading -->
         <section
           id="searchLoading"
           class="search-loading-state"
@@ -162,7 +128,7 @@
           </div>
         </section>
 
-        <!-- Results state -->
+        <!-- Results -->
         <section
           id="searchResultsState"
           class="search-results-state"
@@ -171,10 +137,7 @@
           <div class="search-container">
             <div class="results-header">
               <h3 id="resultsTitle">Results</h3>
-              <span
-                id="resultsCount"
-                class="results-count"
-              ></span>
+              <span id="resultsCount" class="results-count"></span>
             </div>
 
             <section
@@ -183,10 +146,7 @@
               style="display: none;"
             >
               <h4>Users</h4>
-              <div
-                id="usersList"
-                class="users-list"
-              ></div>
+              <div id="usersList" class="users-list"></div>
             </section>
 
             <section
@@ -195,10 +155,7 @@
               style="display: none;"
             >
               <h4>Posts</h4>
-              <div
-                id="postsList"
-                class="posts-list"
-              ></div>
+              <div id="postsList" class="posts-list"></div>
             </section>
 
             <section
@@ -207,10 +164,7 @@
               style="display: none;"
             >
               <h4>Hashtags</h4>
-              <div
-                id="hashtagsList"
-                class="hashtags-list"
-              ></div>
+              <div id="hashtagsList" class="hashtags-list"></div>
             </section>
           </div>
         </section>
@@ -229,30 +183,30 @@
       </section>
     </main>
 
-    <!-- Bottom navigation – make it match home page using sprite icons -->
+    <!-- Bottom nav with Font Awesome icons so they always show -->
     <nav class="bottom-nav">
       <a href="index.html" class="nav-item">
-        <span class="nav-icon icon icon-home"></span>
+        <i class="fa-solid fa-house nav-icon"></i>
         <span class="nav-label">Home</span>
       </a>
 
       <a href="search.html" class="nav-item active">
-        <span class="nav-icon icon icon-search"></span>
+        <i class="fa-solid fa-magnifying-glass nav-icon"></i>
         <span class="nav-label">Search</span>
       </a>
 
       <a href="alerts.html" class="nav-item">
-        <span class="nav-icon icon icon-bell"></span>
+        <i class="fa-regular fa-bell nav-icon"></i>
         <span class="nav-label">Alerts</span>
       </a>
 
       <a href="messages.html" class="nav-item">
-        <span class="nav-icon icon icon-messages"></span>
+        <i class="fa-regular fa-envelope nav-icon"></i>
         <span class="nav-label">Messages</span>
       </a>
     </nav>
 
-    <!-- Scripts: Supabase FIRST, then auth, then search -->
+    <!-- Supabase + scripts -->
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="js/auth.js"></script>
     <script src="js/search.js"></script>
