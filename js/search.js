@@ -254,6 +254,11 @@ class SearchManager {
             avatar: post.avatar_url || "assets/icons/default-profile.png",
           },
         }));
+
+            // Hydrate posts with real engagement numbers from backend API
+    if (results.posts.length) {
+      await this.enrichPostsFromApi(results.posts);
+    }
       } else {
         console.error("Error searching posts:", error);
       }
@@ -295,6 +300,61 @@ class SearchManager {
     }
 
     return results;
+  }
+
+    /**
+   * Enrich posts with real engagement numbers from backend API
+   * Uses the same endpoint the feed / post page uses, so counts match everywhere.
+   */
+  async enrichPostsFromApi(posts) {
+    const token = this.getAuthToken();
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+    await Promise.all(
+      posts.map(async (post) => {
+        try {
+          const res = await fetch(`${FEED_API_BASE_URL}/posts/${post.id}`, {
+            method: "GET",
+            headers,
+          });
+
+          if (!res.ok) return;
+
+          const data = await res.json();
+          const row = data.post || data; // depending on how your API wraps it
+          if (!row) return;
+
+          const likes =
+            typeof row.likes === "number"
+              ? row.likes
+              : row.like_count ?? row.likes_count ?? 0;
+
+          const comments =
+            typeof row.comments === "number"
+              ? row.comments
+              : row.comment_count ?? row.comments_count ?? 0;
+
+          const saves =
+            typeof row.saves === "number"
+              ? row.saves
+              : row.save_count ??
+                row.saves_count ??
+                row.bookmarks_count ??
+                0;
+
+          post.likes = likes;
+          post.comments = comments;
+          post.saves = saves;
+
+          post.liked_by_me =
+            row.liked_by_me ?? row.is_liked ?? post.liked_by_me;
+          post.saved_by_me =
+            row.saved_by_me ?? row.is_saved ?? post.saved_by_me;
+        } catch (err) {
+          console.error("Failed to enrich post engagement", err);
+        }
+      })
+    );
   }
 
   displaySearchResults(results, query) {
