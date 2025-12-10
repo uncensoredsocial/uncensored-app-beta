@@ -984,4 +984,20 @@ document.addEventListener("DOMContentLoaded", () => {
   const page = new UserProfilePage();
   page.init();
   window.userProfilePage = page; // for console debugging
+
+  // ---- Back button handler for user.html ----
+  const backBtn = document.getElementById("userBackButton");
+  if (backBtn) {
+    backBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+
+      // If we have history, go back to where they came from
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        // Fallback: go to search page
+        window.location.href = "search.html";
+      }
+    });
+  }
 });
