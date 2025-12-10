@@ -194,7 +194,8 @@ class SearchManager {
               id: user.id,
               username: user.username,
               displayName: user.display_name || user.username,
-              avatar: user.avatar_url || "assets/icons/default-profile.png",
+              avatar:
+                user.avatar_url || "default-profile.PNG",
               bio: user.bio,
               followersCount: user.followers_count || 0,
               isFollowing,
@@ -230,6 +231,10 @@ class SearchManager {
             typeof post.comments === "number"
               ? post.comments
               : post.comment_count || post.comments_count || 0,
+          saves:
+            typeof post.saves === "number"
+              ? post.saves
+              : post.save_count || post.saves_count || 0,
           media_url: post.media_url,
           media_type: post.media_type,
           liked_by_me:
@@ -241,9 +246,11 @@ class SearchManager {
             post.is_saved === true ||
             post.isSaved === true,
           user: {
+            id: post.user_id,
             username: post.username,
             displayName: post.display_name || post.username,
-            avatar: post.avatar_url || "assets/icons/default-profile.png",
+            avatar:
+              post.avatar_url || "default-profile.PNG",
           },
         }));
       } else {
@@ -334,7 +341,7 @@ class SearchManager {
         <img src="${user.avatar}" alt="${this.escapeHtml(
           user.displayName
         )}" class="user-avatar"
-          onerror="this.src='assets/icons/default-profile.png'">
+          onerror="this.src='default-profile.PNG'">
         <div class="user-info">
           <div class="user-name">${this.escapeHtml(user.displayName)}</div>
           <div class="user-handle">@${user.username}</div>
@@ -394,7 +401,8 @@ class SearchManager {
     section.style.display = "block";
     list.innerHTML = posts
       .map((post) => {
-        const avatar = post.user.avatar || "assets/icons/default-profile.png";
+        const avatar =
+          post.user.avatar || "default-profile.PNG";
         const username = post.user.username || "unknown";
         const displayName = post.user.displayName || username;
         const time = this.formatTime(post.createdAt);
@@ -414,6 +422,11 @@ class SearchManager {
             ? post.comments
             : post.comments || 0;
 
+        const saveCount =
+          typeof post.saves === "number"
+            ? post.saves
+            : post.saves || 0;
+
         const mediaHtml = this.renderMediaHtml(
           post.media_url,
           post.media_type
@@ -424,7 +437,7 @@ class SearchManager {
         <header class="post-header">
           <div class="post-user" data-username="${this.escapeHtml(username)}">
             <img class="post-avatar" src="${avatar}"
-              onerror="this.src='assets/icons/default-profile.png'">
+              onerror="this.src='default-profile.PNG'">
             <div class="post-user-meta">
               <span class="post-display-name">${this.escapeHtml(
                 displayName
@@ -465,6 +478,7 @@ class SearchManager {
             <button class="post-action save-btn ${saved ? "saved" : ""}"
                     style="flex:1;display:flex;align-items:center;gap:6px;justify-content:center;">
               <i class="fa-${saved ? "solid" : "regular"} fa-bookmark"></i>
+              <span class="save-count">${saveCount}</span>
             </button>
           </div>
         </footer>
@@ -1009,7 +1023,30 @@ class SearchManager {
   }
 
   updateUI() {
-    // header on search page is centered logo only, so nothing special to do now
+    // Change header text from "UncensoredSocial" to "Search"
+    const logoEl = document.querySelector(".header .logo");
+    if (logoEl) {
+      logoEl.textContent = "Search";
+    }
+
+    // On desktop, hide the side nav and show the bottom nav like the home page
+    const sideNav = document.querySelector(".side-nav");
+    if (sideNav) {
+      sideNav.style.display = "none";
+    }
+
+    const bottomNav = document.querySelector(".bottom-nav");
+    if (bottomNav) {
+      bottomNav.style.display = "flex";
+    }
+
+    // Remove the left margin that was there for the sidebar on desktop
+    const mainContent = document.querySelector(".main-content");
+    if (mainContent) {
+      mainContent.style.marginLeft = "0";
+      mainContent.style.maxWidth = "600px";
+      mainContent.style.marginRight = "auto";
+    }
   }
 }
 
