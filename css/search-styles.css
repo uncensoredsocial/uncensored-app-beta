@@ -2,7 +2,8 @@
 
 /* Search Header */
 .search-header {
-  padding: var(--space-4) var(--space-4) var(--space-5);
+  /* UPDATED: tighten vertical padding */
+  padding: var(--space-3) var(--space-4) var(--space-3);
   border-bottom: 1px solid var(--border-light);
   background-color: var(--bg-color);
   position: sticky;
@@ -20,7 +21,8 @@
   align-items: center;
   background-color: var(--bg-secondary);
   border-radius: var(--radius-xl);
-  padding: var(--space-2) var(--space-3);
+  /* UPDATED: slightly smaller vertical padding */
+  padding: var(--space-1) var(--space-3);
   border: 1px solid var(--border-light);
   transition: all var(--transition-fast);
 }
@@ -71,21 +73,22 @@
 
 /* Search Filters */
 .search-filters {
-  padding: var(--space-4);
+  /* UPDATED: less padding + much smaller margins */
+  padding: var(--space-2) var(--space-4) var(--space-2);
   border-bottom: 1px solid var(--border-light);
   background-color: var(--bg-color);
   position: sticky;
   top: 120px;
   z-index: 90;
 
-  /* extra spacing relative to search bar & Recent */
-  margin-top: var(--space-2);
-  margin-bottom: var(--space-4);
+  /* smaller spacing relative to search bar & Recent */
+  margin-top: var(--space-1);
+  margin-bottom: var(--space-2);
 }
 
 .filter-tabs {
   display: flex;
-  gap: var(--space-4);
+  gap: var(--space-3);
   overflow-x: auto;
   padding-bottom: 2px;
 }
@@ -98,7 +101,8 @@
   background: none;
   border: none;
   color: var(--text-muted);
-  padding: var(--space-2) var(--space-3);
+  /* UPDATED: smaller vertical padding so the row isn’t so tall */
+  padding: var(--space-1) var(--space-3);
   font-size: var(--font-size-base);
   font-weight: 500;
   cursor: pointer;
@@ -137,8 +141,8 @@
 
 /* Default State */
 .search-default-state {
-  /* extra top padding to push "Recent" down */
-  padding: var(--space-7) var(--space-4) var(--space-4);
+  /* UPDATED: remove huge top padding so "Recent searches" shows sooner */
+  padding: var(--space-3) var(--space-4) var(--space-4);
 }
 
 .trending-section,
@@ -416,7 +420,7 @@
   }
 
   .search-filters {
-    padding: var(--space-3);
+    padding: var(--space-2) var(--space-3);
   }
 
   .filter-tabs {
@@ -425,7 +429,7 @@
 
   .filter-tab {
     font-size: var(--font-size-sm);
-    padding: var(--space-2);
+    padding: var(--space-1) var(--space-2); /* keep tabs small on mobile */
   }
 }
 
