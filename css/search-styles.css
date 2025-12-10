@@ -11,7 +11,7 @@
 }
 
 .search-container {
-  max-width: 600px;       /* center the search content */
+  max-width: 600px;       /* center the content */
   margin: 0 auto;
 }
 
@@ -48,14 +48,14 @@
   padding: var(--space-2) 0;
   outline: none;
   font-family: inherit;
-  padding-left: 2px; /* extra breathing room from icon */
+  padding-left: 2px; /* slight padding from the icon */
 }
 
 .search-input::placeholder {
   color: var(--text-muted);
 }
 
-/* hide clear/X button but keep it in DOM for JS */
+/* If you keep a clear button in the DOM, this will hide it. Right now we removed it from HTML */
 .clear-search {
   display: none !important;
 }
@@ -205,7 +205,6 @@
   color: var(--text-color);
 }
 
-/* (clear-recent button visually still used on hover) */
 .clear-recent {
   background: none;
   border: none;
@@ -234,7 +233,7 @@
 .results-header {
   display: flex;
   align-items: baseline;
-  gap: 8px;           /* spacing between “Results for” + count */
+  gap: 8px;
   margin-bottom: var(--space-4);
   padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--border-light);
@@ -317,7 +316,7 @@
   white-space: nowrap;
 }
 
-/* Posts Results – we just constrain width, actual look comes from feed-styles .post */
+/* Posts Results */
 .posts-list {
   display: flex;
   flex-direction: column;
@@ -436,14 +435,14 @@
   margin: 0;
 }
 
-/* === Fix double blue box in search input === */
+/* Kill double blue focus outline on iOS */
 .search-input:focus,
 .search-input:focus-visible {
   outline: none !important;
   box-shadow: none;
 }
 
-/* === Bottom Navigation – match main site styling === */
+/* Bottom Navigation – same styling as rest of app */
 .bottom-nav {
   position: fixed;
   bottom: 0;
