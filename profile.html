@@ -58,7 +58,18 @@
 <body class="profile-page-body">
     <!-- Top bar -->
     <header class="profile-header-bar">
+        <!-- NEW: back button for when we came from search -->
+        <button
+          id="profileBackButton"
+          class="profile-header-back"
+          aria-label="Back"
+          style="display: none;"
+        >
+          <i class="fa-solid fa-arrow-left"></i>
+        </button>
+
         <h1 class="profile-header-title">Profile</h1>
+
         <button class="profile-header-settings" id="settingsButton" aria-label="Settings">
             <i class="fa-solid fa-gear"></i>
         </button>
