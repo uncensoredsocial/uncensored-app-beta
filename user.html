@@ -57,25 +57,23 @@
   </style>
 </head>
 <body class="profile-page-body">
-  <!-- ===== TOP HEADER BAR ===== -->
-  <header class="profile-header-bar">
-    <button
-      class="btn btn-ghost btn-icon profile-header-back"
-      onclick="history.back()"
-      aria-label="Go back"
-    >
-      <i class="fa-solid fa-arrow-left"></i>
-    </button>
-
-    <h1 class="profile-header-title" id="viewProfileTitle">Profile</h1>
-
-    <button
-      class="btn btn-ghost btn-icon profile-header-settings"
-      id="userOptionsButton"
-      aria-label="Profile options"
-    >
-      <i class="fa-solid fa-ellipsis"></i>
-    </button>
+  <!-- ===== TOP HEADER BAR (same structure as post.html) ===== -->
+  <header class="header">
+    <div class="header-left">
+      <button class="btn btn-icon" id="userBackButton" aria-label="Back">
+        <i class="fa-solid fa-arrow-left"></i>
+      </button>
+    </div>
+    <h1 class="logo" id="viewProfileTitle">Profile</h1>
+    <div class="header-actions">
+      <button
+        class="btn btn-ghost btn-icon profile-header-settings"
+        id="userOptionsButton"
+        aria-label="Profile options"
+      >
+        <i class="fa-solid fa-ellipsis"></i>
+      </button>
+    </div>
   </header>
 
   <!-- ===== MAIN CONTENT ===== -->
