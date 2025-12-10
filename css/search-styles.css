@@ -2,7 +2,7 @@
 
 /* Search Header */
 .search-header {
-  padding: var(--space-4);
+  padding: var(--space-4) var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--border-light);
   background-color: var(--bg-color);
   position: sticky;
@@ -11,8 +11,7 @@
 }
 
 .search-container {
-  max-width: 600px;       /* center the content */
-  margin: 0 auto;
+  max-width: 100%;
 }
 
 .search-input-wrapper {
@@ -35,8 +34,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: var(--space-2); /* space between icon and text */
-  font-size: 0.9rem;
+  margin-right: var(--space-2);
+  color: var(--text-muted);
 }
 
 .search-input {
@@ -48,37 +47,40 @@
   padding: var(--space-2) 0;
   outline: none;
   font-family: inherit;
-  padding-left: 2px; /* slight padding from the icon */
 }
 
 .search-input::placeholder {
   color: var(--text-muted);
 }
 
-/* If you keep a clear button in the DOM, this will hide it. Right now we removed it from HTML */
 .clear-search {
-  display: none !important;
+  padding: var(--space-1);
+  margin-left: var(--space-2);
 }
 
 .search-button {
   border: none;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   padding: 0 16px;
-  height: 36px;
+  height: 40px; /* slightly taller & vertically centered */
   border-radius: 999px;
   cursor: pointer;
 }
 
 /* Search Filters */
 .search-filters {
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4);
   border-bottom: 1px solid var(--border-light);
   background-color: var(--bg-color);
   position: sticky;
   top: 120px;
   z-index: 90;
+
+  /* extra spacing relative to search bar & Recent */
+  margin-top: var(--space-2);
+  margin-bottom: var(--space-4);
 }
 
 .filter-tabs {
@@ -135,7 +137,8 @@
 
 /* Default State */
 .search-default-state {
-  padding: var(--space-6) var(--space-4);
+  /* extra top padding to push "Recent" down */
+  padding: var(--space-7) var(--space-4) var(--space-4);
 }
 
 .trending-section,
@@ -435,14 +438,14 @@
   margin: 0;
 }
 
-/* Kill double blue focus outline on iOS */
+/* Fix double blue box in search input */
 .search-input:focus,
 .search-input:focus-visible {
   outline: none !important;
   box-shadow: none;
 }
 
-/* Bottom Navigation – same styling as rest of app */
+/* Bottom Navigation – match main site styling */
 .bottom-nav {
   position: fixed;
   bottom: 0;
@@ -499,7 +502,7 @@
   font-weight: 500;
 }
 
-/* FIX NAV BAR SHRINKING ON SEARCH PAGE */
+/* Fix nav bar shrinking on search page */
 .bottom-nav .nav-item {
   font-size: var(--font-size-xs);
 }
