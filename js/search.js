@@ -255,10 +255,10 @@ class SearchManager {
           },
         }));
 
-            // Hydrate posts with real engagement numbers from backend API
-    if (results.posts.length) {
-      await this.enrichPostsFromApi(results.posts);
-    }
+        // Hydrate posts with real engagement numbers from backend API
+        if (results.posts.length) {
+          await this.enrichPostsFromApi(results.posts);
+        }
       } else {
         console.error("Error searching posts:", error);
       }
@@ -302,7 +302,7 @@ class SearchManager {
     return results;
   }
 
-    /**
+  /**
    * Enrich posts with real engagement numbers from backend API
    * Uses the same endpoint the feed / post page uses, so counts match everywhere.
    */
@@ -446,7 +446,8 @@ class SearchManager {
         const me =
           typeof getCurrentUser === "function" ? getCurrentUser() : null;
         if (me && me.username === username) {
-          window.location.href = "profile.html";
+          // UPDATED: go to profile with flag so back button knows we came from search
+          window.location.href = "profile.html?from=search";
         } else {
           window.location.href = `user.html?user=${encodeURIComponent(
             username
