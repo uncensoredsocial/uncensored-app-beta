@@ -194,7 +194,7 @@ class SearchManager {
               id: user.id,
               username: user.username,
               displayName: user.display_name || user.username,
-              avatar: user.avatar_url || "assets/icons/default-profile.png",
+              avatar: user.avatar_url || "default-profile.PNG",
               bio: user.bio,
               followersCount: user.followers_count || 0,
               isFollowing,
@@ -251,7 +251,7 @@ class SearchManager {
           user: {
             username: post.username,
             displayName: post.display_name || post.username,
-            avatar: post.avatar_url || "assets/icons/default-profile.png",
+            avatar: post.avatar_url || "default-profile.PNG",
           },
         }));
 
@@ -471,7 +471,7 @@ class SearchManager {
     section.style.display = "block";
     list.innerHTML = posts
       .map((post) => {
-        const avatar = post.user.avatar || "assets/icons/default-profile.png";
+        const avatar = post.user.avatar || "default-profile.PNG";
         const username = post.user.username || "unknown";
         const displayName = post.user.displayName || username;
         const time = this.formatTime(post.createdAt);
@@ -503,7 +503,7 @@ class SearchManager {
         <header class="post-header">
           <div class="post-user" data-username="${this.escapeHtml(username)}">
             <img class="post-avatar" src="${avatar}"
-              onerror="this.src='assets/icons/default-profile.png'">
+              onerror="this.src='default-profile.PNG'">
             <div class="post-user-meta">
               <span class="post-display-name">${this.escapeHtml(
                 displayName
