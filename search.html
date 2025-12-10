@@ -8,7 +8,7 @@
     />
     <title>Search - Uncensored Social</title>
 
-    <!-- Font Awesome for icons -->
+    <!-- Font Awesome for icons (same as other pages) -->
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
@@ -24,7 +24,7 @@
     <link rel="stylesheet" href="css/icons.css" />
   </head>
   <body class="app-body">
-    <!-- Top navigation (same shell as other pages, title changed to "Search") -->
+    <!-- Top navigation: same structure as other pages, title = Search -->
     <header class="top-nav">
       <button
         class="icon-button back-button"
@@ -74,15 +74,7 @@
               autocomplete="off"
             />
 
-            <!-- Clear button kept for JS but hidden by CSS -->
-            <button
-              id="clearSearch"
-              class="clear-search"
-              type="button"
-              aria-label="Clear search"
-            >
-              <span class="icon icon-close"></span>
-            </button>
+            <!-- NO X BUTTON any more -->
 
             <button
               id="searchButton"
@@ -237,50 +229,31 @@
       </section>
     </main>
 
-    <!-- Bottom navigation – same style as the rest of the site -->
+    <!-- Bottom navigation – make it match home page using sprite icons -->
     <nav class="bottom-nav">
-      <a
-        href="index.html"
-        class="nav-item"
-      >
-        <span class="nav-icon">
-          <i class="fa-solid fa-house"></i>
-        </span>
+      <a href="index.html" class="nav-item">
+        <span class="nav-icon icon icon-home"></span>
         <span class="nav-label">Home</span>
       </a>
 
-      <a
-        href="search.html"
-        class="nav-item active"
-      >
-        <span class="nav-icon">
-          <i class="fa-solid fa-magnifying-glass"></i>
-        </span>
+      <a href="search.html" class="nav-item active">
+        <span class="nav-icon icon icon-search"></span>
         <span class="nav-label">Search</span>
       </a>
 
-      <a
-        href="alerts.html"
-        class="nav-item"
-      >
-        <span class="nav-icon">
-          <i class="fa-regular fa-bell"></i>
-        </span>
+      <a href="alerts.html" class="nav-item">
+        <span class="nav-icon icon icon-bell"></span>
         <span class="nav-label">Alerts</span>
       </a>
 
-      <a
-        href="messages.html"
-        class="nav-item"
-      >
-        <span class="nav-icon">
-          <i class="fa-regular fa-envelope"></i>
-        </span>
+      <a href="messages.html" class="nav-item">
+        <span class="nav-icon icon icon-messages"></span>
         <span class="nav-label">Messages</span>
       </a>
     </nav>
 
-    <!-- Scripts -->
+    <!-- Scripts: Supabase FIRST, then auth, then search -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="js/auth.js"></script>
     <script src="js/search.js"></script>
   </body>
