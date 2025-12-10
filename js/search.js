@@ -194,8 +194,7 @@ class SearchManager {
               id: user.id,
               username: user.username,
               displayName: user.display_name || user.username,
-              avatar:
-                user.avatar_url || "default-profile.PNG",
+              avatar: user.avatar_url || "assets/icons/default-profile.png",
               bio: user.bio,
               followersCount: user.followers_count || 0,
               isFollowing,
@@ -231,10 +230,14 @@ class SearchManager {
             typeof post.comments === "number"
               ? post.comments
               : post.comment_count || post.comments_count || 0,
+          // NEW: normalize saves count
           saves:
             typeof post.saves === "number"
               ? post.saves
-              : post.save_count || post.saves_count || 0,
+              : post.save_count ||
+                post.saves_count ||
+                post.bookmarks_count ||
+                0,
           media_url: post.media_url,
           media_type: post.media_type,
           liked_by_me:
@@ -246,11 +249,9 @@ class SearchManager {
             post.is_saved === true ||
             post.isSaved === true,
           user: {
-            id: post.user_id,
             username: post.username,
             displayName: post.display_name || post.username,
-            avatar:
-              post.avatar_url || "default-profile.PNG",
+            avatar: post.avatar_url || "assets/icons/default-profile.png",
           },
         }));
       } else {
@@ -333,15 +334,32 @@ class SearchManager {
       return;
     }
 
+    const currentUser =
+      typeof getCurrentUser === "function" ? getCurrentUser() : null;
+
     section.style.display = "block";
     list.innerHTML = users
-      .map(
-        (user) => `
+      .map((user) => {
+        const isMe = currentUser && currentUser.id === user.id;
+
+        const followButtonHtml = isMe
+          ? `<span class="you-pill">You</span>`
+          : `<button
+          class="btn btn-sm ${
+            user.isFollowing ? "btn-secondary" : "btn-primary"
+          } follow-btn"
+          onclick="searchManager.handleFollow('${user.id}', this)"
+          ${!getCurrentUser ? "disabled" : ""}
+        >
+          ${user.isFollowing ? "Following" : "Follow"}
+        </button>`;
+
+        return `
       <div class="user-card" data-username="${user.username}">
         <img src="${user.avatar}" alt="${this.escapeHtml(
           user.displayName
         )}" class="user-avatar"
-          onerror="this.src='default-profile.PNG'">
+          onerror="this.src='assets/icons/default-profile.png'">
         <div class="user-info">
           <div class="user-name">${this.escapeHtml(user.displayName)}</div>
           <div class="user-handle">@${user.username}</div>
@@ -354,18 +372,10 @@ class SearchManager {
             <span class="follower-count">${user.followersCount.toLocaleString()} followers</span>
           </div>
         </div>
-        <button
-          class="btn btn-sm ${
-            user.isFollowing ? "btn-secondary" : "btn-primary"
-          } follow-btn"
-          onclick="searchManager.handleFollow('${user.id}', this)"
-          ${!getCurrentUser ? "disabled" : ""}
-        >
-          ${user.isFollowing ? "Following" : "Follow"}
-        </button>
+        ${followButtonHtml}
       </div>
-    `
-      )
+    `;
+      })
       .join("");
 
     // Clicking card -> go to user.html/profile
@@ -401,8 +411,7 @@ class SearchManager {
     section.style.display = "block";
     list.innerHTML = posts
       .map((post) => {
-        const avatar =
-          post.user.avatar || "default-profile.PNG";
+        const avatar = post.user.avatar || "assets/icons/default-profile.png";
         const username = post.user.username || "unknown";
         const displayName = post.user.displayName || username;
         const time = this.formatTime(post.createdAt);
@@ -421,11 +430,8 @@ class SearchManager {
           typeof post.comments === "number"
             ? post.comments
             : post.comments || 0;
-
         const saveCount =
-          typeof post.saves === "number"
-            ? post.saves
-            : post.saves || 0;
+          typeof post.saves === "number" ? post.saves : post.saves || 0;
 
         const mediaHtml = this.renderMediaHtml(
           post.media_url,
@@ -437,7 +443,7 @@ class SearchManager {
         <header class="post-header">
           <div class="post-user" data-username="${this.escapeHtml(username)}">
             <img class="post-avatar" src="${avatar}"
-              onerror="this.src='default-profile.PNG'">
+              onerror="this.src='assets/icons/default-profile.png'">
             <div class="post-user-meta">
               <span class="post-display-name">${this.escapeHtml(
                 displayName
@@ -896,12 +902,13 @@ class SearchManager {
         }
       );
 
-      if (!error && trending) {
-        const list = document.querySelector(".trending-list");
-        if (list) {
-          list.innerHTML = trending
-            .map(
-              (item, index) => `
+      const list = document.querySelector(".trending-list");
+      if (!list) return;
+
+      if (!error && trending && trending.length) {
+        list.innerHTML = trending
+          .map(
+            (item, index) => `
             <div class="trending-item" onclick="searchManager.searchHashtag('${
               item.tag
             }')">
@@ -912,17 +919,24 @@ class SearchManager {
               </div>
             </div>
           `
-            )
-            .join("");
-        }
+          )
+          .join("");
       } else {
-        this.loadMockTrendingHashtags();
+        // no fake data – just show empty state
+        list.innerHTML =
+          '<div class="trending-empty">No trending hashtags yet</div>';
       }
     } catch (err) {
       console.error("Error loading trending hashtags:", err);
-      this.loadMockTrendingHashtags();
+      const list = document.querySelector(".trending-list");
+      if (list) {
+        list.innerHTML =
+          '<div class="trending-empty">No trending hashtags yet</div>';
+      }
     }
   }
+
+  // (loadMockTrendingHashtags left here but no longer used – no fake tags shown)
 
   loadMockTrendingHashtags() {
     const mock = [
@@ -1023,30 +1037,7 @@ class SearchManager {
   }
 
   updateUI() {
-    // Change header text from "UncensoredSocial" to "Search"
-    const logoEl = document.querySelector(".header .logo");
-    if (logoEl) {
-      logoEl.textContent = "Search";
-    }
-
-    // On desktop, hide the side nav and show the bottom nav like the home page
-    const sideNav = document.querySelector(".side-nav");
-    if (sideNav) {
-      sideNav.style.display = "none";
-    }
-
-    const bottomNav = document.querySelector(".bottom-nav");
-    if (bottomNav) {
-      bottomNav.style.display = "flex";
-    }
-
-    // Remove the left margin that was there for the sidebar on desktop
-    const mainContent = document.querySelector(".main-content");
-    if (mainContent) {
-      mainContent.style.marginLeft = "0";
-      mainContent.style.maxWidth = "600px";
-      mainContent.style.marginRight = "auto";
-    }
+    // header on search page is centered logo only, so nothing special to do now
   }
 }
 
