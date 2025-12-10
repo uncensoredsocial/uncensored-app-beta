@@ -11,7 +11,8 @@
 }
 
 .search-container {
-  max-width: 100%;
+  max-width: 600px;       /* center the search content */
+  margin: 0 auto;
 }
 
 .search-input-wrapper {
@@ -30,6 +31,14 @@
   background-color: var(--bg-color);
 }
 
+.search-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: var(--space-2); /* space between icon and text */
+  font-size: 0.9rem;
+}
+
 .search-input {
   flex: 1;
   background: transparent;
@@ -39,15 +48,16 @@
   padding: var(--space-2) 0;
   outline: none;
   font-family: inherit;
+  padding-left: 2px; /* extra breathing room from icon */
 }
 
 .search-input::placeholder {
   color: var(--text-muted);
 }
 
+/* hide clear/X button but keep it in DOM for JS */
 .clear-search {
-  padding: var(--space-1);
-  margin-left: var(--space-2);
+  display: none !important;
 }
 
 .search-button {
@@ -195,6 +205,7 @@
   color: var(--text-color);
 }
 
+/* (clear-recent button visually still used on hover) */
 .clear-recent {
   background: none;
   border: none;
