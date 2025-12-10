@@ -24,50 +24,34 @@
     <link rel="stylesheet" href="css/icons.css" />
   </head>
 
-  <!-- IMPORTANT: no-side-nav class disables desktop sidebar on this page -->
-  <body class="app-body no-side-nav">
-    <!-- ===== TOP NAV (same as other pages, center text changed to “Search”) ===== -->
-    <header class="top-nav">
-      <div class="top-nav-left">
-        <a href="index.html" class="top-nav-back-btn" aria-label="Back to feed">
-          <i class="fa-solid fa-arrow-left"></i>
-        </a>
-      </div>
-      <div class="top-nav-center">
-        <span class="app-title">Search</span>
-      </div>
-      <div class="top-nav-right">
-        <!-- Right-side icons kept minimal, same style as other pages -->
-        <a href="messages.html" class="top-nav-icon" aria-label="Messages">
-          <i class="fa-regular fa-envelope"></i>
-        </a>
-        <a href="notifications.html" class="top-nav-icon" aria-label="Notifications">
-          <i class="fa-regular fa-bell"></i>
-        </a>
-      </div>
-    </header>
-
-    <!-- ===== MAIN LAYOUT ===== -->
+  <body>
     <div class="app-shell">
-      <!-- NO <aside class="side-nav"> HERE ON PURPOSE -->
+      <!-- ===== TOP APP HEADER (same layout as home, text = Search) ===== -->
+      <header class="app-header header-centered">
+        <div class="header-left"></div>
+        <div class="header-center">
+          <h1 class="logo-text">Search</h1>
+        </div>
+        <div class="header-right"></div>
+      </header>
 
-      <main class="main-content search-page">
-        <!-- ===== SEARCH BAR ===== -->
-        <section class="search-bar-wrapper">
-          <div class="search-bar">
+      <!-- ===== SEARCH HEADER (matches .search-header CSS) ===== -->
+      <header class="search-header">
+        <div class="search-container">
+          <div class="search-input-wrapper">
             <span class="search-icon">
               <i class="fa-solid fa-magnifying-glass"></i>
             </span>
             <input
               id="searchInput"
-              type="text"
               class="search-input"
+              type="text"
               placeholder="Search for users, posts, or #hashtags"
               autocomplete="off"
             />
             <button
               id="clearSearch"
-              class="search-clear-btn"
+              class="clear-search"
               type="button"
               aria-label="Clear search"
               style="display: none;"
@@ -76,214 +60,223 @@
             </button>
             <button
               id="searchButton"
-              class="search-submit-btn"
+              class="search-button btn btn-primary"
               type="button"
-              aria-label="Search"
             >
               Search
             </button>
           </div>
-        </section>
+        </div>
+      </header>
 
-        <!-- ===== FILTER TABS ===== -->
-        <section class="search-filters">
-          <button
-            class="filter-tab active"
-            data-filter="all"
-            type="button"
-          >
-            All
-          </button>
-          <button
-            class="filter-tab"
-            data-filter="users"
-            type="button"
-          >
-            Users
-          </button>
-          <button
-            class="filter-tab"
-            data-filter="posts"
-            type="button"
-          >
-            Posts
-          </button>
-          <button
-            class="filter-tab"
-            data-filter="hashtags"
-            type="button"
-          >
-            Hashtags
-          </button>
-        </section>
+      <!-- ===== FILTER TABS (matches .search-filters / .filter-tabs CSS) ===== -->
+      <section class="search-filters">
+        <div class="search-container">
+          <div class="filter-tabs">
+            <button
+              type="button"
+              class="filter-tab active"
+              data-filter="all"
+            >
+              All
+            </button>
+            <button
+              type="button"
+              class="filter-tab"
+              data-filter="users"
+            >
+              Users
+            </button>
+            <button
+              type="button"
+              class="filter-tab"
+              data-filter="posts"
+            >
+              Posts
+            </button>
+            <button
+              type="button"
+              class="filter-tab"
+              data-filter="hashtags"
+            >
+              Hashtags
+            </button>
+          </div>
+        </div>
+      </section>
 
-        <div class="search-layout">
-          <!-- ===== LEFT / MAIN COLUMN ===== -->
-          <div class="search-main-column">
-            <!-- RECENT SEARCHES -->
-            <section class="recent-searches-card">
-              <div class="card-header">
-                <h2 class="card-title">Recent</h2>
-              </div>
-              <div id="recentList" class="recent-list">
-                <!-- Populated by search.js -->
+      <!-- ===== MAIN CONTENT ===== -->
+      <main class="main-content search-results">
+        <!-- DEFAULT STATE (matches .search-default-state CSS) -->
+        <section
+          id="searchDefault"
+          class="search-default-state"
+        >
+          <div class="search-container">
+            <section class="recent-searches">
+              <h3>Recent</h3>
+              <div
+                id="recentList"
+                class="recent-list"
+              >
+                <!-- Filled by search.js -->
               </div>
               <button
                 id="recentSeeMore"
-                class="btn btn-ghost see-more-btn"
+                class="btn btn-ghost"
                 type="button"
-                style="display: none;"
+                style="margin-top: 8px; display: none;"
               >
                 See more
               </button>
             </section>
 
-            <!-- DEFAULT STATE -->
-            <section
-              id="searchDefault"
-              class="search-state search-state-default"
-            >
-              <div class="state-icon">
-                <i class="fa-solid fa-magnifying-glass"></i>
-              </div>
-              <h2>Search Uncensored Social</h2>
-              <p>Find users, posts, and hashtags across the platform.</p>
-            </section>
+            <section class="trending-section">
+              <h3>Search Uncensored Social</h3>
+              <p style="margin-bottom: 16px; color: var(--text-muted);">
+                Find users, posts, and hashtags across the platform.
+              </p>
 
-            <!-- LOADING STATE -->
-            <section
-              id="searchLoading"
-              class="search-state search-state-loading"
-              style="display: none;"
-            >
-              <div class="spinner"></div>
-              <p>Searching…</p>
-            </section>
-
-            <!-- RESULTS STATE -->
-            <section
-              id="searchResultsState"
-              class="search-state search-state-results"
-              style="display: none;"
-            >
-              <header class="results-header">
-                <div>
-                  <h2 id="resultsTitle" class="results-title">
-                    <!-- “Results for …” -->
-                  </h2>
-                  <p id="resultsCount" class="results-count">
-                    <!-- “X results” -->
-                  </p>
-                </div>
-              </header>
-
-              <!-- USERS RESULTS -->
-              <section
-                id="usersResults"
-                class="results-section users-results"
-                style="display: none;"
-              >
-                <h3 class="results-section-title">Users</h3>
-                <div id="usersList" class="users-list">
-                  <!-- Populated by search.js -->
-                </div>
-              </section>
-
-              <!-- POSTS RESULTS -->
-              <section
-                id="postsResults"
-                class="results-section posts-results"
-                style="display: none;"
-              >
-                <h3 class="results-section-title">Posts</h3>
-                <div id="postsList" class="posts-list">
-                  <!-- Populated by search.js as feed-style posts -->
-                </div>
-              </section>
-
-              <!-- HASHTAGS RESULTS -->
-              <section
-                id="hashtagsResults"
-                class="results-section hashtags-results"
-                style="display: none;"
-              >
-                <h3 class="results-section-title">Hashtags</h3>
-                <div id="hashtagsList" class="hashtags-list">
-                  <!-- Populated by search.js -->
-                </div>
-              </section>
-
-              <!-- NO RESULTS STATE -->
-              <div
-                id="noResults"
-                class="search-state search-state-empty"
-                style="display: none;"
-              >
-                <div class="state-icon">
-                  <i class="fa-regular fa-face-frown"></i>
-                </div>
-                <h3>No results found</h3>
-                <p>Try searching for something else.</p>
-              </div>
-            </section>
-          </div>
-
-          <!-- ===== RIGHT COLUMN: TRENDING ===== -->
-          <aside class="search-side-column">
-            <section class="trending-card">
-              <div class="card-header">
-                <h2 class="card-title">Trending now</h2>
-              </div>
+              <h3>Trending now</h3>
               <div class="trending-list">
                 <!-- Filled by search.js with real trending hashtags -->
               </div>
             </section>
-          </aside>
-        </div>
+          </div>
+        </section>
+
+        <!-- LOADING STATE (matches .search-loading-state CSS) -->
+        <section
+          id="searchLoading"
+          class="search-loading-state"
+          style="display: none;"
+        >
+          <div class="search-container">
+            <div class="spinner"></div>
+            <p>Searching…</p>
+          </div>
+        </section>
+
+        <!-- RESULTS STATE (matches .search-results-state CSS) -->
+        <section
+          id="searchResultsState"
+          class="search-results-state"
+          style="display: none;"
+        >
+          <div class="search-container">
+            <header class="results-header">
+              <h3 id="resultsTitle">Results</h3>
+              <span
+                id="resultsCount"
+                class="results-count"
+              ></span>
+            </header>
+
+            <!-- USERS RESULTS -->
+            <section
+              id="usersResults"
+              class="results-section"
+              style="display: none;"
+            >
+              <h4>Users</h4>
+              <div
+                id="usersList"
+                class="users-list"
+              >
+                <!-- Filled by search.js -->
+              </div>
+            </section>
+
+            <!-- POSTS RESULTS -->
+            <section
+              id="postsResults"
+              class="results-section"
+              style="display: none;"
+            >
+              <h4>Posts</h4>
+              <div
+                id="postsList"
+                class="posts-list"
+              >
+                <!-- Filled by search.js (feed-style posts) -->
+              </div>
+            </section>
+
+            <!-- HASHTAGS RESULTS -->
+            <section
+              id="hashtagsResults"
+              class="results-section"
+              style="display: none;"
+            >
+              <h4>Hashtags</h4>
+              <div
+                id="hashtagsList"
+                class="hashtags-list"
+              >
+                <!-- Filled by search.js -->
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- NO RESULTS (matches .no-results CSS) -->
+        <section
+          id="noResults"
+          class="no-results"
+          style="display: none;"
+        >
+          <div class="search-container">
+            <h3>No results found</h3>
+            <p>Try searching for something else.</p>
+          </div>
+        </section>
       </main>
+
+      <!-- ===== BOTTOM NAV (matches .bottom-nav / .nav-item CSS) ===== -->
+      <nav class="bottom-nav">
+        <a
+          href="index.html"
+          class="nav-item"
+        >
+          <span class="icon icon-home nav-icon"></span>
+          <span class="nav-label">Home</span>
+        </a>
+
+        <a
+          href="search.html"
+          class="nav-item active"
+        >
+          <span class="icon icon-search nav-icon"></span>
+          <span class="nav-label">Search</span>
+        </a>
+
+        <a
+          href="notifications.html"
+          class="nav-item"
+        >
+          <span class="icon icon-notifications nav-icon"></span>
+          <span class="nav-label">Alerts</span>
+        </a>
+
+        <a
+          href="messages.html"
+          class="nav-item"
+        >
+          <span class="icon icon-messages nav-icon"></span>
+          <span class="nav-label">Messages</span>
+        </a>
+
+        <a
+          href="profile.html"
+          class="nav-item"
+        >
+          <span class="icon icon-profile nav-icon"></span>
+          <span class="nav-label">Profile</span>
+        </a>
+      </nav>
     </div>
 
-    <!-- ===== BOTTOM NAV (same as other pages) ===== -->
-    <nav class="bottom-nav">
-      <a href="index.html" class="bottom-nav-item" aria-label="Home">
-        <span class="icon icon-home"></span>
-        <span class="bottom-nav-label">Home</span>
-      </a>
-      <a
-        href="search.html"
-        class="bottom-nav-item active"
-        aria-label="Search"
-      >
-        <span class="icon icon-search"></span>
-        <span class="bottom-nav-label">Search</span>
-      </a>
-      <a
-        href="notifications.html"
-        class="bottom-nav-item"
-        aria-label="Notifications"
-      >
-        <span class="icon icon-notifications"></span>
-        <span class="bottom-nav-label">Alerts</span>
-      </a>
-      <a
-        href="messages.html"
-        class="bottom-nav-item"
-        aria-label="Messages"
-      >
-        <span class="icon icon-messages"></span>
-        <span class="bottom-nav-label">Messages</span>
-      </a>
-      <a
-        href="profile.html"
-        class="bottom-nav-item"
-        aria-label="Profile"
-      >
-        <span class="icon icon-profile"></span>
-        <span class="bottom-nav-label">Profile</span>
-      </a>
-    </nav>
-
-    <!-- ===== SCRIPTS ===== -->
+    <!-- SCRIPTS -->
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="js/auth.js"></script>
     <script src="js/search.js"></script>
