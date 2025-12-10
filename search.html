@@ -1,9 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Search - Uncensored Social</title>
+
+  <!-- Global styles -->
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/icons.css" />
 
   <!-- Font Awesome -->
   <link
@@ -14,175 +18,414 @@
     referrerpolicy="no-referrer"
   />
 
-  <!-- Global styles -->
-  <link rel="stylesheet" href="css/styles.css">
-  <link rel="stylesheet" href="css/feed-styles.css"><!-- so posts look like feed -->
-  <link rel="stylesheet" href="css/search-styles.css">
-  <link rel="stylesheet" href="css/icons.css">
+  <style>
+    /* Force NO sidebar on this page, always bottom nav */
+    @media (min-width: 768px) {
+      .side-nav {
+        display: none !important;
+      }
+      .bottom-nav {
+        display: flex !important;
+      }
+      .main-content {
+        margin-left: 0 !important;
+        min-height: calc(100vh - 120px);
+      }
+      .content-wrapper {
+        margin-bottom: 60px;
+      }
+    }
+
+    .search-main {
+      padding: var(--space-4);
+    }
+
+    .search-header-block {
+      margin-bottom: var(--space-4);
+    }
+
+    .search-title {
+      font-size: var(--font-size-xl);
+      font-weight: 700;
+      margin-bottom: var(--space-3);
+    }
+
+    .search-form {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      background-color: var(--bg-secondary);
+      border-radius: 999px;
+      padding: 0 var(--space-3);
+      border: 1px solid var(--border-light);
+      height: 44px;
+      margin-bottom: var(--space-3);
+    }
+
+    .search-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-color);
+      font-size: var(--font-size-base);
+      outline: none;
+    }
+
+    .search-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .search-submit-btn {
+      border: none;
+      background-color: var(--primary-color);
+      border-radius: 999px;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .search-submit-btn i {
+      color: #fff;
+      font-size: 0.9rem;
+    }
+
+    .search-tabs {
+      display: flex;
+      gap: var(--space-2);
+      border-bottom: 1px solid var(--border-light);
+      padding-bottom: var(--space-2);
+    }
+
+    .search-tab {
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: var(--font-size-sm);
+      padding: var(--space-1) var(--space-2);
+      cursor: pointer;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .search-tab.active {
+      background-color: var(--bg-secondary);
+      color: var(--primary-color);
+      font-weight: 600;
+    }
+
+    .search-tab i {
+      font-size: 0.9rem;
+    }
+
+    .search-empty-state {
+      padding: var(--space-4) 0;
+    }
+
+    .section-title {
+      font-size: var(--font-size-lg);
+      font-weight: 600;
+      margin-bottom: var(--space-2);
+    }
+
+    .trending-tags,
+    .recent-searches-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      margin-bottom: var(--space-4);
+    }
+
+    .tag-pill {
+      padding: var(--space-1) var(--space-3);
+      border-radius: 999px;
+      border: 1px solid var(--border-light);
+      background-color: var(--bg-secondary);
+      font-size: var(--font-size-sm);
+      cursor: pointer;
+    }
+
+    .tag-pill:hover {
+      background-color: var(--hover-color);
+    }
+
+    .recent-item {
+      width: 100%;
+      cursor: pointer;
+      font-size: var(--font-size-sm);
+    }
+
+    .recent-more {
+      font-size: var(--font-size-sm);
+      color: var(--primary-color);
+      cursor: pointer;
+      margin-top: var(--space-1);
+    }
+
+    .results-section {
+      padding-top: var(--space-3);
+      display: none;
+    }
+
+    .results-section.active {
+      display: block;
+    }
+
+    .results-group-title {
+      font-size: var(--font-size-lg);
+      font-weight: 600;
+      margin-top: var(--space-3);
+      margin-bottom: var(--space-2);
+    }
+
+    .user-result-card,
+    .post-result-card,
+    .hashtag-result-card {
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-light);
+      background-color: var(--bg-secondary);
+      padding: var(--space-3);
+      margin-bottom: var(--space-2);
+      display: flex;
+      gap: var(--space-3);
+      cursor: pointer;
+    }
+
+    .user-result-avatar,
+    .post-result-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .user-result-main,
+    .post-result-main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .user-name-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin-bottom: 2px;
+    }
+
+    .user-display-name {
+      font-weight: 600;
+    }
+
+    .user-username {
+      color: var(--text-muted);
+      font-size: var(--font-size-xs);
+    }
+
+    .user-badge {
+      font-size: var(--font-size-xs);
+      border-radius: 999px;
+      padding: 2px 6px;
+      border: 1px solid var(--border-light);
+      color: var(--text-muted);
+    }
+
+    .user-bio {
+      font-size: var(--font-size-sm);
+      color: var(--text-color);
+      margin-top: 2px;
+    }
+
+    .user-follow-btn {
+      align-self: center;
+      white-space: nowrap;
+    }
+
+    .post-header-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .post-user-block {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .post-display-name {
+      font-weight: 600;
+      font-size: var(--font-size-sm);
+    }
+
+    .post-username {
+      color: var(--text-muted);
+      font-size: var(--font-size-xs);
+    }
+
+    .post-age {
+      color: var(--text-muted);
+      font-size: var(--font-size-xs);
+    }
+
+    .post-content {
+      font-size: var(--font-size-sm);
+      margin-top: 4px;
+      margin-bottom: 8px;
+    }
+
+    .post-stats-row {
+      display: flex;
+      gap: var(--space-4);
+      font-size: var(--font-size-xs);
+      color: var(--text-muted);
+    }
+
+    .post-stat {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .hashtag-result-card span {
+      font-size: var(--font-size-sm);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 767px) {
+      .search-main {
+        padding: var(--space-3);
+      }
+    }
+  </style>
 </head>
+
 <body>
-  <!-- ===== TOP HEADER (centered logo only) ===== -->
+  <!-- HEADER: say "Search" instead of logo -->
   <header class="header header-centered">
-    <h1 class="logo">Uncensored<span>Social</span></h1>
+    <div class="header-left"></div>
+    <h1 class="logo search-title">Search</h1>
+    <div class="header-actions"></div>
   </header>
 
-  <!-- ===== MAIN LAYOUT ===== -->
   <div class="content-wrapper">
-    <!-- (Optional) Side nav on desktop – same as home -->
-    <nav class="side-nav" id="sideNav">
-      <a href="index.html" class="nav-item">
-        <span class="icon icon-home"></span>
-        <span class="nav-label">Home</span>
-      </a>
-      <a href="search.html" class="nav-item active">
-        <span class="icon icon-search"></span>
-        <span class="nav-label">Search</span>
-      </a>
-      <a href="notifications.html" class="nav-item">
-        <span class="icon icon-notifications"></span>
-        <span class="nav-label">Alerts</span>
-      </a>
-      <a href="messages.html" class="nav-item">
-        <span class="icon icon-messages"></span>
-        <span class="nav-label">Messages</span>
-      </a>
-    </nav>
+    <main class="main-content search-main">
+      <!-- Search bar + tabs -->
+      <section class="search-header-block">
+        <form id="searchForm" class="search-form">
+          <input
+            id="searchInput"
+            class="search-input"
+            type="text"
+            autocomplete="off"
+            placeholder="Search users, posts, or hashtags..."
+          />
+          <button type="submit" class="search-submit-btn">
+            <i class="fa-solid fa-magnifying-glass"></i>
+          </button>
+        </form>
 
-    <!-- ===== MAIN SEARCH CONTENT ===== -->
-    <main class="main-content">
-      <!-- Search bar -->
-      <div class="search-header">
-        <div class="search-container">
-          <div class="search-input-wrapper">
-            <input
-              type="text"
-              id="searchInput"
-              placeholder="Search users, posts, or hashtags..."
-              class="search-input"
-            />
-
-            <button
-              class="btn btn-ghost btn-icon clear-search"
-              id="clearSearch"
-              style="display:none;"
-            >
-              <span class="icon icon-close"></span>
-            </button>
-
-            <button
-              class="btn btn-primary btn-icon search-button"
-              id="searchButton"
-              aria-label="Search"
-            >
-              <i class="fa-solid fa-magnifying-glass"></i>
-            </button>
-          </div>
+        <div class="search-tabs" id="searchTabs">
+          <button class="search-tab active" data-tab="all">
+            <i class="fa-solid fa-layer-group"></i> All
+          </button>
+          <button class="search-tab" data-tab="users">
+            <i class="fa-solid fa-user"></i> Users
+          </button>
+          <button class="search-tab" data-tab="posts">
+            <i class="fa-regular fa-square"></i> Posts
+          </button>
+          <button class="search-tab" data-tab="hashtags">
+            <i class="fa-solid fa-hashtag"></i> Hashtags
+          </button>
         </div>
-      </div>
+      </section>
 
-      <!-- Filter tabs -->
-      <div class="search-filters" id="searchFilters">
-        <div class="filter-tabs">
-          <button class="filter-tab active" data-filter="all">All</button>
-          <button class="filter-tab" data-filter="users">Users</button>
-          <button class="filter-tab" data-filter="posts">Posts</button>
-          <button class="filter-tab" data-filter="hashtags">Hashtags</button>
-        </div>
-      </div>
-
-      <!-- Results wrapper -->
-      <div class="search-results" id="searchResults">
-        <!-- Default state -->
-        <div class="search-default-state" id="searchDefault">
-          <div class="trending-section">
-            <h3>Trending Now</h3>
-            <div class="trending-list">
-              <!-- Replaced by JS -->
-            </div>
-          </div>
-
-          <div class="recent-searches" id="recentSearches">
-            <h3>Recent Searches</h3>
-            <div class="recent-list" id="recentList">
-              <!-- Recent searches rendered here -->
-            </div>
-            <button
-              class="btn btn-ghost btn-sm"
-              id="recentSeeMore"
-              style="display:none;margin-top:8px;"
-            >
-              See more
-            </button>
+      <!-- Empty state: Trending + history -->
+      <section id="searchEmptyState" class="search-empty-state">
+        <div>
+          <h2 class="section-title">Trending Now</h2>
+          <div id="trendingList" class="trending-tags">
+            <!-- filled by JS -->
           </div>
         </div>
 
-        <!-- Loading -->
-        <div class="search-loading-state" id="searchLoading" style="display:none;">
-          <div class="loading-indicator">
-            <div class="loading-spinner"></div>
-            <span>Searching...</span>
+        <div>
+          <h2 class="section-title">Recent Searches</h2>
+          <div id="recentSearchesList" class="recent-searches-list">
+            <!-- filled by JS -->
+          </div>
+          <div id="recentSeeMore" class="recent-more hidden">See more</div>
+        </div>
+      </section>
+
+      <!-- Results -->
+      <section id="resultsSection" class="results-section">
+        <!-- ALL -->
+        <div id="tab-all" class="results-tab-content active">
+          <div id="allUsersBlock" class="hidden">
+            <h3 class="results-group-title">Users</h3>
+            <div id="allUsersList"></div>
+          </div>
+
+          <div id="allPostsBlock" class="hidden">
+            <h3 class="results-group-title">Posts</h3>
+            <div id="allPostsList"></div>
+          </div>
+
+          <div id="allHashtagsBlock" class="hidden">
+            <h3 class="results-group-title">Hashtags</h3>
+            <div id="allHashtagsList"></div>
           </div>
         </div>
 
-        <!-- Results state -->
-        <div class="search-results-state" id="searchResultsState" style="display:none;">
-          <div class="results-header">
-            <h3 id="resultsTitle">Search Results</h3>
-            <span class="results-count" id="resultsCount">0 results</span>
-          </div>
-
-          <!-- Users -->
-          <div class="results-section users-results" id="usersResults">
-            <h4>Users</h4>
-            <div class="users-list" id="usersList"></div>
-          </div>
-
-          <!-- Posts -->
-          <div class="results-section posts-results" id="postsResults">
-            <h4>Posts</h4>
-            <div class="posts-list" id="postsList"></div>
-          </div>
-
-          <!-- Hashtags -->
-          <div class="results-section hashtags-results" id="hashtagsResults">
-            <h4>Hashtags</h4>
-            <div class="hashtags-list" id="hashtagsList"></div>
-          </div>
-
-          <!-- No results -->
-          <div class="no-results" id="noResults" style="display:none;">
-            <div class="empty-state">
-              <h3>No results found</h3>
-              <p>Try different keywords or check the spelling</p>
-            </div>
-          </div>
+        <!-- USERS ONLY -->
+        <div id="tab-users" class="results-tab-content hidden">
+          <div id="usersOnlyList"></div>
         </div>
-      </div>
+
+        <!-- POSTS ONLY -->
+        <div id="tab-posts" class="results-tab-content hidden">
+          <div id="postsOnlyList"></div>
+        </div>
+
+        <!-- HASHTAGS ONLY -->
+        <div id="tab-hashtags" class="results-tab-content hidden">
+          <div id="hashtagsOnlyList"></div>
+        </div>
+      </section>
     </main>
   </div>
 
-  <!-- ===== BOTTOM NAV (same as home, messages.html) ===== -->
-  <nav class="bottom-nav" id="bottomNav">
+  <!-- BOTTOM NAV (same as home) -->
+  <nav class="bottom-nav">
     <a href="index.html" class="nav-item">
-      <i class="fa-solid fa-house nav-icon"></i>
+      <img src="assets/icons/home.svg" alt="" class="icon" />
       <span class="nav-label">Home</span>
     </a>
     <a href="search.html" class="nav-item active">
-      <i class="fa-solid fa-magnifying-glass nav-icon"></i>
+      <img src="assets/icons/search.svg" alt="" class="icon" />
       <span class="nav-label">Search</span>
     </a>
     <a href="notifications.html" class="nav-item">
-      <i class="fa-regular fa-bell nav-icon"></i>
+      <img src="assets/icons/bell.svg" alt="" class="icon" />
       <span class="nav-label">Alerts</span>
     </a>
     <a href="messages.html" class="nav-item">
-      <i class="fa-regular fa-envelope nav-icon"></i>
+      <img src="assets/icons/messages.svg" alt="" class="icon" />
       <span class="nav-label">Messages</span>
     </a>
   </nav>
 
   <!-- Scripts -->
-  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/auth.js"></script>
   <script src="js/app.js"></script>
   <script src="js/search.js"></script>
