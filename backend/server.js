@@ -901,6 +901,47 @@ app.get('/api/posts/:id/comments', async (req, res) => {
   }
 });
 
+// Delete a comment (only owner can delete)
+app.delete('/api/comments/:id', authMiddleware, async (req, res) => {
+  try {
+    const commentId = req.params.id;
+    const userId = req.user.id;
+
+    // make sure it exists and belongs to this user
+    const { data: comment, error: commentError } = await supabase
+      .from('post_comments')
+      .select('id, user_id')
+      .eq('id', commentId)
+      .single();
+
+    if (commentError || !comment) {
+      console.error('Delete comment: not found', commentError);
+      return res.status(404).json({ error: 'Comment not found' });
+    }
+
+    if (comment.user_id !== userId) {
+      return res
+        .status(403)
+        .json({ error: 'You can only delete your own comments' });
+    }
+
+    const { error: deleteError } = await supabase
+      .from('post_comments')
+      .delete()
+      .eq('id', commentId);
+
+    if (deleteError) {
+      console.error('Delete comment error:', deleteError);
+      return res.status(500).json({ error: 'Failed to delete comment' });
+    }
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /api/comments/:id error:', err);
+    return res.status(500).json({ error: 'Failed to delete comment' });
+  }
+});
+
 // Save / unsave (bookmark) a post
 app.post('/api/posts/:id/save', authMiddleware, async (req, res) => {
   try {
