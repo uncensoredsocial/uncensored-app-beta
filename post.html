@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="css/feed-styles.css" />
   <link rel="stylesheet" href="css/icons.css" />
 
-  <!-- Font Awesome for icons -->
+  <!-- Font Awesome -->
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
@@ -19,107 +19,266 @@
     referrerpolicy="no-referrer"
   />
 
-  <!-- Page layout tweaks for single post -->
+  <!-- Page-specific layout tweaks + bottom nav same as home -->
   <style>
     @media (min-width: 900px) {
-      .post-page-main {
+      .content-wrapper {
+        max-width: 960px;
+        margin: 0 auto;
+        padding-top: 72px;
+      }
+      .post-main {
         max-width: 700px;
         margin: 0 auto;
       }
     }
+
+    /* Force bottom nav visible on desktop, like home */
+    @media (min-width: 768px) {
+      .bottom-nav {
+        display: flex !important;
+      }
+    }
+
+    /* Font Awesome icons above labels in bottom nav */
+    .bottom-nav .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+    }
+
+    .bottom-nav .nav-icon {
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+
+    /* Post page specific */
+    .post-wrapper {
+      padding: var(--space-4);
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .post-page-card {
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-light);
+      background-color: var(--bg-secondary);
+      box-shadow: var(--shadow-sm);
+      padding: var(--space-4);
+    }
+
+    /* Comments section */
+    .comments-section {
+      padding: var(--space-4);
+    }
+
+    .comments-title {
+      font-size: var(--font-size-lg);
+      margin-bottom: var(--space-3);
+    }
+
+    .comment-form {
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-light);
+      background-color: var(--bg-secondary);
+      padding: var(--space-3);
+      margin-bottom: var(--space-3);
+    }
+
+    .comment-input-row {
+      display: flex;
+      gap: var(--space-3);
+      align-items: flex-start;
+      margin-bottom: var(--space-2);
+    }
+
+    .comment-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .comment-input-row textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-color);
+      resize: none;
+      min-height: 48px;
+      font-family: inherit;
+      font-size: var(--font-size-sm);
+    }
+
+    .comment-input-row textarea:focus {
+      outline: none;
+    }
+
+    .comment-form-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .comments-list {
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-light);
+      background-color: var(--bg-secondary);
+      overflow: hidden;
+    }
+
+    .comment {
+      display: flex;
+      padding: var(--space-3);
+      gap: var(--space-3);
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .comment:last-child {
+      border-bottom: none;
+    }
+
+    .comment-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .comment-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin-bottom: 2px;
+      font-size: var(--font-size-xs);
+    }
+
+    .comment-display-name {
+      font-weight: 600;
+    }
+
+    .comment-username {
+      color: var(--text-muted);
+    }
+
+    .comment-time {
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+
+    .comment-text {
+      font-size: var(--font-size-sm);
+      color: var(--text-color);
+      word-wrap: break-word;
+    }
+
+    .comment-actions-row {
+      margin-top: 4px;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .comment-delete-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: var(--font-size-xs);
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: var(--radius-sm);
+    }
+
+    .comment-delete-btn:hover {
+      background-color: var(--hover-color);
+      color: var(--error-color);
+    }
+
+    .error-message {
+      color: var(--error-color);
+      padding: var(--space-2) 0;
+      font-size: var(--font-size-sm);
+    }
   </style>
 </head>
 
-<body class="post-page-body">
-  <!-- ============== HEADER ============== -->
-  <header class="header post-header">
-    <button
-      class="btn btn-ghost btn-icon"
-      type="button"
-      onclick="history.back()"
-      aria-label="Back"
-    >
-      <i class="fa-solid fa-chevron-left"></i>
-    </button>
-
-    <h1 class="page-title">Post</h1>
-
-    <!-- empty right side (we removed the weird refresh button) -->
+<body>
+  <!-- Header with back arrow + "Post" title -->
+  <header class="header">
+    <div class="header-left">
+      <button class="btn btn-icon" id="backButton" aria-label="Back">
+        <i class="fa-solid fa-arrow-left"></i>
+      </button>
+    </div>
+    <h1 class="logo">Post</h1>
     <div class="header-actions"></div>
   </header>
 
-  <!-- ============== MAIN CONTENT ============== -->
-  <main class="post-page-main">
-    <section class="post-page-section">
-      <!-- Single post container -->
-      <div id="postContainer" class="post-page-card">
-        <div class="loading-indicator" id="postLoading">
+  <div class="content-wrapper">
+    <main class="main-content post-main">
+      <!-- Single post -->
+      <section id="postWrapper" class="post-wrapper">
+        <div id="postLoading" class="loading-indicator">
           <div class="loading-spinner"></div>
           <span>Loading post...</span>
         </div>
-        <div class="post-error-message" id="postError" style="display: none;">
-          Could not load this post.
+        <div id="postError" class="error-message hidden"></div>
+        <div id="postContainer"></div>
+      </section>
+
+      <!-- Comments -->
+      <section id="commentsSection" class="comments-section">
+        <h2 class="comments-title">Comments</h2>
+
+        <div id="guestCommentMessage" class="guest-message hidden">
+          <div class="guest-content">
+            <h2>Log in to comment</h2>
+            <p>Create an account or log in to join the conversation.</p>
+          </div>
         </div>
-      </div>
-    </section>
 
-    <!-- Comments -->
-    <section class="comments-section" id="commentsSection">
-      <h2 class="comments-title">Comments</h2>
-
-      <!-- Comment box for logged-in users -->
-      <div class="comment-composer auth-dependent" id="commentComposer">
-        <img
-          src="assets/icons/default-avatar.png"
-          alt="You"
-          class="comment-avatar"
-          id="commentUserAvatar"
-        />
-
-        <div class="comment-input-wrapper">
-          <textarea
-            id="commentInput"
-            class="comment-input"
-            placeholder="Add a comment..."
-            maxlength="280"
-          ></textarea>
-
-          <div class="comment-actions-bar">
-            <span
-              id="commentCharCounter"
-              class="char-counter comment-char-counter"
-            >
-              0/280
-            </span>
+        <form id="commentForm" class="comment-form">
+          <div class="comment-input-row">
+            <img
+              id="commentUserAvatar"
+              class="comment-avatar"
+              src="default-profile.PNG"
+              onerror="this.src='default-profile.PNG'"
+              alt="Your avatar"
+            />
+            <textarea
+              id="commentInput"
+              maxlength="280"
+              placeholder="Add a comment"
+            ></textarea>
+          </div>
+          <div class="comment-form-footer">
+            <span id="commentCharCounter" class="char-counter">0/280</span>
             <button
-              type="button"
-              class="btn btn-primary btn-sm"
               id="commentSubmitBtn"
-              disabled
+              type="submit"
+              class="btn btn-primary btn-sm"
             >
               Comment
             </button>
           </div>
+        </form>
+
+        <div id="commentsLoading" class="loading-indicator hidden">
+          <div class="loading-spinner"></div>
+          <span>Loading comments...</span>
         </div>
-      </div>
 
-      <!-- Guest message when not logged in -->
-      <div class="guest-message guest-message-small" id="commentGuestMessage">
-        <p>You need an account to comment.</p>
-        <div class="guest-actions">
-          <a href="signup.html" class="btn btn-primary btn-sm">Create account</a>
-          <a href="login.html" class="btn btn-secondary btn-sm">Log in</a>
+        <div id="commentsEmpty" class="empty-state hidden">
+          <h3>No comments yet</h3>
+          <p>Be the first to comment.</p>
         </div>
-      </div>
 
-      <!-- List of comments -->
-      <div id="commentsList" class="comments-list">
-        <!-- post.js will inject comments here -->
-      </div>
-    </section>
-  </main>
+        <div id="commentsList" class="comments-list"></div>
+      </section>
+    </main>
+  </div>
 
-  <!-- ============== BOTTOM NAV ============== -->
+  <!-- Bottom nav: SAME layout as other pages -->
   <nav class="bottom-nav" id="bottomNav">
     <a href="index.html" class="nav-item">
       <i class="fa-solid fa-house nav-icon"></i>
@@ -140,8 +299,9 @@
   </nav>
 
   <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/auth.js"></script>
-  <script src="js/post.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/post.js"></script>
 </body>
 </html>
