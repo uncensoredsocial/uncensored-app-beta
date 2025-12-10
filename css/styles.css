@@ -695,3 +695,10 @@ input:focus-visible {
 ::-webkit-scrollbar-thumb:hover {
     background: #555;
 }
+body.no-side-nav .side-nav {
+  display: none !important;
+}
+
+body.no-side-nav .main-content {
+  margin-left: 0 !important;
+}
