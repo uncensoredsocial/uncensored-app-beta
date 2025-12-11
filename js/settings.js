@@ -18,6 +18,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingCards = document.querySelectorAll('.settings-link-card');
     settingCards.forEach((card) => {
         card.addEventListener('click', (e) => {
+            const id = card.id;
+
+            // Logout card: use global logout() from auth.js
+            if (id === 'settingsLogoutBtn') {
+                e.preventDefault();
+                if (typeof logout === 'function') {
+                    logout();
+                } else {
+                    // Fallback, just in case
+                    localStorage.removeItem('us_auth_token');
+                    localStorage.removeItem('us_current_user');
+                    window.location.href = 'index.html';
+                }
+                return;
+            }
+
             const href = card.getAttribute('href');
             if (href) {
                 e.preventDefault();
@@ -66,7 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Save previous state then turn all off
                 lastPerTypeState = perTypeToggles.map(input => input.checked);
                 perTypeToggles.forEach(input => {
-                    input.checked = false);
+                    input.checked = false;
                 });
             } else {
                 // Restore previous state or enable all if none saved
