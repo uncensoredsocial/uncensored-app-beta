@@ -15,7 +15,7 @@
 
 /* Main layout */
 .payment-main {
-  padding: 90px var(--space-4) var(--space-10);
+  padding: 90px var(--space-4) var(--space-8);
 }
 
 /* ===== HEADER / HERO ===== */
@@ -231,20 +231,23 @@
   opacity: 0.6;
 }
 
-.coin-left {
+/* New: match your HTML structure for coin layout */
+
+.coin-info {
   display: flex;
   align-items: center;
   column-gap: var(--space-2);
   min-width: 0;
 }
 
-.coin-left img {
+.coin-icon {
   width: 26px;
   height: 26px;
   border-radius: 999px;
+  object-fit: cover;
 }
 
-.coin-meta {
+.coin-text {
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -260,21 +263,7 @@
   color: var(--text-muted);
 }
 
-.coin-status {
-  font-size: 0.7rem;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--border-light);
-  color: var(--text-muted);
-  margin-left: var(--space-2);
-}
-
-.coin-status.primary {
-  border-color: var(--primary-color);
-  color: var(--primary-color);
-}
-
-.coin-right {
+.coin-meta-right {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -285,20 +274,14 @@
   font-size: 0.8rem;
 }
 
-.coin-pill,
-.coin-pill-muted {
+.coin-status-tag {
   font-size: 0.7rem;
   border-radius: 999px;
   padding: 2px 8px;
   border: 1px solid var(--border-light);
 }
 
-.coin-pill {
-  color: var(--primary-color);
-  border-color: var(--primary-color);
-}
-
-.coin-pill-muted {
+.coin-status-tag.coin-status-muted {
   color: var(--text-muted);
 }
 
@@ -365,6 +348,7 @@
   margin-top: var(--space-2);
 }
 
+.btn-full,
 .wide-btn,
 .btn-primary {
   width: 100%;
@@ -412,8 +396,15 @@
   }
 }
 
-.invoice-amount {
-  margin-bottom: var(--space-3);
+.invoice-summary .invoice-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.invoice-summary .invoice-row:last-child {
+  margin-bottom: 0;
 }
 
 .invoice-label {
@@ -424,61 +415,29 @@
 }
 
 .invoice-value {
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 600;
 }
 
-.invoice-subvalue {
-  font-size: 0.85rem;
-  color: var(--text-muted);
+.invoice-status {
+  font-size: 0.9rem;
 }
 
-.invoice-address {
-  margin-top: var(--space-3);
+.invoice-address-box {
+  margin-top: var(--space-4);
 }
 
-.address-row {
+.invoice-address-row {
   display: flex;
   align-items: center;
   column-gap: var(--space-2);
   margin-top: 4px;
 }
 
-.address-text {
+.invoice-address {
   font-size: 0.8rem;
   max-width: 100%;
   word-break: break-all;
-}
-
-.copy-btn {
-  border-radius: 999px;
-  border: 1px solid var(--border-light);
-  background: transparent;
-  color: var(--text-color);
-  padding: 6px 10px;
-  cursor: pointer;
-}
-
-/* Invoice status row */
-
-.invoice-status-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: var(--space-3);
-  gap: var(--space-3);
-}
-
-.invoice-status-text {
-  font-size: 0.9rem;
-}
-
-.invoice-timer {
-  text-align: right;
-}
-
-.invoice-countdown {
-  font-size: 0.9rem;
 }
 
 /* QR */
@@ -501,7 +460,7 @@
   background: #000;
 }
 
-.qr-wrapper img {
+.qr-image {
   width: 100%;
   height: 100%;
   object-fit: contain;
