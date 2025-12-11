@@ -36,6 +36,7 @@
     font-weight: 600;
     margin: 0;
     color: #fff;
+    justify-self: center; /* ensure perfect centering in the grid */
 }
 
 /* Back button with Font Awesome arrow */
@@ -130,7 +131,7 @@
     margin-left: 12px;
 }
 
-/* Danger variant (Delete account link on hub) */
+/* Danger variant (Delete account + Logout) */
 
 .settings-link-danger {
     border-color: #661111;
@@ -296,62 +297,13 @@
     margin: 0;
 }
 
-/* --------------------------------------------------
-   BOTTOM NAV – FORCE SAME AS HOME/SEARCH
--------------------------------------------------- */
+/* (Bottom nav styling now comes from global styles.css) */
 
-.bottom-nav {
-    position: fixed !important;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background-color: var(--bg-color);
-    border-top: 1px solid var(--border-light);
-    display: flex;
-    justify-content: space-around;
-    padding: var(--space-2) 0 !important;
-    z-index: 1000;
-    height: 60px !important;
+/* Keep these for layouts that disable side nav */
+body.no-side-nav .side-nav {
+  display: none !important;
 }
 
-.bottom-nav .nav-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: var(--space-2);
-    text-decoration: none;
-    color: var(--text-color);
-    font-size: var(--font-size-xs) !important;
-    opacity: 0.7;
-    transition: all var(--transition-fast);
-    border-radius: var(--radius-md);
-    flex: 1;
-    max-width: 80px;
-    height: 100%;
-}
-
-.bottom-nav .nav-item:hover,
-.bottom-nav .nav-item.active {
-    opacity: 1;
-    background-color: var(--hover-color);
-    color: var(--primary-color);
-}
-
-.bottom-nav .nav-item .icon,
-.bottom-nav .nav-item .nav-icon {
-    margin-bottom: 2px;
-    opacity: 0.9;
-    width: 20px;
-    height: 20px;
-}
-
-.bottom-nav .nav-item.active .icon,
-.bottom-nav .nav-item.active .nav-icon {
-    opacity: 1;
-}
-
-.bottom-nav .nav-label {
-    font-size: 10px !important;
-    font-weight: 500;
+body.no-side-nav .main-content {
+  margin-left: 0 !important;
 }
