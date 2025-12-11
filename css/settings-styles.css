@@ -11,12 +11,18 @@
 -------------------------------------------------- */
 
 .header.header-centered {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
+    /* keep same base behavior as global .header, just tweak spacing */
+    display: flex;
     align-items: center;
+    justify-content: space-between;
     padding: 10px 16px;
     border-bottom: 1px solid #222;
     background: #000;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
 }
 
 /* Left/right areas for arrow / future buttons */
@@ -25,18 +31,19 @@
 .header-actions {
     display: flex;
     align-items: center;
-    justify-content: flex-start;
 }
 
-/* Centered title */
+/* Perfectly centered title using absolute centering */
 
 .header.header-centered .logo {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
     text-align: center;
     font-size: 18px;
     font-weight: 600;
     margin: 0;
     color: #fff;
-    justify-self: center; /* ensure perfect centering in the grid */
 }
 
 /* Back button with Font Awesome arrow */
@@ -287,17 +294,6 @@
         padding: 8px 12px;
     }
 }
-
-/* Centered header title helper */
-.header-centered {
-    justify-content: center;
-}
-
-.header-centered .logo {
-    margin: 0;
-}
-
-/* (Bottom nav styling now comes from global styles.css) */
 
 /* Keep these for layouts that disable side nav */
 body.no-side-nav .side-nav {
