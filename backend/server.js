@@ -25,6 +25,17 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
+// ======================================================
+//                    MONERO WATCHER
+// ======================================================
+
+try {
+  const { startMoneroWatcher } = require('./js/monero-watcher');
+  startMoneroWatcher(supabase);
+} catch (err) {
+  console.error('Failed to start Monero watcher:', err);
+}
+
 // Buckets
 const USER_MEDIA_BUCKET = 'user-media';
 const POST_MEDIA_BUCKET = 'post-media';
