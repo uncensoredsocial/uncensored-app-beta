@@ -1829,6 +1829,67 @@ app.get('/api/payments/status/:id', authMiddleware, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/payments/my-invoices
+ * - Returns recent invoices for the current user
+ */
+app.get('/api/payments/my-invoices', authMiddleware, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('user_id', req.user.id)
+      .order('created_at', { ascending: false })
+      .limit(25);
+
+    if (error) {
+      console.error('GET /api/payments/my-invoices error:', error);
+      return res.status(500).json({ error: 'Failed to load invoices' });
+    }
+
+    return res.json(data || []);
+  } catch (err) {
+    console.error('GET /api/payments/my-invoices error:', err);
+    res.status(500).json({ error: 'Failed to load invoices' });
+  }
+});
+
+/**
+ * GET /api/subscription/me
+ * - Returns the latest (non-expired) subscription for current user
+ * - You can use this on the frontend to show:
+ *   - "Verified" checkmark
+ *   - Plan & expiry date
+ */
+app.get('/api/subscription/me', authMiddleware, async (req, res) => {
+  try {
+    const nowIso = new Date().toISOString();
+
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', req.user.id)
+      .gt('expires_at', nowIso)
+      .order('expires_at', { ascending: false })
+      .limit(1);
+
+    if (error) {
+      console.error('GET /api/subscription/me error:', error);
+      return res.status(500).json({ error: 'Failed to load subscription' });
+    }
+
+    const active = data && data.length > 0 ? data[0] : null;
+
+    return res.json({
+      active: !!active,
+      subscription: active
+    });
+  } catch (err) {
+    console.error('GET /api/subscription/me error:', err);
+    res.status(500).json({ error: 'Failed to load subscription' });
+  }
+});
+
 // ======================================================
 //                      START SERVER
 // ======================================================
