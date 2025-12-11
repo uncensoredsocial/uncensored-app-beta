@@ -37,6 +37,60 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'ssssss@gmail.com')
   .filter(Boolean);
 
 // ======================================================
+//                    MONERO WALLET RPC
+// ======================================================
+
+const MONERO_RPC_URL = process.env.MONERO_RPC_URL || '';
+const MONERO_RPC_USER = process.env.MONERO_RPC_USER || '';
+const MONERO_RPC_PASSWORD = process.env.MONERO_RPC_PASSWORD || '';
+const MONERO_ACCOUNT_INDEX = Number(process.env.MONERO_ACCOUNT_INDEX || '0');
+
+/**
+ * Call monero-wallet-rpc JSON-RPC API
+ */
+async function moneroRpc(method, params = {}) {
+  if (!MONERO_RPC_URL) {
+    throw new Error('MONERO_RPC_URL not set');
+  }
+
+  const headers = { 'Content-Type': 'application/json' };
+
+  if (MONERO_RPC_USER || MONERO_RPC_PASSWORD) {
+    const auth = Buffer.from(
+      `${MONERO_RPC_USER}:${MONERO_RPC_PASSWORD}`
+    ).toString('base64');
+    headers['Authorization'] = `Basic ${auth}`;
+  }
+
+  const body = JSON.stringify({
+    jsonrpc: '2.0',
+    id: '0',
+    method,
+    params
+  });
+
+  const res = await fetch(MONERO_RPC_URL, {
+    method: 'POST',
+    headers,
+    body
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`RPC HTTP error ${res.status}: ${text}`);
+  }
+
+  const json = await res.json();
+  if (json.error) {
+    throw new Error(
+      `RPC error ${json.error.code}: ${json.error.message}`
+    );
+  }
+
+  return json.result;
+}
+
+// ======================================================
 //                      MIDDLEWARE
 // ======================================================
 
