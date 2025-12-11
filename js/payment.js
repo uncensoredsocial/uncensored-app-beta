@@ -1,455 +1,466 @@
-// payment.js — subscription payments (Monero-only for now)
+// js/payment.js
 
-const PAY_API_BASE_URL =
-  typeof API_BASE_URL !== "undefined"
+const PAYMENT_API_BASE_URL =
+  typeof API_BASE_URL !== 'undefined'
     ? API_BASE_URL
-    : "https://uncensored-app-beta-production.up.railway.app/api";
+    : 'https://uncensored-app-beta-production.up.railway.app/api';
 
-class PaymentPage {
-  constructor() {
-    this.currentPlan = "monthly";
-    this.currentPriceUsd = 8;
-    this.currentCoin = "XMR";
-    this.prices = {
-      XMR: null
-    };
-    this.invoiceId = null;
-    this.invoicePollInterval = null;
+const COIN_CONFIG = {
+  BTC: { id: 'bitcoin', priceEl: 'btcPriceUsd' },
+  ETH: { id: 'ethereum', priceEl: 'ethPriceUsd' },
+  SOL: { id: 'solana', priceEl: 'solPriceUsd' },
+  USDC: { id: 'usd-coin', priceEl: 'usdcPriceUsd' },
+  USDT: { id: 'tether', priceEl: 'usdtPriceUsd' },
+  XMR: { id: 'monero', priceEl: 'xmrPriceUsd' }
+};
+
+// State
+let currentPlan = 'monthly'; // 'monthly' | 'yearly'
+let xmrPriceUsd = null;
+let currentCurrency = 'XMR';
+
+let currentInvoice = null;
+let invoiceStatusInterval = null;
+let invoiceCountdownInterval = null;
+
+// ===== Small helpers =====
+
+function showToast(message, type = 'info') {
+  if (!message) return;
+  const existing = document.querySelector('.status-toast');
+  if (existing) existing.remove();
+
+  const div = document.createElement('div');
+  div.className = 'status-toast';
+  if (type === 'error') {
+    div.style.borderColor = '#7a1f24';
+    div.style.background = '#3b0f14';
+  } else if (type === 'success') {
+    div.style.borderColor = '#1f7a3a';
+    div.style.background = '#0f3b23';
   }
+  div.textContent = message;
+  document.body.appendChild(div);
+  setTimeout(() => div.remove(), 2600);
+}
 
-  init() {
-    if (!window.location.pathname.toLowerCase().includes("payment.html")) {
-      return;
-    }
+function formatUsd(amount) {
+  return '$' + amount.toFixed(2);
+}
 
-    this.cacheDom();
-    this.bindEvents();
-    this.updatePlanUI();
-    this.updateCoinUI();
-    this.fetchLivePrices();
-  }
+function formatXmr(amount) {
+  return amount.toFixed(6);
+}
 
-  cacheDom() {
-    this.planCards = document.querySelectorAll(".plan-card");
-    this.coinCards = document.querySelectorAll(".coin-card");
+// ===== Price fetching =====
 
-    this.priceUsdLabel = document.getElementById("priceUsdLabel");
-    this.priceCoinCode = document.getElementById("priceCoinCode");
-    this.priceCoinLabel = document.getElementById("priceCoinLabel");
-    this.priceSourceLabel = document.getElementById("priceSourceLabel");
+async function fetchCryptoPrices() {
+  try {
+    const ids = Object.values(COIN_CONFIG)
+      .map((c) => c.id)
+      .join(',');
 
-    this.generateInvoiceBtn = document.getElementById("generateInvoiceBtn");
+    // Pricing API
+    const url =
+      'https://api.coingecko.com/api/v3/simple/price?ids=' +
+      encodeURIComponent(ids) +
+      '&vs_currencies=usd';
 
-    this.invoiceSection = document.getElementById("invoiceSection");
-    this.invoicePlanLabel = document.getElementById("invoicePlanLabel");
-    this.invoiceAmountLabel = document.getElementById("invoiceAmountLabel");
-    this.invoiceCurrencyLabel = document.getElementById("invoiceCurrencyLabel");
-    this.invoiceStatusLabel = document.getElementById("invoiceStatusLabel");
-    this.invoiceAddressText = document.getElementById("invoiceAddressText");
-    this.copyAddressBtn = document.getElementById("copyAddressBtn");
-    this.invoiceQrImage = document.getElementById("invoiceQrImage");
-    this.confirmationsLabel = document.getElementById("confirmationsLabel");
-    this.confirmationsBar = document.getElementById("confirmationsBar");
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to load prices');
+    const data = await res.json();
 
-    this.toastContainer = document.getElementById("paymentStatusContainer");
+    Object.entries(COIN_CONFIG).forEach(([symbol, cfg]) => {
+      const elId = cfg.priceEl;
+      const el = elId ? document.getElementById(elId) : null;
+      const coinData = data[cfg.id];
+      if (!el || !coinData || typeof coinData.usd !== 'number') return;
 
-    this.backButton = document.getElementById("paymentBackButton");
-  }
-
-  bindEvents() {
-    if (this.backButton) {
-      this.backButton.addEventListener("click", () => {
-        history.back();
-      });
-    }
-
-    // Plan cards
-    if (this.planCards && this.planCards.length) {
-      this.planCards.forEach((card) => {
-        card.addEventListener("click", () => {
-          const plan = card.dataset.plan || "monthly";
-          const price = parseFloat(card.dataset.priceUsd || "8");
-          this.currentPlan = plan;
-          this.currentPriceUsd = price;
-          this.updatePlanUI();
-          this.updateConversionUI();
-        });
-      });
-    }
-
-    // Coin cards
-    if (this.coinCards && this.coinCards.length) {
-      this.coinCards.forEach((card) => {
-        card.addEventListener("click", () => {
-          const code = card.dataset.coin;
-          const enabled = card.dataset.enabled === "true";
-
-          if (!enabled) {
-            this.showToast(
-              "This payment method isn’t accepted yet. Use Monero (XMR) for now.",
-              "info"
-            );
-            return;
-          }
-
-          this.currentCoin = code;
-          this.updateCoinUI();
-          this.updateConversionUI();
-        });
-      });
-    }
-
-    // Create invoice
-    if (this.generateInvoiceBtn) {
-      this.generateInvoiceBtn.addEventListener("click", () =>
-        this.handleCreateInvoice()
-      );
-    }
-
-    // Copy address
-    if (this.copyAddressBtn) {
-      this.copyAddressBtn.addEventListener("click", () =>
-        this.copyAddress()
-      );
-    }
-  }
-
-  /* -------------------- UI helpers -------------------- */
-
-  updatePlanUI() {
-    if (!this.planCards) return;
-    this.planCards.forEach((card) => {
-      const plan = card.dataset.plan;
-      if (plan === this.currentPlan) {
-        card.classList.add("active");
-      } else {
-        card.classList.remove("active");
+      const price = coinData.usd;
+      el.textContent = formatUsd(price);
+      if (symbol === 'XMR') {
+        xmrPriceUsd = price;
       }
     });
 
-    if (this.priceUsdLabel) {
-      this.priceUsdLabel.textContent = `$${this.currentPriceUsd.toFixed(2)} USD`;
-    }
-
-    if (this.invoicePlanLabel) {
-      this.invoicePlanLabel.textContent =
-        this.currentPlan === "yearly" ? "Yearly" : "Monthly";
-    }
-  }
-
-  updateCoinUI() {
-    if (!this.coinCards) return;
-    this.coinCards.forEach((card) => {
-      const code = card.dataset.coin;
-      if (code === this.currentCoin) {
-        card.classList.add("active");
-      } else {
-        card.classList.remove("active");
-      }
-    });
-
-    if (this.priceCoinCode) {
-      this.priceCoinCode.textContent = this.currentCoin;
-    }
-    if (this.invoiceCurrencyLabel) {
-      this.invoiceCurrencyLabel.textContent = this.currentCoin;
-    }
-  }
-
-  updateConversionUI() {
-    if (!this.priceCoinLabel) return;
-
-    if (this.currentCoin !== "XMR") {
-      this.priceCoinLabel.textContent = "Not supported yet";
-      return;
-    }
-
-    const price = this.prices.XMR;
-    if (!price || !price.usd) {
-      this.priceCoinLabel.textContent = "Loading…";
-      return;
-    }
-
-    const amountCoin = this.currentPriceUsd / price.usd;
-    this.priceCoinLabel.textContent = `${amountCoin.toFixed(6)} XMR`;
-  }
-
-  /* -------------------- Live prices -------------------- */
-
-  async fetchLivePrices() {
-    // Only fetching XMR for now
-    try {
-      this.priceSourceLabel.textContent = "CoinGecko · Loading…";
-
-      const res = await fetch(
-        "https://api.coingecko.com/api/v3/simple/price?ids=monero&vs_currencies=usd"
-      );
-      const data = await res.json();
-
-      const usd = data?.monero?.usd;
-      if (!usd || typeof usd !== "number") {
-        throw new Error("Bad price");
-      }
-
-      this.prices.XMR = { usd };
-      this.priceSourceLabel.textContent = `CoinGecko · 1 XMR ≈ $${usd.toFixed(
-        2
-      )} USD`;
-
-      this.updateConversionUI();
-    } catch (err) {
-      console.error("Price fetch error:", err);
-      this.priceSourceLabel.textContent = "Price source unavailable";
-      this.showToast(
-        "Couldn’t load live XMR price. You can still generate an invoice.",
-        "error"
-      );
-    }
-  }
-
-  /* -------------------- Invoice creation -------------------- */
-
-  async handleCreateInvoice() {
-    if (this.currentCoin !== "XMR") {
-      this.showToast(
-        "Only Monero (XMR) payments are accepted right now.",
-        "error"
-      );
-      return;
-    }
-
-    // Get approximate amount in XMR
-    let amountXmr = 0;
-    const price = this.prices.XMR;
-    if (price && typeof price.usd === "number") {
-      amountXmr = this.currentPriceUsd / price.usd;
-    } else {
-      // Fall back to a placeholder (you can adjust manually if needed)
-      amountXmr = 0.1;
-    }
-
-    try {
-      this.generateInvoiceBtn.disabled = true;
-      this.generateInvoiceBtn.textContent = "Creating invoice…";
-
-      const token =
-        typeof getAuthToken === "function" ? getAuthToken() : null;
-
-      if (!token) {
-        this.showToast("You must be logged in to subscribe.", "error");
-        this.generateInvoiceBtn.disabled = false;
-        this.generateInvoiceBtn.textContent = "Continue to payment";
-        return;
-      }
-
-      const res = await fetch(`${PAY_API_BASE_URL}/payments/create`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          plan: this.currentPlan,
-          currency: this.currentCoin,
-          amount_crypto: amountXmr
-        })
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to create invoice");
-      }
-
-      this.invoiceId = data.id;
-      this.renderInvoice(data);
-
-      // Start polling for status every 15s
-      this.startInvoicePolling();
-
-      this.showToast("Invoice created. Send the payment to upgrade.", "success");
-    } catch (err) {
-      console.error("Create invoice error:", err);
-      this.showToast(
-        err.message || "Failed to create invoice. Try again.",
-        "error"
-      );
-    } finally {
-      this.generateInvoiceBtn.disabled = false;
-      this.generateInvoiceBtn.textContent = "Continue to payment";
-    }
-  }
-
-  renderInvoice(inv) {
-    if (!this.invoiceSection) return;
-    this.invoiceSection.style.display = "block";
-
-    if (this.invoicePlanLabel) {
-      this.invoicePlanLabel.textContent =
-        inv.plan === "yearly" ? "Yearly" : "Monthly";
-    }
-
-    const amountUsd = inv.amount_usd ?? this.currentPriceUsd;
-    const amountCrypto = inv.amount_crypto ?? 0;
-
-    if (this.invoiceAmountLabel) {
-      this.invoiceAmountLabel.textContent = `$${amountUsd.toFixed(
-        2
-      )} ≈ ${amountCrypto.toFixed(6)} ${inv.currency || "XMR"}`;
-    }
-
-    if (this.invoiceCurrencyLabel) {
-      this.invoiceCurrencyLabel.textContent = inv.currency || "XMR";
-    }
-
-    if (this.invoiceAddressText) {
-      this.invoiceAddressText.textContent = inv.address || "–";
-    }
-
-    // Status
-    this.updateInvoiceStatus(inv.status || "pending");
-
-    // Confirmations
-    const confirmations = inv.confirmations || 0;
-    const required = inv.required_confirmations || 10;
-    this.updateConfirmations(confirmations, required);
-
-    // QR
-    if (this.invoiceQrImage && inv.qr_string) {
-      const encoded = encodeURIComponent(inv.qr_string);
-      // Using a public QR API (no secrets)
-      this.invoiceQrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encoded}`;
-    }
-  }
-
-  updateInvoiceStatus(status) {
-    if (!this.invoiceStatusLabel) return;
-
-    this.invoiceStatusLabel.classList.remove(
-      "status-pending",
-      "status-paid",
-      "status-confirmed"
-    );
-
-    if (status === "confirmed") {
-      this.invoiceStatusLabel.textContent = "Payment confirmed";
-      this.invoiceStatusLabel.classList.add("status-confirmed");
-    } else if (status === "paid") {
-      this.invoiceStatusLabel.textContent = "Payment received, waiting confirmations";
-      this.invoiceStatusLabel.classList.add("status-paid");
-    } else if (status === "expired") {
-      this.invoiceStatusLabel.textContent = "Invoice expired";
-    } else {
-      this.invoiceStatusLabel.textContent = "Waiting for payment";
-      this.invoiceStatusLabel.classList.add("status-pending");
-    }
-  }
-
-  updateConfirmations(current, required) {
-    if (this.confirmationsLabel) {
-      this.confirmationsLabel.textContent = `${current} / ${required}`;
-    }
-
-    if (this.confirmationsBar) {
-      const pct = Math.max(
-        0,
-        Math.min(100, (current / (required || 1)) * 100)
-      );
-      this.confirmationsBar.style.width = `${pct}%`;
-    }
-  }
-
-  startInvoicePolling() {
-    if (!this.invoiceId) return;
-
-    if (this.invoicePollInterval) {
-      clearInterval(this.invoicePollInterval);
-    }
-
-    const poll = async () => {
-      try {
-        const token =
-          typeof getAuthToken === "function" ? getAuthToken() : null;
-        if (!token) return;
-
-        const res = await fetch(
-          `${PAY_API_BASE_URL}/payments/status/${this.invoiceId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          }
-        );
-
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          console.error("Status poll error:", data);
-          return;
-        }
-
-        this.renderInvoice(data);
-
-        if (data.status === "confirmed") {
-          this.showToast("Subscription activated. You’re now verified.", "success");
-          clearInterval(this.invoicePollInterval);
-          this.invoicePollInterval = null;
-        }
-      } catch (err) {
-        console.error("Invoice poll error:", err);
-      }
-    };
-
-    // immediate + interval
-    poll();
-    this.invoicePollInterval = setInterval(poll, 15000);
-  }
-
-  async copyAddress() {
-    if (!this.invoiceAddressText) return;
-    const text = this.invoiceAddressText.textContent.trim();
-    if (!text || text === "–") return;
-
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(text);
-        this.showToast("Address copied to clipboard.", "success");
-      } else {
-        this.showToast("Clipboard not available.", "error");
-      }
-    } catch {
-      this.showToast("Could not copy address.", "error");
-    }
-  }
-
-  /* -------------------- Toasts -------------------- */
-
-  showToast(message, type = "info") {
-    if (!this.toastContainer || !message) return;
-
-    const div = document.createElement("div");
-    div.className = `payment-toast ${type}`;
-
-    let iconClass = "fa-circle-info";
-    if (type === "error") iconClass = "fa-triangle-exclamation";
-    if (type === "success") iconClass = "fa-check-circle";
-
-    div.innerHTML = `
-      <i class="fa-solid ${iconClass}"></i>
-      <span>${message}</span>
-    `;
-
-    this.toastContainer.appendChild(div);
-
-    setTimeout(() => {
-      div.remove();
-    }, 3000);
+    updatePlanSummary();
+  } catch (err) {
+    console.error('Price fetch error:', err);
   }
 }
 
-/* =========================== INIT =========================== */
+// ===== Plan / summary logic =====
 
-document.addEventListener("DOMContentLoaded", () => {
-  const page = new PaymentPage();
-  page.init();
-  window.paymentPage = page;
+function getPlanUsd() {
+  return currentPlan === 'yearly' ? 60 : 8;
+}
+
+function calculateXmrAmount() {
+  const usd = getPlanUsd();
+  if (!xmrPriceUsd || xmrPriceUsd <= 0) return null;
+  return usd / xmrPriceUsd;
+}
+
+function updatePlanSummary() {
+  const summaryPlanLabel = document.getElementById('summaryPlanLabel');
+  const summaryXmrAmount = document.getElementById('summaryXmrAmount');
+
+  const usd = getPlanUsd();
+  if (summaryPlanLabel) {
+    summaryPlanLabel.textContent =
+      currentPlan === 'yearly'
+        ? `Yearly • ${formatUsd(usd)}`
+        : `Monthly • ${formatUsd(usd)}`;
+  }
+
+  const xmrAmt = calculateXmrAmount();
+  if (summaryXmrAmount) {
+    if (!xmrAmt) {
+      summaryXmrAmount.textContent = '— XMR (waiting for price…)';
+    } else {
+      summaryXmrAmount.textContent = `${formatXmr(
+        xmrAmt
+      )} XMR (estimated)`;
+    }
+  }
+}
+
+function attachPlanHandlers() {
+  const toggleEl = document.getElementById('plansToggle');
+  if (!toggleEl) return;
+
+  toggleEl.querySelectorAll('.plan-card').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      toggleEl.querySelectorAll('.plan-card').forEach((b) =>
+        b.classList.remove('active')
+      );
+      btn.classList.add('active');
+      currentPlan = btn.dataset.plan === 'yearly' ? 'yearly' : 'monthly';
+      updatePlanSummary();
+      updateInvoiceAmountsDisplay();
+    });
+  });
+}
+
+// ===== Coin selection =====
+
+function attachCoinHandlers() {
+  const grid = document.getElementById('coinGrid');
+  if (!grid) return;
+
+  grid.querySelectorAll('.coin-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      const currency = card.dataset.currency;
+
+      // Highlight new card
+      grid.querySelectorAll('.coin-card').forEach((c) =>
+        c.classList.remove('active')
+      );
+      card.classList.add('active');
+
+      currentCurrency = currency;
+
+      if (currency !== 'XMR') {
+        showToast('This currency is not supported yet. Use Monero for now.', 'info');
+      } else {
+        updatePlanSummary();
+      }
+    });
+  });
+}
+
+// ===== Subscription status =====
+
+async function loadSubscriptionStatus() {
+  const statusEl = document.getElementById('subscriptionStatus');
+  if (!statusEl) return;
+
+  const token =
+    typeof getAuthToken === 'function' ? getAuthToken() : null;
+  if (!token) {
+    statusEl.textContent =
+      'You must be logged in to manage subscriptions.';
+    return;
+  }
+
+  try {
+    const res = await fetch(
+      `${PAYMENT_API_BASE_URL}/subscription/me`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    );
+
+    if (!res.ok) {
+      statusEl.textContent = '';
+      return;
+    }
+
+    const data = await res.json();
+    if (!data || !data.active || !data.subscription) {
+      statusEl.textContent = 'No active subscription yet.';
+      return;
+    }
+
+    const exp = data.subscription.expires_at
+      ? new Date(data.subscription.expires_at)
+      : null;
+
+    if (exp && !isNaN(exp.getTime())) {
+      statusEl.innerHTML = `✅ Active subscription. Expires on <strong>${exp.toLocaleDateString()}</strong>.`;
+    } else {
+      statusEl.textContent = '✅ Active subscription.';
+    }
+  } catch (err) {
+    console.error('loadSubscriptionStatus error:', err);
+  }
+}
+
+// ===== Invoice / payment =====
+
+function updateInvoiceAmountsDisplay() {
+  if (!currentInvoice) return;
+  const amtXmrEl = document.getElementById('invoiceAmountXmr');
+  const amtUsdEl = document.getElementById('invoiceAmountUsd');
+
+  if (!amtXmrEl || !amtUsdEl) return;
+
+  const usd = getPlanUsd();
+  amtXmrEl.textContent = `${formatXmr(currentInvoice.amount_crypto)} XMR`;
+  amtUsdEl.textContent = `≈ ${formatUsd(usd)}`;
+}
+
+function startInvoiceCountdown(expireAtMs) {
+  const countdownEl = document.getElementById('invoiceCountdown');
+  if (!countdownEl) return;
+
+  if (invoiceCountdownInterval) {
+    clearInterval(invoiceCountdownInterval);
+  }
+
+  function tick() {
+    const now = Date.now();
+    const remaining = expireAtMs - now;
+
+    if (remaining <= 0) {
+      countdownEl.textContent = '00:00';
+      clearInterval(invoiceCountdownInterval);
+      invoiceCountdownInterval = null;
+      const statusEl = document.getElementById('invoiceStatus');
+      if (statusEl && currentInvoice && currentInvoice.status !== 'confirmed') {
+        statusEl.textContent =
+          'Invoice expired. Create a new one to try again.';
+      }
+      return;
+    }
+
+    const totalSeconds = Math.floor(remaining / 1000);
+    const minutes = String(Math.floor(totalSeconds / 60)).padStart(
+      2,
+      '0'
+    );
+    const seconds = String(totalSeconds % 60).padStart(2, '0');
+    countdownEl.textContent = `${minutes}:${seconds}`;
+  }
+
+  tick();
+  invoiceCountdownInterval = setInterval(tick, 1000);
+}
+
+function startInvoiceStatusPolling(invoiceId) {
+  const statusEl = document.getElementById('invoiceStatus');
+  if (!statusEl) return;
+
+  if (invoiceStatusInterval) {
+    clearInterval(invoiceStatusInterval);
+  }
+
+  const token =
+    typeof getAuthToken === 'function' ? getAuthToken() : null;
+  if (!token) {
+    statusEl.textContent = 'You must be logged in.';
+    return;
+  }
+
+  async function checkStatus() {
+    try {
+      const res = await fetch(
+        `${PAYMENT_API_BASE_URL}/payments/status/${invoiceId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      if (!res.ok) return;
+      const invoice = await res.json();
+
+      currentInvoice = invoice;
+
+      if (statusEl) {
+        if (invoice.status === 'confirmed') {
+          statusEl.textContent = 'Payment confirmed ✅';
+        } else if (invoice.confirmations) {
+          statusEl.textContent = `Waiting for confirmations… (${invoice.confirmations}/${invoice.required_confirmations ||
+            10})`;
+        } else {
+          statusEl.textContent = 'Waiting for payment…';
+        }
+      }
+
+      if (invoice.status === 'confirmed') {
+        clearInterval(invoiceStatusInterval);
+        invoiceStatusInterval = null;
+        showToast('Subscription activated!', 'success');
+        loadSubscriptionStatus();
+      }
+    } catch (err) {
+      console.error('invoice status polling error:', err);
+    }
+  }
+
+  // Check immediately and then on interval
+  checkStatus();
+  invoiceStatusInterval = setInterval(checkStatus, 15000);
+}
+
+function renderInvoice(invoice, xmrAmountUsed) {
+  const section = document.getElementById('invoiceSection');
+  if (!section) return;
+
+  section.hidden = false;
+  currentInvoice = invoice;
+
+  const addrEl = document.getElementById('invoiceAddress');
+  const statusEl = document.getElementById('invoiceStatus');
+  const qrEl = document.getElementById('invoiceQr');
+
+  if (addrEl) addrEl.textContent = invoice.address || '—';
+  if (statusEl) statusEl.textContent = 'Waiting for payment…';
+
+  // Use the amount we sent to backend (xmrAmountUsed) as the target
+  currentInvoice.amount_crypto = xmrAmountUsed;
+
+  updateInvoiceAmountsDisplay();
+
+  // Simple QR: using public QR service
+  if (qrEl) {
+    const qrData = invoice.qr_string || '';
+    const qrUrl =
+      'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' +
+      encodeURIComponent(qrData);
+    qrEl.src = qrUrl;
+  }
+
+  // 30-minute expiry from now (client side)
+  const expireAtMs = Date.now() + 30 * 60 * 1000;
+  startInvoiceCountdown(expireAtMs);
+  startInvoiceStatusPolling(invoice.id);
+}
+
+async function handleContinueToPayment() {
+  if (currentCurrency !== 'XMR') {
+    showToast('Only Monero payments are supported right now.', 'error');
+    return;
+  }
+
+  const token =
+    typeof getAuthToken === 'function' ? getAuthToken() : null;
+  if (!token) {
+    window.location.href = 'login.html';
+    return;
+  }
+
+  const btn = document.getElementById('continueToPaymentBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Creating invoice…';
+  }
+
+  try {
+    const xmrAmount = calculateXmrAmount();
+    if (!xmrAmount || !isFinite(xmrAmount)) {
+      throw new Error('Unable to calculate XMR amount');
+    }
+
+    const res = await fetch(
+      `${PAYMENT_API_BASE_URL}/payments/create`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          plan: currentPlan,
+          currency: 'XMR',
+          amount_crypto: xmrAmount
+        })
+      }
+    );
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to create invoice');
+    }
+
+    showToast('Invoice created. Waiting for payment…', 'success');
+    renderInvoice(data, xmrAmount);
+  } catch (err) {
+    console.error('handleContinueToPayment error:', err);
+    showToast(err.message || 'Failed to start payment', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Continue to payment';
+    }
+  }
+}
+
+function attachContinueHandler() {
+  const btn = document.getElementById('continueToPaymentBtn');
+  if (!btn) return;
+  btn.addEventListener('click', handleContinueToPayment);
+}
+
+function attachCopyAddressHandler() {
+  const btn = document.getElementById('copyAddressBtn');
+  const addrEl = document.getElementById('invoiceAddress');
+  if (!btn || !addrEl) return;
+
+  btn.addEventListener('click', async () => {
+    const text = addrEl.textContent || '';
+    if (!text.trim()) return;
+
+    try {
+      await navigator.clipboard.writeText(text.trim());
+      showToast('Address copied to clipboard', 'success');
+    } catch {
+      showToast('Unable to copy address', 'error');
+    }
+  });
+}
+
+// ===== Init =====
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Require auth for this page
+  const token =
+    typeof getAuthToken === 'function' ? getAuthToken() : null;
+  if (!token) {
+    window.location.href = 'login.html';
+    return;
+  }
+
+  attachPlanHandlers();
+  attachCoinHandlers();
+  attachContinueHandler();
+  attachCopyAddressHandler();
+
+  updatePlanSummary();
+  fetchCryptoPrices();
+  loadSubscriptionStatus();
 });
