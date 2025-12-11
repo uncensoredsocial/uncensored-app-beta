@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Subscription - Uncensored Social</title>
+
+  <!-- Global styles -->
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/feed-styles.css" />
+  <link rel="stylesheet" href="css/icons.css" />
+  <link rel="stylesheet" href="css/payment-styles.css" />
+
+  <!-- Font Awesome -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer"
+  />
+</head>
+
+<body class="payment-page-body">
+  <!-- Header (same vibe as post.html) -->
+  <header class="header">
+    <div class="header-left">
+      <button class="btn btn-icon" id="paymentBackButton" aria-label="Back">
+        <i class="fa-solid fa-arrow-left"></i>
+      </button>
+    </div>
+    <h1 class="logo">Subscription</h1>
+    <div class="header-actions"></div>
+  </header>
+
+  <div class="content-wrapper">
+    <main class="main-content payment-main">
+      <!-- Intro / benefits -->
+      <section class="payment-hero">
+        <h2 class="payment-title">Support Uncensored Social</h2>
+        <p class="payment-subtitle">
+          Go <span class="highlight">Verified</span> and unlock creator tools while funding
+          more privacy features, Monero-first payments, and future iOS/Android apps.
+        </p>
+
+        <ul class="payment-benefits">
+          <li><i class="fa-solid fa-check"></i> Verified checkmark on your profile</li>
+          <li><i class="fa-solid fa-check"></i> Link in bio + creator tools</li>
+          <li><i class="fa-solid fa-check"></i> Access to subscriber-only / secret posts (soon)</li>
+          <li><i class="fa-solid fa-check"></i> Priority for new features & experiments</li>
+        </ul>
+      </section>
+
+      <!-- Plan selection -->
+      <section class="payment-section">
+        <h3 class="section-title">Choose your plan</h3>
+        <div class="plan-grid">
+          <button
+            class="plan-card active"
+            data-plan="monthly"
+            data-price-usd="8"
+          >
+            <div class="plan-label-row">
+              <span class="plan-name">Monthly</span>
+              <span class="plan-tag">Most flexible</span>
+            </div>
+            <div class="plan-price-row">
+              <span class="plan-price">$8</span>
+              <span class="plan-period">per month</span>
+            </div>
+          </button>
+
+          <button
+            class="plan-card"
+            data-plan="yearly"
+            data-price-usd="60"
+          >
+            <div class="plan-label-row">
+              <span class="plan-name">Yearly</span>
+              <span class="plan-tag best-value">Best value</span>
+            </div>
+            <div class="plan-price-row">
+              <span class="plan-price">$60</span>
+              <span class="plan-period">per year</span>
+            </div>
+          </button>
+        </div>
+      </section>
+
+      <!-- Coin selection -->
+      <section class="payment-section">
+        <h3 class="section-title">Pay with crypto</h3>
+        <p class="section-caption">
+          Only <strong>Monero (XMR)</strong> is accepted right now. Others are coming later.
+        </p>
+
+        <div class="coin-grid">
+          <!-- Bitcoin (disabled) -->
+          <button
+            class="coin-card disabled-coin"
+            data-coin="BTC"
+            data-enabled="false"
+          >
+            <div class="coin-info">
+              <img src="bitcoin.png" alt="Bitcoin" class="coin-icon" />
+              <div class="coin-text">
+                <span class="coin-name">Bitcoin</span>
+                <span class="coin-symbol">BTC</span>
+              </div>
+            </div>
+            <span class="coin-status">Soon</span>
+          </button>
+
+          <!-- Ethereum (disabled) -->
+          <button
+            class="coin-card disabled-coin"
+            data-coin="ETH"
+            data-enabled="false"
+          >
+            <div class="coin-info">
+              <img src="ethereum.png" alt="Ethereum" class="coin-icon" />
+              <div class="coin-text">
+                <span class="coin-name">Ethereum</span>
+                <span class="coin-symbol">ETH</span>
+              </div>
+            </div>
+            <span class="coin-status">Soon</span>
+          </button>
+
+          <!-- Solana (disabled) -->
+          <button
+            class="coin-card disabled-coin"
+            data-coin="SOL"
+            data-enabled="false"
+          >
+            <div class="coin-info">
+              <img src="solana.png" alt="Solana" class="coin-icon" />
+              <div class="coin-text">
+                <span class="coin-name">Solana</span>
+                <span class="coin-symbol">SOL</span>
+              </div>
+            </div>
+            <span class="coin-status">Soon</span>
+          </button>
+
+          <!-- USDC (disabled) -->
+          <button
+            class="coin-card disabled-coin"
+            data-coin="USDC"
+            data-enabled="false"
+          >
+            <div class="coin-info">
+              <img src="usdc.png" alt="USDC" class="coin-icon" />
+              <div class="coin-text">
+                <span class="coin-name">USD Coin</span>
+                <span class="coin-symbol">USDC</span>
+              </div>
+            </div>
+            <span class="coin-status">Soon</span>
+          </button>
+
+          <!-- USDT (disabled) -->
+          <button
+            class="coin-card disabled-coin"
+            data-coin="USDT"
+            data-enabled="false"
+          >
+            <div class="coin-info">
+              <img src="usdt.png" alt="USDT" class="coin-icon" />
+              <div class="coin-text">
+                <span class="coin-name">Tether</span>
+                <span class="coin-symbol">USDT</span>
+              </div>
+            </div>
+            <span class="coin-status">Soon</span>
+          </button>
+
+          <!-- Monero (ENABLED) -->
+          <button
+            class="coin-card active"
+            data-coin="XMR"
+            data-enabled="true"
+          >
+            <div class="coin-info">
+              <img src="monero.png" alt="Monero" class="coin-icon" />
+              <div class="coin-text">
+                <span class="coin-name">Monero</span>
+                <span class="coin-symbol">XMR</span>
+              </div>
+            </div>
+            <span class="coin-status primary">Accepted</span>
+          </button>
+        </div>
+
+        <p class="section-caption tiny">
+          When you tap on a coin that isn’t supported yet, you’ll see a message instead of payment details.
+        </p>
+      </section>
+
+      <!-- Price summary + button -->
+      <section class="payment-section">
+        <h3 class="section-title">Price & conversion</h3>
+
+        <div class="price-box">
+          <div class="price-row">
+            <span class="price-label">Plan price</span>
+            <span class="price-value" id="priceUsdLabel">$8.00 USD</span>
+          </div>
+
+          <div class="price-row">
+            <span class="price-label">
+              Estimated crypto amount (<span id="priceCoinCode">XMR</span>)
+            </span>
+            <span class="price-value" id="priceCoinLabel">–</span>
+          </div>
+
+          <div class="price-row price-row-muted">
+            <span class="price-label">Live price source</span>
+            <span class="price-value" id="priceSourceLabel">Loading…</span>
+          </div>
+        </div>
+
+        <button
+          id="generateInvoiceBtn"
+          class="btn btn-primary btn-full"
+          type="button"
+        >
+          Continue to payment
+        </button>
+
+        <p class="section-caption tiny">
+          You’ll get a unique Monero address and QR code. Send the exact amount.
+          Your account will be upgraded after the payment is confirmed.
+        </p>
+      </section>
+
+      <!-- Invoice / payment details (hidden until created) -->
+      <section
+        class="payment-section payment-section-bordered"
+        id="invoiceSection"
+        style="display:none;"
+      >
+        <h3 class="section-title">Payment details</h3>
+
+        <div class="invoice-grid">
+          <div class="invoice-left">
+            <div class="invoice-summary">
+              <div class="invoice-row">
+                <span class="invoice-label">Plan</span>
+                <span class="invoice-value" id="invoicePlanLabel">–</span>
+              </div>
+              <div class="invoice-row">
+                <span class="invoice-label">Amount</span>
+                <span class="invoice-value" id="invoiceAmountLabel">–</span>
+              </div>
+              <div class="invoice-row">
+                <span class="invoice-label">Currency</span>
+                <span class="invoice-value" id="invoiceCurrencyLabel">XMR</span>
+              </div>
+              <div class="invoice-row">
+                <span class="invoice-label">Status</span>
+                <span class="invoice-status" id="invoiceStatusLabel">
+                  Waiting for payment
+                </span>
+              </div>
+            </div>
+
+            <div class="invoice-address-box">
+              <label class="invoice-label">Deposit address</label>
+              <div class="invoice-address-row">
+                <span
+                  id="invoiceAddressText"
+                  class="invoice-address"
+                >
+                  –
+                </span>
+                <button
+                  id="copyAddressBtn"
+                  class="btn btn-secondary btn-icon-only"
+                  type="button"
+                >
+                  <i class="fa-regular fa-copy"></i>
+                </button>
+              </div>
+              <p class="section-caption tiny">
+                Send exactly the required amount to this address. The upgrade is
+                applied after enough confirmations.
+              </p>
+            </div>
+          </div>
+
+          <div class="invoice-right">
+            <div class="qr-wrapper">
+              <div class="qr-inner">
+                <img
+                  id="invoiceQrImage"
+                  alt="Payment QR"
+                  class="qr-image"
+                />
+              </div>
+              <p class="qr-caption">
+                Scan with your Monero wallet
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="confirmations-box">
+          <div class="confirmations-row">
+            <span class="confirmations-label">Confirmations</span>
+            <span class="confirmations-value" id="confirmationsLabel">
+              0 / 10
+            </span>
+          </div>
+          <div class="confirmations-progress">
+            <div
+              class="confirmations-bar"
+              id="confirmationsBar"
+              style="width:0%;"
+            ></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Status toast container -->
+      <div id="paymentStatusContainer"></div>
+    </main>
+  </div>
+
+  <!-- Bottom nav (same structure as other pages) -->
+  <nav class="bottom-nav" id="bottomNav">
+    <a href="index.html" class="nav-item">
+      <i class="fa-solid fa-house nav-icon"></i>
+      <span class="nav-label">Home</span>
+    </a>
+    <a href="search.html" class="nav-item">
+      <i class="fa-solid fa-magnifying-glass nav-icon"></i>
+      <span class="nav-label">Search</span>
+    </a>
+    <a href="notifications.html" class="nav-item">
+      <i class="fa-regular fa-bell nav-icon"></i>
+      <span class="nav-label">Notifications</span>
+    </a>
+    <a href="messages.html" class="nav-item">
+      <i class="fa-regular fa-envelope nav-icon"></i>
+      <span class="nav-label">Messages</span>
+    </a>
+  </nav>
+
+  <!-- Scripts -->
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/payment.js"></script>
+</body>
+</html>
