@@ -10,40 +10,42 @@
    HEADER: centered title + left arrow
 -------------------------------------------------- */
 
+/* Use the global .header from styles.css, but center this one */
 .header.header-centered {
-    /* keep same base behavior as global .header, just tweak spacing */
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 16px;
-    border-bottom: 1px solid #222;
-    background: #000;
-    position: fixed;
+    justify-content: center;          /* center the logo horizontally */
+    position: fixed;                  /* keep same behavior as global header */
     top: 0;
     left: 0;
     right: 0;
-    z-index: 1000;
 }
 
-/* Left/right areas for arrow / future buttons */
-
-.header-left,
-.header-actions {
-    display: flex;
-    align-items: center;
-}
-
-/* Perfectly centered title using absolute centering */
-
+/* Perfectly center the "Settings" text */
 .header.header-centered .logo {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
     text-align: center;
     font-size: 18px;
     font-weight: 600;
-    margin: 0;
-    color: #fff;
+    margin: 0 auto;
+}
+
+/* Put back button and any future actions on the edges,
+   without affecting the centered title */
+.header.header-centered .header-left,
+.header.header-centered .header-actions {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-width: auto; /* override the min-width from styles.css so it doesn't push the title */
+}
+
+.header.header-centered .header-left {
+    left: 16px;
+}
+
+.header.header-centered .header-actions {
+    right: 16px;
 }
 
 /* Back button with Font Awesome arrow */
@@ -138,7 +140,7 @@
     margin-left: 12px;
 }
 
-/* Danger variant (Delete account + Logout) */
+/* Danger variant (Logout + Delete account link on hub) */
 
 .settings-link-danger {
     border-color: #661111;
@@ -289,17 +291,30 @@
     .settings-page {
         padding: 12px 12px 72px;
     }
-
-    .header.header-centered {
-        padding: 8px 12px;
-    }
 }
 
-/* Keep these for layouts that disable side nav */
-body.no-side-nav .side-nav {
-  display: none !important;
+/* --------------------------------------------------
+   BOTTOM NAV ICON SIZE (Font Awesome)
+   Inherit *all* layout from css/styles.css.
+   Just ensure FA icons have a good size like on home.
+-------------------------------------------------- */
+
+.bottom-nav .nav-item {
+    /* copy the vertical layout used on home */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
 }
 
-body.no-side-nav .main-content {
-  margin-left: 0 !important;
+/* Make the Font Awesome icons match the home page size */
+.bottom-nav .nav-icon {
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+/* Centered header title helper (deprecated by above but safe to keep) */
+.header-centered .logo {
+    margin: 0;
 }
