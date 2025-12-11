@@ -1644,175 +1644,203 @@ app.post('/api/posts/upload-media', authMiddleware, async (req, res) => {
 
 // ======================================================
 //                          PAYMENTS
-//          (Monero-only now, coin-agnostic structure)
+//             Simple plans + payments + subscription
 // ======================================================
 
-/**
- * POST /api/payments/create
- * body: { plan: "monthly" | "yearly", currency: "XMR", amount_crypto: number }
- *
- * For now:
- * - Only accepts currency = "XMR"
- * - amount_usd is fixed ($8 or $60)
- * - amount_crypto is provided by frontend (from live price)
- * - address / qr_string should come from your Monero wallet / watcher setup.
- */
+// Optional: hard-code some plans for now
+const PLANS = [
+  {
+    slug: 'business',
+    name: 'Business Account',
+    price_cents: 990, // $9.90
+    currency: 'usd'
+  },
+  {
+    slug: 'creator',
+    name: 'Creator Plus',
+    price_cents: 1490, // $14.90
+    currency: 'usd'
+  }
+];
+
+// Get available plans
+app.get('/api/payments/plans', (req, res) => {
+  res.json({ plans: PLANS });
+});
+
+// Create a "payment" entry (pending)
+// Frontend can call this when user clicks "Buy"
 app.post('/api/payments/create', authMiddleware, async (req, res) => {
   try {
-    const { plan, currency, amount_crypto } = req.body;
+    const userId = req.user.id;
+    const { plan_slug, payment_method } = req.body || {};
 
-    if (!plan || !['monthly', 'yearly'].includes(plan)) {
-      return res.status(400).json({ error: 'Invalid plan' });
+    if (!plan_slug) {
+      return res.status(400).json({ error: 'Missing plan_slug' });
     }
 
-    // Only XMR for now
-    if (!currency || currency !== 'XMR') {
-      return res.status(400).json({ error: 'This currency is not accepted yet.' });
+    const plan = PLANS.find((p) => p.slug === plan_slug) || null;
+    if (!plan) {
+      return res.status(400).json({ error: 'Unknown plan' });
     }
 
-    const amountUsd = plan === 'yearly' ? 60 : 8;
+    const method = payment_method || 'manual'; // e.g. 'monero', 'stripe', etc.
 
-    const amtCryptoNum = Number(amount_crypto || 0);
-    if (!amtCryptoNum || !Number.isFinite(amtCryptoNum) || amtCryptoNum <= 0) {
-      return res
-        .status(400)
-        .json({ error: 'Invalid crypto amount from client.' });
-    }
-
-    // TODO: integrate with monero-wallet-rpc to generate per-invoice subaddress.
-    // For now: placeholder address string – replace with your real XMR address or subaddress.
-    const moneroAddress =
-      process.env.MONERO_PLACEHOLDER_ADDRESS ||
-      'YOUR_MONERO_ADDRESS_HERE';
-
-    // For XMR, the QR string is usually "monero:<address>?tx_amount=<amount>"
-    const qrString = `monero:${moneroAddress}?tx_amount=${amtCryptoNum.toFixed(
-      6
-    )}`;
-
-    const invoice = {
-      id: uuidv4(),
-      user_id: req.user.id,
-      plan,
-      currency,
-      amount_usd: amountUsd,
-      amount_crypto: amtCryptoNum,
-      address: moneroAddress,
-      qr_string: qrString,
-      status: 'pending',
-      tx_hash: null,
-      confirmations: 0,
-      required_confirmations: 10,
-      created_at: new Date().toISOString(),
-      paid_at: null,
-      confirmed_at: null
-    };
-
-    const { data: inserted, error } = await supabase
-      .from('invoices')
-      .insert(invoice)
+    const { data, error } = await supabase
+      .from('payments')
+      .insert({
+        user_id: userId,
+        plan_slug: plan.slug,
+        amount_cents: plan.price_cents,
+        currency: plan.currency,
+        status: 'pending',
+        payment_method: method
+      })
       .select('*')
       .single();
 
     if (error) {
-      console.error('Create invoice error:', error);
-      return res.status(500).json({ error: 'Failed to create invoice' });
+      console.error('Supabase create payment error:', error);
+      return res.status(500).json({ error: 'Failed to create payment.' });
     }
 
-    return res.status(201).json(inserted);
-  } catch (err) {
-    console.error('POST /api/payments/create error:', err);
-    res.status(500).json({ error: 'Failed to create invoice' });
-  }
-});
-
-/**
- * GET /api/payments/status/:id
- * - Returns invoice row for the current user.
- * - Designed so a Monero watcher updates status/confirmations in Supabase.
- */
-app.get('/api/payments/status/:id', authMiddleware, async (req, res) => {
-  try {
-    const invoiceId = req.params.id;
-
-    const { data: invoice, error } = await supabase
-      .from('invoices')
-      .select('*')
-      .eq('id', invoiceId)
-      .eq('user_id', req.user.id)
-      .single();
-
-    if (error || !invoice) {
-      return res.status(404).json({ error: 'Invoice not found' });
-    }
-
-    return res.json(invoice);
-  } catch (err) {
-    console.error('GET /api/payments/status/:id error:', err);
-    res.status(500).json({ error: 'Failed to load invoice status' });
-  }
-});
-
-/**
- * GET /api/payments/my-invoices
- * - Returns recent invoices for the current user
- */
-app.get('/api/payments/my-invoices', authMiddleware, async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('invoices')
-      .select('*')
-      .eq('user_id', req.user.id)
-      .order('created_at', { ascending: false })
-      .limit(25);
-
-    if (error) {
-      console.error('GET /api/payments/my-invoices error:', error);
-      return res.status(500).json({ error: 'Failed to load invoices' });
-    }
-
-    return res.json(data || []);
-  } catch (err) {
-    console.error('GET /api/payments/my-invoices error:', err);
-    res.status(500).json({ error: 'Failed to load invoices' });
-  }
-});
-
-/**
- * GET /api/subscription/me
- * - Returns the latest (non-expired) subscription for current user
- * - You can use this on the frontend to show:
- *   - "Verified" checkmark
- *   - Plan & expiry date
- */
-app.get('/api/subscription/me', authMiddleware, async (req, res) => {
-  try {
-    const nowIso = new Date().toISOString();
-
-    const { data, error } = await supabase
-      .from('subscriptions')
-      .select('*')
-      .eq('user_id', req.user.id)
-      .gt('expires_at', nowIso)
-      .order('expires_at', { ascending: false })
-      .limit(1);
-
-    if (error) {
-      console.error('GET /api/subscription/me error:', error);
-      return res.status(500).json({ error: 'Failed to load subscription' });
-    }
-
-    const active = data && data.length > 0 ? data[0] : null;
-
-    return res.json({
-      active: !!active,
-      subscription: active
+    // Later you can attach Monero / Stripe here (return address, checkout URL, etc.)
+    res.json({
+      payment: data,
+      message: 'Payment created. Complete your payment to activate your plan.'
     });
   } catch (err) {
-    console.error('GET /api/subscription/me error:', err);
-    res.status(500).json({ error: 'Failed to load subscription' });
+    console.error('POST /api/payments/create error:', err);
+    res.status(500).json({ error: 'Server error creating payment.' });
   }
 });
+
+// Get a single payment (for this user)
+app.get('/api/payments/:paymentId', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { paymentId } = req.params;
+
+    const { data, error } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('id', paymentId)
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !data) {
+      console.error('Supabase get payment error:', error);
+      return res.status(404).json({ error: 'Payment not found' });
+    }
+
+    res.json({ payment: data });
+  } catch (err) {
+    console.error('GET /api/payments/:paymentId error:', err);
+    res.status(500).json({ error: 'Server error fetching payment.' });
+  }
+});
+
+// Manually mark a payment as completed (for now)
+// Later this can be done by a webhook or watcher.
+app.post(
+  '/api/payments/:paymentId/mark-completed',
+  authMiddleware,
+  async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const { paymentId } = req.params;
+
+      // 1) Load payment
+      const { data: payment, error: fetchErr } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('id', paymentId)
+        .eq('user_id', userId)
+        .single();
+
+      if (fetchErr || !payment) {
+        console.error('Supabase fetch payment error:', fetchErr);
+        return res.status(404).json({ error: 'Payment not found' });
+      }
+
+      // 2) Update payment -> completed
+      const { data: updatedPayment, error: updateErr } = await supabase
+        .from('payments')
+        .update({
+          status: 'completed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', paymentId)
+        .select('*')
+        .single();
+
+      if (updateErr) {
+        console.error('Supabase update payment error:', updateErr);
+        return res.status(500).json({ error: 'Failed to update payment.' });
+      }
+
+      // 3) Grant subscription on users table (e.g. 30 days)
+      const thirtyDaysFromNow = new Date();
+      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+      const { error: userUpdateErr } = await supabase
+        .from('users')
+        .update({
+          plan_slug: payment.plan_slug,
+          subscription_expires_at: thirtyDaysFromNow.toISOString()
+        })
+        .eq('id', userId);
+
+      if (userUpdateErr) {
+        console.error('Supabase update user plan error:', userUpdateErr);
+        // still return success for payment
+      }
+
+      res.json({
+        payment: updatedPayment,
+        message: 'Payment marked completed and plan activated.'
+      });
+    } catch (err) {
+      console.error(
+        'POST /api/payments/:paymentId/mark-completed error:',
+        err
+      );
+      res.status(500).json({ error: 'Server error completing payment.' });
+    }
+  }
+);
+
+// Get my current subscription info from users table
+app.get(
+  '/api/payments/me/subscription',
+  authMiddleware,
+  async (req, res) => {
+    try {
+      const userId = req.user.id;
+
+      const { data: user, error } = await supabase
+        .from('users')
+        .select('plan_slug, subscription_expires_at')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Supabase fetch subscription error:', error);
+        return res
+          .status(500)
+          .json({ error: 'Failed to fetch subscription.' });
+      }
+
+      res.json({ subscription: user });
+    } catch (err) {
+      console.error(
+        'GET /api/payments/me/subscription error:',
+        err
+      );
+      res.status(500).json({ error: 'Server error fetching subscription.' });
+    }
+  }
+);
 
 // ======================================================
 //                      START SERVER
