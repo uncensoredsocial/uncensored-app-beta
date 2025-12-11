@@ -1643,6 +1643,117 @@ app.post('/api/posts/upload-media', authMiddleware, async (req, res) => {
 });
 
 // ======================================================
+//                          PAYMENTS
+//          (Monero-only now, coin-agnostic structure)
+// ======================================================
+
+/**
+ * POST /api/payments/create
+ * body: { plan: "monthly" | "yearly", currency: "XMR", amount_crypto: number }
+ *
+ * For now:
+ * - Only accepts currency = "XMR"
+ * - amount_usd is fixed ($8 or $60)
+ * - amount_crypto is provided by frontend (from live price)
+ * - address / qr_string should come from your Monero wallet / watcher setup.
+ */
+app.post('/api/payments/create', authMiddleware, async (req, res) => {
+  try {
+    const { plan, currency, amount_crypto } = req.body;
+
+    if (!plan || !['monthly', 'yearly'].includes(plan)) {
+      return res.status(400).json({ error: 'Invalid plan' });
+    }
+
+    // Only XMR for now
+    if (!currency || currency !== 'XMR') {
+      return res.status(400).json({ error: 'This currency is not accepted yet.' });
+    }
+
+    const amountUsd = plan === 'yearly' ? 60 : 8;
+
+    const amtCryptoNum = Number(amount_crypto || 0);
+    if (!amtCryptoNum || !Number.isFinite(amtCryptoNum) || amtCryptoNum <= 0) {
+      return res
+        .status(400)
+        .json({ error: 'Invalid crypto amount from client.' });
+    }
+
+    // TODO: integrate with monero-wallet-rpc to generate per-invoice subaddress.
+    // For now: placeholder address string – replace with your real XMR address or subaddress.
+    const moneroAddress =
+      process.env.MONERO_PLACEHOLDER_ADDRESS ||
+      'YOUR_MONERO_ADDRESS_HERE';
+
+    // For XMR, the QR string is usually "monero:<address>?tx_amount=<amount>"
+    const qrString = `monero:${moneroAddress}?tx_amount=${amtCryptoNum.toFixed(
+      6
+    )}`;
+
+    const invoice = {
+      id: uuidv4(),
+      user_id: req.user.id,
+      plan,
+      currency,
+      amount_usd: amountUsd,
+      amount_crypto: amtCryptoNum,
+      address: moneroAddress,
+      qr_string: qrString,
+      status: 'pending',
+      tx_hash: null,
+      confirmations: 0,
+      required_confirmations: 10,
+      created_at: new Date().toISOString(),
+      paid_at: null,
+      confirmed_at: null
+    };
+
+    const { data: inserted, error } = await supabase
+      .from('invoices')
+      .insert(invoice)
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('Create invoice error:', error);
+      return res.status(500).json({ error: 'Failed to create invoice' });
+    }
+
+    return res.status(201).json(inserted);
+  } catch (err) {
+    console.error('POST /api/payments/create error:', err);
+    res.status(500).json({ error: 'Failed to create invoice' });
+  }
+});
+
+/**
+ * GET /api/payments/status/:id
+ * - Returns invoice row for the current user.
+ * - Designed so a Monero watcher updates status/confirmations in Supabase.
+ */
+app.get('/api/payments/status/:id', authMiddleware, async (req, res) => {
+  try {
+    const invoiceId = req.params.id;
+
+    const { data: invoice, error } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('id', invoiceId)
+      .eq('user_id', req.user.id)
+      .single();
+
+    if (error || !invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    return res.json(invoice);
+  } catch (err) {
+    console.error('GET /api/payments/status/:id error:', err);
+    res.status(500).json({ error: 'Failed to load invoice status' });
+  }
+});
+
+// ======================================================
 //                      START SERVER
 // ======================================================
 
