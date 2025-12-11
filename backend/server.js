@@ -8,6 +8,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { createClient } = require('@supabase/supabase-js');
+const fetch = require('node-fetch'); // if not already installed, add to package.json
 
 const app = express();
 const PORT = process.env.PORT || 3000;
