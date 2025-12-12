@@ -7,12 +7,24 @@ const USER_KEY = 'us_current_user';
 // ===== Storage helpers =====
 function setAuthToken(token) {
     localStorage.setItem(TOKEN_KEY, token);
+
+    // --- COMPAT: some older scripts might read "token" ---
+    // Keep them in sync so payments / other pages don’t break.
+    try {
+        localStorage.setItem('token', token);
+    } catch (e) {}
 }
 function getAuthToken() {
-    return localStorage.getItem(TOKEN_KEY);
+    // Prefer the real key, but fallback to older "token" if it exists.
+    return localStorage.getItem(TOKEN_KEY) || localStorage.getItem('token');
 }
 function clearAuthToken() {
     localStorage.removeItem(TOKEN_KEY);
+
+    // --- COMPAT ---
+    try {
+        localStorage.removeItem('token');
+    } catch (e) {}
 }
 
 function setCurrentUser(user) {
@@ -47,6 +59,65 @@ window.setCurrentUser = setCurrentUser;
 window.getCurrentUser = getCurrentUser;
 window.isLoggedIn = isLoggedIn;
 window.logout = logout;
+
+// ======================================================
+// NEW: Redirect-back + require login helpers (site-wide)
+// ======================================================
+
+// Save current page so login can return you back here
+function saveReturnUrl(url) {
+    try {
+        const u = url || window.location.href;
+
+        // Don’t store login/signup as return targets
+        if (u.includes('login.html') || u.includes('signup.html')) return;
+
+        sessionStorage.setItem('returnTo', u);
+    } catch (e) {}
+}
+
+// Go back to saved page, otherwise go home
+function redirectAfterLogin(fallback = 'index.html') {
+    try {
+        const returnTo = sessionStorage.getItem('returnTo');
+        if (returnTo) {
+            sessionStorage.removeItem('returnTo');
+            window.location.href = returnTo;
+            return;
+        }
+    } catch (e) {}
+    window.location.href = fallback;
+}
+
+// Guard for pages/actions that require auth (payments, settings, etc)
+function requireLoginOrRedirect(message) {
+    const token = (getAuthToken() || '').trim();
+    if (!token) {
+        saveReturnUrl();
+        if (message) {
+            try { sessionStorage.setItem('authReason', message); } catch (e) {}
+        }
+        window.location.href = 'login.html';
+        return false;
+    }
+    return true;
+}
+
+// Expose globally so payment.js etc can use it
+window.saveReturnUrl = saveReturnUrl;
+window.redirectAfterLogin = redirectAfterLogin;
+window.requireLoginOrRedirect = requireLoginOrRedirect;
+
+// Optional: read reason on login page (if you want to display it)
+window.getAuthReason = function () {
+    try {
+        const msg = sessionStorage.getItem('authReason');
+        if (msg) sessionStorage.removeItem('authReason');
+        return msg;
+    } catch (e) {
+        return null;
+    }
+};
 
 // ===== UI helpers =====
 function showAuthMessage(el, message, type = 'error') {
@@ -126,8 +197,8 @@ async function handleSignup(e) {
         showAuthMessage(successMessage, 'Account created! Redirecting...', 'success');
 
         setTimeout(() => {
-            // New users are normal users by default -> go to home feed
-            window.location.href = 'index.html';
+            // NEW: if we came here from another page, go back there
+            redirectAfterLogin('index.html');
         }, 800);
     } catch (err) {
         console.error('Signup error:', err);
@@ -200,8 +271,8 @@ async function handleLogin(e) {
             // Admin -> dashboard
             window.location.href = 'admin.html';
         } else {
-            // Normal user -> main home feed
-            window.location.href = 'index.html';
+            // NEW: go back to the page the user was trying to view
+            redirectAfterLogin('index.html');
         }
     } catch (err) {
         console.error('Login error:', err);
@@ -224,6 +295,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (loginForm) {
         loginForm.addEventListener('submit', handleLogin);
+
+        // Optional: if you want to show why user was redirected to login
+        const reason = window.getAuthReason ? window.getAuthReason() : null;
+        const errorMessage = document.getElementById('errorMessage');
+        if (reason && errorMessage) {
+            showAuthMessage(errorMessage, reason, 'error');
+        }
     }
 
     // Header auth/profile toggle (only on pages that have these)
