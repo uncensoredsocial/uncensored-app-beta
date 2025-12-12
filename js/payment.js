@@ -1,15 +1,14 @@
 // js/payment.js
+
 const PAYMENT_API_BASE_URL =
   typeof API_BASE_URL !== "undefined"
     ? API_BASE_URL
     : "https://uncensored-app-beta-production.up.railway.app/api";
 
-const TOKEN_KEY = "us_auth_token";
-
 document.addEventListener("DOMContentLoaded", () => {
-  // -----------------------------
+  // ----------------------------
   // DOM
-  // -----------------------------
+  // ----------------------------
   const backBtn = document.getElementById("paymentBackButton");
 
   const planButtons = Array.from(document.querySelectorAll(".plan-card"));
@@ -40,42 +39,48 @@ document.addEventListener("DOMContentLoaded", () => {
   const copyAddressBtn = document.getElementById("copyAddressBtn");
   const statusContainer = document.getElementById("paymentStatusContainer");
 
-  // Safety: if critical elements are missing, tell you immediately.
-  if (!generateInvoiceBtn) {
-    console.error("payment.js: Missing #generateInvoiceBtn in HTML");
-  }
-  if (!priceSourceLabel) {
-    console.warn("payment.js: Missing #priceSourceLabel in HTML");
-  }
-
-  // -----------------------------
-  // STATE
-  // -----------------------------
+  // ----------------------------
+  // State
+  // ----------------------------
   let selectedPlan = "monthly";
   let selectedPlanUsd = 8;
-  let selectedCurrency = "XMR";
 
-  let prices = null; // { BTC, ETH, SOL, USDT, USDC, XMR }
+  let selectedCoin = "XMR"; // only supported
+  let prices = null;
+
   let currentInvoiceId = null;
-
   let countdownTimerId = null;
-  let statusPollId = null;
+  let pollTimerId = null;
 
-  const invoiceLifetimeSeconds = 30 * 60;
+  const invoiceLifetimeSeconds = 30 * 60; // 30 min
 
-  // -----------------------------
-  // UTILS
-  // -----------------------------
-  function getAuthTokenSafe() {
-    try {
-      if (typeof window.getAuthToken === "function") {
-        return window.getAuthToken() || "";
-      }
-    } catch {}
-    return localStorage.getItem(TOKEN_KEY) || "";
+  // ----------------------------
+  // Token helper (fixes “Missing auth token” / “Invalid token” UX)
+  // ----------------------------
+  function getToken() {
+    return (
+      localStorage.getItem("token") ||
+      localStorage.getItem("authToken") ||
+      localStorage.getItem("jwt") ||
+      ""
+    );
   }
 
-  function showToast(message, type = "default", ms = 3500) {
+  function requireLoginOrToast() {
+    const token = getToken();
+    if (!token) {
+      showToast("You must be logged in to subscribe.", "error");
+      // optional redirect:
+      setTimeout(() => (window.location.href = "login.html"), 700);
+      return null;
+    }
+    return token;
+  }
+
+  // ----------------------------
+  // Toasts
+  // ----------------------------
+  function showToast(message, type = "default", ms = 3200) {
     if (!statusContainer) return;
     const div = document.createElement("div");
     div.className = "payment-toast" + (type !== "default" ? " " + type : "");
@@ -84,560 +89,414 @@ document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => div.remove(), ms);
   }
 
-  function setInvoiceSectionVisible(visible) {
-    if (!invoiceSection) return;
-    invoiceSection.style.display = visible ? "block" : "none";
+  // ----------------------------
+  // Back button
+  // ----------------------------
+  if (backBtn) {
+    backBtn.addEventListener("click", () => {
+      // go back if possible, else go home
+      if (window.history.length > 1) window.history.back();
+      else window.location.href = "settings.html";
+    });
   }
 
-  function clearTimers() {
-    if (countdownTimerId) {
-      clearInterval(countdownTimerId);
-      countdownTimerId = null;
-    }
-    if (statusPollId) {
-      clearInterval(statusPollId);
-      statusPollId = null;
-    }
-  }
+  // ----------------------------
+  // Plan selection (fixes “can’t switch monthly/yearly”)
+  // ----------------------------
+  function setActivePlan(btn) {
+    planButtons.forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
 
-  function formatUsd(n) {
-    const num = Number(n);
-    if (!Number.isFinite(num)) return "—";
-    return `$${num.toFixed(2)} USD`;
-  }
+    selectedPlan = btn.dataset.plan === "yearly" ? "yearly" : "monthly";
+    selectedPlanUsd = Number(btn.dataset.priceUsd || (selectedPlan === "yearly" ? 60 : 8));
 
-  function planLabel(plan) {
-    return plan === "yearly" ? "Yearly" : "Monthly";
-  }
-
-  function ensureLoggedInOrToast() {
-    const token = getAuthTokenSafe();
-    if (!token) {
-      showToast("You must be logged in to subscribe.", "error");
-      return false;
-    }
-    return true;
-  }
-
-  function resetInvoiceUi() {
-    currentInvoiceId = null;
-    clearTimers();
-
-    setInvoiceSectionVisible(false);
-
-    if (invoicePlanLabel) invoicePlanLabel.textContent = "–";
-    if (invoiceAmountLabel) invoiceAmountLabel.textContent = "–";
-    if (invoiceCurrencyLabel) invoiceCurrencyLabel.textContent = "XMR";
-    if (invoiceStatusLabel) invoiceStatusLabel.textContent = "Waiting for payment";
-    if (invoiceCountdownLabel) invoiceCountdownLabel.textContent = "30:00";
-
-    if (invoiceAddressText) invoiceAddressText.textContent = "–";
-
-    if (invoiceQrImage) {
-      invoiceQrImage.removeAttribute("src");
-      invoiceQrImage.alt = "Payment QR";
-    }
-
-    if (confirmationsLabel) confirmationsLabel.textContent = "0 / 10";
-    if (confirmationsBar) confirmationsBar.style.width = "0%";
-  }
-
-  // -----------------------------
-  // FETCH WITH TIMEOUT
-  // -----------------------------
-  async function fetchWithTimeout(url, opts = {}, timeoutMs = 8000) {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch(url, { ...opts, signal: controller.signal });
-      clearTimeout(id);
-      return res;
-    } catch (e) {
-      clearTimeout(id);
-      throw e;
-    }
-  }
-
-  // -----------------------------
-  // PRICE SOURCES (fallbacks)
-  // -----------------------------
-  async function loadPricesFromCoinGecko() {
-    const url =
-      "https://api.coingecko.com/api/v3/simple/price" +
-      "?ids=bitcoin,ethereum,solana,tether,usd-coin,monero&vs_currencies=usd";
-
-    const res = await fetchWithTimeout(url, {}, 9000);
-    if (!res.ok) throw new Error("CoinGecko HTTP " + res.status);
-    const json = await res.json();
-
-    return {
-      BTC: json.bitcoin?.usd ?? null,
-      ETH: json.ethereum?.usd ?? null,
-      SOL: json.solana?.usd ?? null,
-      USDT: json.tether?.usd ?? null,
-      USDC: json["usd-coin"]?.usd ?? null,
-      XMR: json.monero?.usd ?? null,
-      _source: "CoinGecko"
-    };
-  }
-
-  async function loadPricesFromCoinCap() {
-    // CoinCap provides per-asset endpoints; use XMR + a few basics
-    async function get(assetId) {
-      const res = await fetchWithTimeout(`https://api.coincap.io/v2/assets/${assetId}`, {}, 9000);
-      if (!res.ok) throw new Error("CoinCap HTTP " + res.status);
-      const json = await res.json();
-      const priceUsd = Number(json?.data?.priceUsd);
-      return Number.isFinite(priceUsd) ? priceUsd : null;
-    }
-
-    const [BTC, ETH, SOL, USDT, USDC, XMR] = await Promise.all([
-      get("bitcoin"),
-      get("ethereum"),
-      get("solana"),
-      get("tether"),
-      get("usd-coin"),
-      get("monero")
-    ]);
-
-    return { BTC, ETH, SOL, USDT, USDC, XMR, _source: "CoinCap" };
-  }
-
-  async function loadPricesFromCryptoCompare() {
-    // CryptoCompare simple multi-price endpoint (no key often works for low usage)
-    const url =
-      "https://min-api.cryptocompare.com/data/pricemulti" +
-      "?fsyms=BTC,ETH,SOL,USDT,USDC,XMR&tsyms=USD";
-
-    const res = await fetchWithTimeout(url, {}, 9000);
-    if (!res.ok) throw new Error("CryptoCompare HTTP " + res.status);
-    const json = await res.json();
-
-    return {
-      BTC: json.BTC?.USD ?? null,
-      ETH: json.ETH?.USD ?? null,
-      SOL: json.SOL?.USD ?? null,
-      USDT: json.USDT?.USD ?? null,
-      USDC: json.USDC?.USD ?? null,
-      XMR: json.XMR?.USD ?? null,
-      _source: "CryptoCompare"
-    };
-  }
-
-  async function loadPrices() {
-    try {
-      if (priceSourceLabel) priceSourceLabel.textContent = "Loading…";
-
-      let p = null;
-      let lastErr = null;
-
-      // Try sources in order
-      for (const fn of [loadPricesFromCoinGecko, loadPricesFromCoinCap, loadPricesFromCryptoCompare]) {
-        try {
-          p = await fn();
-          break;
-        } catch (e) {
-          lastErr = e;
-          console.warn("Price source failed:", e?.message || e);
-        }
-      }
-
-      if (!p || !p.XMR) {
-        throw lastErr || new Error("No price sources available");
-      }
-
-      prices = p;
-
-      // Update coin card price labels
-      const setPrice = (id, value) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        if (!value) el.textContent = "—";
-        else {
-          el.textContent = `$${Number(value).toLocaleString(undefined, {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-          })}`;
-        }
-      };
-
-      setPrice("btcPriceUsd", prices.BTC);
-      setPrice("ethPriceUsd", prices.ETH);
-      setPrice("solPriceUsd", prices.SOL);
-      setPrice("usdcPriceUsd", prices.USDC);
-      setPrice("usdtPriceUsd", prices.USDT);
-      setPrice("xmrPriceUsd", prices.XMR);
-
-      if (priceSourceLabel) {
-        priceSourceLabel.textContent = `Updated just now (${prices._source})`;
-      }
-
-      recalcXmrAmount();
-    } catch (err) {
-      console.error("Failed to load prices:", err);
-      prices = null;
-
-      if (priceSourceLabel) priceSourceLabel.textContent = "Unavailable";
-      if (priceCoinLabel) priceCoinLabel.textContent = "—";
-
-      showToast("Could not load live prices. Try again later.", "error");
-    }
-  }
-
-  function recalcXmrAmount() {
-    if (!prices || !prices.XMR || !Number.isFinite(Number(prices.XMR))) {
-      if (priceCoinLabel) priceCoinLabel.textContent = "—";
-      return;
-    }
-    const xmrPrice = Number(prices.XMR);
-    const amt = selectedPlanUsd / xmrPrice;
-    const rounded = Math.max(amt, 0).toFixed(6);
-    if (priceCoinLabel) priceCoinLabel.textContent = `${rounded} XMR`;
-    if (priceCoinCode) priceCoinCode.textContent = "XMR";
-  }
-
-  // -----------------------------
-  // PLAN + COIN HANDLERS
-  // -----------------------------
-  function updatePlanStateFromDom() {
-    const activeBtn = planButtons.find((btn) => btn.classList.contains("active"));
-    if (!activeBtn) return;
-
-    selectedPlan = activeBtn.dataset.plan === "yearly" ? "yearly" : "monthly";
-    selectedPlanUsd = selectedPlan === "yearly" ? 60 : 8;
-
-    if (priceUsdLabel) priceUsdLabel.textContent = formatUsd(selectedPlanUsd);
+    if (priceUsdLabel) priceUsdLabel.textContent = `$${selectedPlanUsd.toFixed(2)} USD`;
 
     recalcXmrAmount();
-    resetInvoiceUi();
   }
 
   planButtons.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      planButtons.forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      updatePlanStateFromDom();
-    });
+    btn.addEventListener("click", () => setActivePlan(btn));
   });
+
+  // ----------------------------
+  // Coin selection (HTML uses data-coin + data-enabled)
+  // ----------------------------
+  function setActiveCoin(btn) {
+    const coin = (btn.dataset.coin || "").toUpperCase();
+    const enabled = btn.dataset.enabled === "true";
+
+    if (!coin) return;
+
+    if (!enabled) {
+      showToast(`${coin} is not supported yet. Use Monero (XMR) for now.`, "error");
+      return;
+    }
+
+    // Only XMR supported for now
+    if (coin !== "XMR") {
+      showToast(`${coin} is not supported yet. Use Monero (XMR) for now.`, "error");
+      return;
+    }
+
+    selectedCoin = "XMR";
+    coinButtons.forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+
+    if (priceCoinCode) priceCoinCode.textContent = "XMR";
+    recalcXmrAmount();
+  }
 
   coinButtons.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const coin = (btn.dataset.coin || "").toUpperCase();
-      const enabled = (btn.dataset.enabled || "false") === "true";
-
-      if (!coin) return;
-
-      if (!enabled || coin !== "XMR") {
-        showToast(`${coin} is not supported yet. Use Monero (XMR) for now.`, "error");
-        return;
-      }
-
-      selectedCurrency = "XMR";
-      coinButtons.forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-
-      if (priceCoinCode) priceCoinCode.textContent = "XMR";
-      recalcXmrAmount();
-      resetInvoiceUi();
-    });
+    btn.addEventListener("click", () => setActiveCoin(btn));
   });
 
-  // -----------------------------
-  // SUBSCRIPTION STATUS (optional UI)
-  // -----------------------------
+  // ----------------------------
+  // Price loading (CoinGecko + fallback)
+  // ----------------------------
+  async function fetchJsonWithTimeout(url, ms = 9000) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), ms);
+    try {
+      const res = await fetch(url, { signal: ctrl.signal });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return await res.json();
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
+  async function loadPrices() {
+    if (priceSourceLabel) priceSourceLabel.textContent = "Loading…";
+
+    // 1) CoinGecko
+    try {
+      const json = await fetchJsonWithTimeout(
+        "https://api.coingecko.com/api/v3/simple/price?ids=monero&vs_currencies=usd",
+        9000
+      );
+
+      const xmr = json?.monero?.usd ?? null;
+      if (!xmr) throw new Error("No XMR price");
+
+      prices = { XMR: Number(xmr) };
+
+      if (priceSourceLabel) priceSourceLabel.textContent = "Updated (CoinGecko)";
+      recalcXmrAmount();
+      return;
+    } catch (e) {
+      console.warn("CoinGecko failed:", e);
+    }
+
+    // 2) Fallback (CoinCap)
+    try {
+      const json = await fetchJsonWithTimeout(
+        "https://api.coincap.io/v2/assets/monero",
+        9000
+      );
+
+      const xmr = json?.data?.priceUsd ? Number(json.data.priceUsd) : null;
+      if (!xmr || !Number.isFinite(xmr)) throw new Error("No XMR price");
+
+      prices = { XMR: xmr };
+
+      if (priceSourceLabel) priceSourceLabel.textContent = "Updated (CoinCap)";
+      recalcXmrAmount();
+      return;
+    } catch (e) {
+      console.warn("CoinCap failed:", e);
+    }
+
+    // total failure
+    prices = null;
+    if (priceSourceLabel) priceSourceLabel.textContent = "Price unavailable";
+    if (priceCoinLabel) priceCoinLabel.textContent = "—";
+    showToast("Could not load XMR price right now. Try again later.", "error");
+  }
+
+  function recalcXmrAmount() {
+    if (!priceCoinLabel) return;
+
+    const xmrPrice = prices?.XMR;
+    if (!xmrPrice || !Number.isFinite(xmrPrice) || xmrPrice <= 0) {
+      priceCoinLabel.textContent = "—";
+      return;
+    }
+
+    const amt = selectedPlanUsd / xmrPrice;
+    const amtRounded = Math.max(amt, 0).toFixed(6);
+    priceCoinLabel.textContent = `${amtRounded} XMR`;
+  }
+
+  // ----------------------------
+  // Subscription status UI
+  // ----------------------------
   async function loadSubscriptionStatus() {
-    if (!subscriptionStatus) return;
-    const token = getAuthTokenSafe();
-    if (!token) {
-      subscriptionStatus.innerHTML = "";
+    const token = getToken();
+    if (!token || !subscriptionStatus) {
+      if (subscriptionStatus) subscriptionStatus.innerHTML = "";
       return;
     }
 
     try {
       const res = await fetch(`${PAYMENT_API_BASE_URL}/subscription/me`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
       });
 
-      if (!res.ok) {
-        subscriptionStatus.innerHTML = "";
-        return;
-      }
+      if (!res.ok) return;
 
       const data = await res.json();
-      if (data?.active && data.subscription) {
-        const exp = data.subscription.expires_at
+      if (data?.active) {
+        const exp = data.subscription?.expires_at
           ? new Date(data.subscription.expires_at).toLocaleString()
           : "—";
-        subscriptionStatus.innerHTML =
-          `<div class="subscription-status-card active">` +
-          `<div class="subscription-status-title">✅ You are Verified</div>` +
-          `<div class="subscription-status-text">Plan: <strong>${data.subscription.plan || "—"}</strong></div>` +
-          `<div class="subscription-status-text">Expires: <strong>${exp}</strong></div>` +
-          `</div>`;
+        subscriptionStatus.innerHTML = `
+          <div class="price-box">
+            <div class="price-row">
+              <span class="price-label">Subscription</span>
+              <span class="price-value">Active</span>
+            </div>
+            <div class="price-row price-row-muted">
+              <span class="price-label">Expires</span>
+              <span class="price-value">${exp}</span>
+            </div>
+          </div>
+        `;
       } else {
-        subscriptionStatus.innerHTML =
-          `<div class="subscription-status-card">` +
-          `<div class="subscription-status-title">No active subscription</div>` +
-          `<div class="subscription-status-text">Choose a plan to become Verified.</div>` +
-          `</div>`;
+        subscriptionStatus.innerHTML = "";
       }
-    } catch {
-      subscriptionStatus.innerHTML = "";
+    } catch (e) {
+      console.warn("subscription status failed:", e);
     }
   }
 
-  // -----------------------------
-  // COUNTDOWN + POLL
-  // -----------------------------
+  // ----------------------------
+  // Invoice UI helpers
+  // ----------------------------
+  function clearTimers() {
+    if (countdownTimerId) clearInterval(countdownTimerId);
+    if (pollTimerId) clearInterval(pollTimerId);
+    countdownTimerId = null;
+    pollTimerId = null;
+  }
+
+  function showInvoiceSection() {
+    if (!invoiceSection) return;
+    invoiceSection.style.display = "block";
+    // smooth scroll to it
+    setTimeout(() => {
+      invoiceSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
+
   function startCountdown(seconds) {
     if (!invoiceCountdownLabel) return;
 
     let remaining = seconds;
 
-    const update = () => {
+    const tick = () => {
       const m = Math.floor(remaining / 60).toString().padStart(2, "0");
-      const s = (remaining % 60).toString().padStart(2, "0");
+      const s = Math.floor(remaining % 60).toString().padStart(2, "0");
       invoiceCountdownLabel.textContent = `${m}:${s}`;
-      remaining -= 1;
 
+      remaining -= 1;
       if (remaining < 0) {
         clearInterval(countdownTimerId);
         countdownTimerId = null;
-        showToast("Invoice expired. Create a new one.", "error");
       }
     };
 
-    update();
-    countdownTimerId = setInterval(update, 1000);
+    tick();
+    countdownTimerId = setInterval(tick, 1000);
+  }
+
+  function setConfirmations(conf, req) {
+    if (!confirmationsLabel || !confirmationsBar) return;
+    const safeReq = req && Number.isFinite(req) ? req : 10;
+    const safeConf = conf && Number.isFinite(conf) ? conf : 0;
+
+    confirmationsLabel.textContent = `${safeConf} / ${safeReq}`;
+    const pct = Math.max(0, Math.min(100, (safeConf / safeReq) * 100));
+    confirmationsBar.style.width = `${pct}%`;
   }
 
   async function pollInvoiceStatus(invoiceId) {
-    if (!invoiceId) return;
-    const token = getAuthTokenSafe();
+    const token = getToken();
     if (!token) return;
 
     async function tick() {
       try {
         const res = await fetch(
           `${PAYMENT_API_BASE_URL}/payments/status/${encodeURIComponent(invoiceId)}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
         );
 
-        if (!res.ok) {
-          if (res.status === 401) {
-            showToast("Session expired. Please log in again.", "error");
-            clearInterval(statusPollId);
-            statusPollId = null;
-          }
+        if (res.status === 401) {
+          showToast("Session expired. Please log in again.", "error");
+          clearTimers();
+          setTimeout(() => (window.location.href = "login.html"), 700);
           return;
         }
 
-        const data = await res.json();
+        if (!res.ok) return;
 
-        if (invoiceStatusLabel) {
-          invoiceStatusLabel.textContent =
-            data.status === "confirmed"
-              ? "Confirmed"
-              : data.status === "paid"
-              ? "Payment received (confirming…)"
-              : data.status === "pending"
-              ? "Waiting for payment"
-              : (data.status || "Waiting for payment");
+        const inv = await res.json();
+
+        if (invoiceStatusLabel) invoiceStatusLabel.textContent = inv.status || "pending";
+
+        if (typeof inv.confirmations === "number" || typeof inv.required_confirmations === "number") {
+          setConfirmations(inv.confirmations || 0, inv.required_confirmations || 10);
         }
 
-        const conf = typeof data.confirmations === "number" ? data.confirmations : 0;
-        const req = typeof data.required_confirmations === "number" ? data.required_confirmations : 10;
-
-        if (confirmationsLabel) confirmationsLabel.textContent = `${conf} / ${req}`;
-        if (confirmationsBar) {
-          const pct = Math.max(0, Math.min(100, (conf / Math.max(1, req)) * 100));
-          confirmationsBar.style.width = `${pct}%`;
-        }
-
-        if (data.status === "confirmed") {
+        if (inv.status === "confirmed") {
           showToast("Payment confirmed. Your subscription will update shortly.", "success");
-          clearInterval(statusPollId);
-          statusPollId = null;
+          clearTimers();
           loadSubscriptionStatus();
         }
-      } catch (err) {
-        console.error("Status poll failed:", err);
+      } catch (e) {
+        console.warn("poll failed:", e);
       }
     }
 
     await tick();
-    statusPollId = setInterval(tick, 20000);
+    pollTimerId = setInterval(tick, 15000);
   }
 
-  // -----------------------------
-  // CREATE INVOICE
-  // -----------------------------
+  // ----------------------------
+  // Create invoice
+  // ----------------------------
   async function handleGenerateInvoice() {
-    // Make button feel responsive immediately
-    showToast("Starting payment…", "default", 1200);
+    // Must be logged in
+    const token = requireLoginOrToast();
+    if (!token) return;
 
-    if (!ensureLoggedInOrToast()) return;
-
-    if (selectedCurrency !== "XMR") {
-      showToast("Right now only Monero (XMR) is accepted.", "error");
-      return;
-    }
-
-    if (!prices || !prices.XMR) {
+    // Must have price
+    const xmrPrice = prices?.XMR;
+    if (!xmrPrice || !Number.isFinite(xmrPrice)) {
       showToast("Still loading XMR price… try again in a moment.", "error");
       return;
     }
 
-    const xmrPrice = Number(prices.XMR);
-    if (!xmrPrice || !Number.isFinite(xmrPrice) || xmrPrice <= 0) {
-      showToast("XMR price unavailable.", "error");
-      return;
-    }
-
+    // compute amount
     const amountXmr = selectedPlanUsd / xmrPrice;
 
-    if (generateInvoiceBtn) {
-      generateInvoiceBtn.disabled = true;
-      generateInvoiceBtn.textContent = "Creating invoice…";
-    }
+    // UI
+    if (generateInvoiceBtn) generateInvoiceBtn.disabled = true;
 
     try {
-      const token = getAuthTokenSafe();
-
       const res = await fetch(`${PAYMENT_API_BASE_URL}/payments/create`, {
         method: "POST",
         headers: {
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
           plan: selectedPlan,
           currency: "XMR",
-          amount_crypto: Number(amountXmr.toFixed(12))
-        })
+          amount_crypto: amountXmr,
+        }),
       });
 
-      const errJson = !res.ok ? await res.json().catch(() => ({})) : null;
-
-      if (!res.ok) {
-        const msg =
-          errJson?.error ||
-          (res.status === 401
-            ? "Session expired. Please log in again."
-            : `Failed to create invoice (HTTP ${res.status})`);
-        showToast(msg, "error");
+      if (res.status === 401) {
+        showToast("Invalid or expired token. Log in again.", "error");
+        setTimeout(() => (window.location.href = "login.html"), 700);
         return;
       }
 
-      const invoice = await res.json();
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        showToast(data?.error || `Failed to create invoice (HTTP ${res.status})`, "error");
+        return;
+      }
+
+      const invoice = data;
       currentInvoiceId = invoice.id;
 
-      setInvoiceSectionVisible(true);
+      // Fill invoice section
+      if (invoicePlanLabel) {
+        invoicePlanLabel.textContent = selectedPlan === "yearly" ? "Yearly" : "Monthly";
+      }
 
-      if (invoicePlanLabel) invoicePlanLabel.textContent = planLabel(invoice.plan || selectedPlan);
+      const amtCrypto = Number(invoice.amount_crypto ?? amountXmr);
+      const amtUsd = Number(invoice.amount_usd ?? selectedPlanUsd);
 
       if (invoiceAmountLabel) {
-        const xmrAmt = Number(invoice.amount_crypto ?? amountXmr);
-        const usdAmt = Number(invoice.amount_usd ?? selectedPlanUsd);
-        invoiceAmountLabel.textContent = `${xmrAmt.toFixed(6)} XMR (≈ $${usdAmt.toFixed(2)})`;
+        invoiceAmountLabel.textContent = `${amtCrypto.toFixed(6)} XMR (≈ $${amtUsd.toFixed(2)})`;
       }
+      if (invoiceCurrencyLabel) invoiceCurrencyLabel.textContent = "XMR";
 
-      if (invoiceCurrencyLabel) invoiceCurrencyLabel.textContent = (invoice.currency || "XMR").toUpperCase();
-
-      if (invoiceStatusLabel) {
-        invoiceStatusLabel.textContent =
-          invoice.status === "pending" ? "Waiting for payment" : (invoice.status || "Waiting for payment");
-      }
-
+      if (invoiceStatusLabel) invoiceStatusLabel.textContent = invoice.status || "pending";
       if (invoiceAddressText) invoiceAddressText.textContent = invoice.address || "—";
 
-      const qrPayload =
-        invoice.qr_string ||
-        (invoice.address
-          ? `monero:${invoice.address}?tx_amount=${Number(invoice.amount_crypto ?? amountXmr).toFixed(6)}`
-          : "");
-
-      if (qrPayload && invoiceQrImage) {
+      // QR
+      if (invoice.qr_string && invoiceQrImage) {
         const qrUrl =
-          "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" +
-          encodeURIComponent(qrPayload);
+          "https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=" +
+          encodeURIComponent(invoice.qr_string);
         invoiceQrImage.src = qrUrl;
-        invoiceQrImage.alt = "Payment QR";
       }
 
-      if (confirmationsLabel) confirmationsLabel.textContent = `0 / ${invoice.required_confirmations || 10}`;
-      if (confirmationsBar) confirmationsBar.style.width = "0%";
+      // confirmations
+      setConfirmations(invoice.confirmations || 0, invoice.required_confirmations || 10);
 
+      // show + start timers/poll
+      showInvoiceSection();
       clearTimers();
       startCountdown(invoiceLifetimeSeconds);
       pollInvoiceStatus(invoice.id);
 
       showToast("Invoice created. Send the exact amount from your Monero wallet.", "success");
-
-      try {
-        invoiceSection?.scrollIntoView({ behavior: "smooth", block: "start" });
-      } catch {}
-    } catch (err) {
-      console.error("Create invoice error:", err);
+    } catch (e) {
+      console.error("create invoice failed:", e);
       showToast("Failed to create invoice. Try again.", "error");
     } finally {
-      if (generateInvoiceBtn) {
-        generateInvoiceBtn.disabled = false;
-        generateInvoiceBtn.textContent = "Continue to payment";
-      }
+      if (generateInvoiceBtn) generateInvoiceBtn.disabled = false;
     }
   }
 
-  // Bind click handler (and warn if it failed)
   if (generateInvoiceBtn) {
     generateInvoiceBtn.addEventListener("click", handleGenerateInvoice);
-  } else {
-    showToast("Payment button missing from page (check HTML ID).", "error", 6000);
   }
 
   // Copy address
-  if (copyAddressBtn && invoiceAddressText) {
+  if (copyAddressBtn) {
     copyAddressBtn.addEventListener("click", async () => {
-      const text = invoiceAddressText.textContent?.trim();
-      if (!text || text === "–" || text === "—") return;
+      const text = (invoiceAddressText?.textContent || "").trim();
+      if (!text || text === "—") return;
 
       try {
         await navigator.clipboard.writeText(text);
-        showToast("Address copied to clipboard.", "success");
-      } catch (err) {
-        console.error("Copy failed:", err);
+        showToast("Address copied.", "success");
+      } catch (e) {
         showToast("Could not copy address.", "error");
       }
     });
   }
 
-  // Back button
-  if (backBtn) {
-    backBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      if (window.history.length > 1) window.history.back();
-      else window.location.href = "settings.html";
-    });
-  }
+  // ----------------------------
+  // Init defaults
+  // ----------------------------
+  // Ensure UI reflects whichever plan button is active in HTML
+  const initiallyActivePlan = planButtons.find((b) => b.classList.contains("active")) || planButtons[0];
+  if (initiallyActivePlan) setActivePlan(initiallyActivePlan);
 
-  // -----------------------------
-  // INIT
-  // -----------------------------
-  function initActiveDefaults() {
-    // Ensure plan defaults match whatever is active in HTML
-    updatePlanStateFromDom();
+  // Ensure active coin (XMR) selection matches HTML
+  const initiallyActiveCoin =
+    coinButtons.find((b) => b.classList.contains("active")) ||
+    coinButtons.find((b) => (b.dataset.coin || "").toUpperCase() === "XMR");
+  if (initiallyActiveCoin) setActiveCoin(initiallyActiveCoin);
 
-    // Ensure XMR is shown
-    if (priceCoinCode) priceCoinCode.textContent = "XMR";
+  // Hide invoice initially
+  if (invoiceSection) invoiceSection.style.display = "none";
 
-    // Hide invoice initially
-    resetInvoiceUi();
-  }
-
-  initActiveDefaults();
-  loadSubscriptionStatus();
   loadPrices();
-
-  // Refresh prices every minute
-  setInterval(loadPrices, 60000);
+  loadSubscriptionStatus();
 });
