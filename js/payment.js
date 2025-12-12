@@ -6,6 +6,39 @@ const PAYMENT_API_BASE_URL =
     : 'https://uncensored-app-beta-production.up.railway.app/api';
 
 document.addEventListener('DOMContentLoaded', () => {
+  // --- AUTH HELPERS ---
+
+  function getAuthToken() {
+    // Try the same key as other pages FIRST
+    // (adjust these if your auth.js uses a specific key)
+    return (
+      localStorage.getItem('token') ||
+      localStorage.getItem('authToken') ||
+      localStorage.getItem('jwt') ||
+      ''
+    );
+  }
+
+  function getAuthHeaders(extra = {}) {
+    const token = getAuthToken();
+    return {
+      Authorization: token ? `Bearer ${token}` : '',
+      ...extra
+    };
+  }
+
+  function ensureLoggedIn() {
+    const token = getAuthToken();
+    if (!token) {
+      showToast('You must be logged in to subscribe.', 'error');
+      setTimeout(() => {
+        window.location.href = 'login.html';
+      }, 1000);
+      return false;
+    }
+    return true;
+  }
+
   // --- DOM CACHE ---
 
   const planButtons = Array.from(document.querySelectorAll('.plan-card'));
@@ -81,8 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!activeBtn) return;
 
     selectedPlan = activeBtn.dataset.plan === 'yearly' ? 'yearly' : 'monthly';
-    selectedPlanUsd =
-      selectedPlan === 'yearly' ? 60 : 8;
+    selectedPlanUsd = selectedPlan === 'yearly' ? 60 : 8;
 
     if (priceUsdLabel) {
       priceUsdLabel.textContent = `$${selectedPlanUsd.toFixed(2)} USD`;
@@ -265,10 +297,9 @@ document.addEventListener('DOMContentLoaded', () => {
             invoiceId
           )}`,
           {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
+            headers: getAuthHeaders({
               'Content-Type': 'application/json'
-            }
+            })
           }
         );
 
@@ -316,6 +347,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- INVOICE FLOW ---
 
   async function handleContinueToPayment() {
+    if (!ensureLoggedIn()) return;
+
     if (selectedCurrency !== 'XMR') {
       showToast('Right now only Monero (XMR) is accepted.', 'error');
       return;
@@ -340,10 +373,9 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const res = await fetch(`${PAYMENT_API_BASE_URL}/payments/create`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token') || ''}`
-        },
+        headers: getAuthHeaders({
+          'Content-Type': 'application/json'
+        }),
         body: JSON.stringify({
           plan: selectedPlan,
           currency: 'XMR',
@@ -405,7 +437,6 @@ document.addEventListener('DOMContentLoaded', () => {
         invoiceQrImage.src = qrUrl;
       }
 
-      // Reset / start timers
       if (countdownTimerId) clearInterval(countdownTimerId);
       if (statusPollId) clearInterval(statusPollId);
 
@@ -444,18 +475,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // --- SUBSCRIPTION STATUS (optional) ---
+  // --- SUBSCRIPTION STATUS ---
 
   async function loadSubscriptionStatus() {
     if (!subscriptionStatus) return;
+    if (!getAuthToken()) {
+      subscriptionStatus.textContent = '';
+      return;
+    }
 
     try {
       const res = await fetch(
         `${PAYMENT_API_BASE_URL}/subscription/me`,
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token') || ''}`
-          }
+          headers: getAuthHeaders()
         }
       );
 
