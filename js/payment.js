@@ -12,34 +12,25 @@ document.addEventListener("DOMContentLoaded", () => {
   // =========================
 
   const backBtn = document.getElementById("paymentBackButton");
-
   const planButtons = Array.from(document.querySelectorAll(".plan-card"));
   const coinButtons = Array.from(document.querySelectorAll(".coin-card"));
-
   const priceUsdLabel = document.getElementById("priceUsdLabel");
   const priceCoinCode = document.getElementById("priceCoinCode");
   const priceCoinLabel = document.getElementById("priceCoinLabel");
   const priceSourceLabel = document.getElementById("priceSourceLabel");
-
   const generateInvoiceBtn = document.getElementById("generateInvoiceBtn");
-
   const subscriptionStatus = document.getElementById("subscriptionStatus");
-
   const invoiceSection = document.getElementById("invoiceSection");
   const invoicePlanLabel = document.getElementById("invoicePlanLabel");
   const invoiceAmountLabel = document.getElementById("invoiceAmountLabel");
   const invoiceCurrencyLabel = document.getElementById("invoiceCurrencyLabel");
   const invoiceStatusLabel = document.getElementById("invoiceStatusLabel");
   const invoiceCountdownLabel = document.getElementById("invoiceCountdownLabel");
-
   const invoiceAddressText = document.getElementById("invoiceAddressText");
   const copyAddressBtn = document.getElementById("copyAddressBtn");
-
   const invoiceQrImage = document.getElementById("invoiceQrImage");
-
   const confirmationsLabel = document.getElementById("confirmationsLabel");
   const confirmationsBar = document.getElementById("confirmationsBar");
-
   const statusContainer = document.getElementById("paymentStatusContainer");
 
   // =========================
@@ -48,22 +39,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let selectedPlan = "monthly"; // monthly | yearly
   let selectedPlanUsd = 8;
-
   let selectedCurrency = "XMR"; // only accepted
   let prices = null;
-
   let currentInvoiceId = null;
-
   let countdownTimerId = null;
   let statusPollId = null;
-
   const invoiceLifetimeSeconds = 30 * 60; // 30 minutes
 
   // =========================
-  // AUTH HELPERS (MATCH YOUR auth.js KEYS)
+  // AUTH HELPERS
   // =========================
 
-  const TOKEN_KEY = "us_auth_token"; // IMPORTANT: your auth.js uses this
+  const TOKEN_KEY = "us_auth_token";
   const USER_KEY = "us_current_user";
   const REDIRECT_KEY = "us_redirect_after_login";
 
@@ -85,6 +72,11 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       localStorage.setItem(REDIRECT_KEY, window.location.href);
     } catch {}
+  }
+
+  function goToLogin() {
+    saveRedirectHere();
+    window.location.href = "login.html";
   }
 
   function handleAuthFailure(message) {
@@ -117,35 +109,37 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function safeFetch(url, opts = {}) {
-    const timeoutMs =
-      typeof opts.timeoutMs === "number" ? opts.timeoutMs : 12000;
+    const timeoutMs = typeof opts.timeoutMs === "number" ? opts.timeoutMs : 12000;
     const retries = typeof opts.retries === "number" ? opts.retries : 1;
-    const retryDelayMs =
-      typeof opts.retryDelayMs === "number" ? opts.retryDelayMs : 600;
+    const retryDelayMs = typeof opts.retryDelayMs === "number" ? opts.retryDelayMs : 600;
+
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+
+    const finalOpts = Object.assign({}, opts);
+    delete finalOpts.timeoutMs;
+    delete finalOpts.retries;
+    delete finalOpts.retryDelayMs;
+    finalOpts.signal = controller.signal;
+
+    let lastErr = null;
 
     for (let attempt = 0; attempt <= retries; attempt++) {
-      const controller = new AbortController();
-      const id = setTimeout(() => controller.abort(), timeoutMs);
-
-      const finalOpts = Object.assign({}, opts);
-      delete finalOpts.timeoutMs;
-      delete finalOpts.retries;
-      delete finalOpts.retryDelayMs;
-      finalOpts.signal = controller.signal;
-
       try {
         const res = await fetch(url, finalOpts);
         clearTimeout(id);
         return res;
       } catch (err) {
-        clearTimeout(id);
+        lastErr = err;
         if (attempt < retries) {
           await sleep(retryDelayMs);
           continue;
         }
-        throw err;
       }
     }
+
+    clearTimeout(id);
+    throw lastErr;
   }
 
   function safeJson(res) {
@@ -171,16 +165,18 @@ document.addEventListener("DOMContentLoaded", () => {
     selectedPlan = plan === "yearly" ? "yearly" : "monthly";
     selectedPlanUsd = selectedPlan === "yearly" ? 60 : 8;
 
+    // update plan card states
     planButtons.forEach((b) => {
       b.classList.toggle("active", b.dataset.plan === selectedPlan);
     });
 
-    if (priceUsdLabel)
-      priceUsdLabel.textContent = `$${selectedPlanUsd.toFixed(2)} USD`;
+    // update labels
+    if (priceUsdLabel) priceUsdLabel.textContent = `$${selectedPlanUsd.toFixed(2)} USD`;
 
     recalcXmrAmount();
   }
 
+  // Initialize plan from active button in DOM
   (function initPlanFromDom() {
     const activeBtn = planButtons.find((b) => b.classList.contains("active"));
     if (activeBtn?.dataset?.plan) setPlan(activeBtn.dataset.plan);
@@ -196,20 +192,19 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // =========================
-  // COIN HANDLING (FIXED: YOUR HTML USES data-currency)
+  // COIN HANDLING - FIXED: Changed from data-coin to data-currency
   // =========================
 
-  function setCoin(coin) {
+  function setCoin(currency) {
     // only allow XMR
-    if (coin !== "XMR") {
-      showToast(`${coin} is not supported yet. Use Monero (XMR).`, "error");
+    if (currency !== "XMR") {
+      showToast(`${currency} is not supported yet. Use Monero (XMR).`, "error");
       return;
     }
 
     selectedCurrency = "XMR";
 
     coinButtons.forEach((b) => {
-      // FIX: dataset.currency (not dataset.coin)
       b.classList.toggle("active", b.dataset.currency === "XMR");
     });
 
@@ -219,18 +214,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   coinButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
-      // FIX: your HTML uses data-currency="BTC/ETH/.../XMR"
-      const coin = btn.dataset.currency;
+      const currency = btn.dataset.currency; // FIXED: changed from data-coin to data-currency
       const enabled = btn.dataset.enabled === "true";
 
-      if (!coin) return;
+      if (!currency) return;
 
-      if (!enabled && coin !== "XMR") {
-        showToast(`${coin} is not supported yet.`, "error");
+      if (!enabled && currency !== "XMR") {
+        showToast(`${currency} is not supported yet.`, "error");
         return;
       }
 
-      setCoin(coin);
+      setCoin(currency);
     });
   });
 
@@ -238,7 +232,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setCoin("XMR");
 
   // =========================
-  // PRICE FETCHING (COINGECKO)
+  // PRICE FETCHING
   // =========================
 
   function setPriceText(id, value) {
@@ -248,7 +242,7 @@ document.addEventListener("DOMContentLoaded", () => {
     else {
       el.textContent = `$${Number(value).toLocaleString(undefined, {
         minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
+        maximumFractionDigits: 2
       })}`;
     }
   }
@@ -260,11 +254,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const url =
         "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,tether,usd-coin,monero&vs_currencies=usd";
 
-      const res = await safeFetch(url, {
-        cache: "no-store",
-        timeoutMs: 12000,
-        retries: 1,
-      });
+      const res = await safeFetch(url, { cache: "no-store", timeoutMs: 12000, retries: 1 });
       if (!res.ok) throw new Error("HTTP " + res.status);
 
       const json = await res.json();
@@ -275,9 +265,10 @@ document.addEventListener("DOMContentLoaded", () => {
         SOL: json.solana?.usd ?? null,
         USDT: json.tether?.usd ?? null,
         USDC: json["usd-coin"]?.usd ?? null,
-        XMR: json.monero?.usd ?? null,
+        XMR: json.monero?.usd ?? null
       };
 
+      // Update the right-side prices in your coin cards
       setPriceText("btcPriceUsd", prices.BTC);
       setPriceText("ethPriceUsd", prices.ETH);
       setPriceText("solPriceUsd", prices.SOL);
@@ -317,11 +308,12 @@ document.addEventListener("DOMContentLoaded", () => {
     priceCoinLabel.textContent = `${amtRounded} XMR`;
   }
 
+  // refresh prices every 60 seconds
   loadPrices();
   setInterval(loadPrices, 60000);
 
   // =========================
-  // SUBSCRIPTION STATUS (optional UI)
+  // SUBSCRIPTION STATUS
   // =========================
 
   async function loadSubscriptionStatus() {
@@ -339,8 +331,8 @@ document.addEventListener("DOMContentLoaded", () => {
         retries: 0,
         headers: {
           Authorization: `Bearer ${getToken()}`,
-          "Content-Type": "application/json",
-        },
+          "Content-Type": "application/json"
+        }
       });
 
       if (res.status === 404) {
@@ -352,9 +344,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await safeJson(res);
 
       if (res.status === 401) {
-        handleAuthFailure(
-          data?.error || "Session expired. Please log in again."
-        );
+        handleAuthFailure(data?.error || "Session expired. Please log in again.");
         return;
       }
 
@@ -365,37 +355,14 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       const active = !!(data.active ?? data.is_active ?? data?.subscription?.active);
-      const sub = data.subscription || data.data || data || null;
+      const sub = data.subscription || data.data || null;
 
-      const planRaw =
-        sub?.plan ||
-        sub?.plan_slug ||
-        sub?.planId ||
-        sub?.plan_id ||
-        sub?.tier ||
-        null;
-
-      const planPretty =
-        planRaw === "monthly" || planRaw === "verified_monthly"
-          ? "Monthly"
-          : planRaw === "yearly" || planRaw === "verified_yearly"
-          ? "Yearly"
-          : planRaw
-          ? String(planRaw)
-          : "—";
-
-      if (active) {
-        const expRaw =
-          sub?.expires_at ||
-          sub?.subscription_expires_at ||
-          sub?.expiresAt ||
-          null;
+      if (active && sub) {
+        const expRaw = sub.expires_at || sub.subscription_expires_at || sub.expiresAt || null;
         const exp = expRaw ? new Date(expRaw).toLocaleString() : "—";
-
         subscriptionStatus.innerHTML = `
           <div class="section-caption">
             <strong>Verified is active.</strong><br/>
-            Plan: ${planPretty}<br/>
             Expires: ${exp}
           </div>
         `;
@@ -449,7 +416,9 @@ document.addEventListener("DOMContentLoaded", () => {
     let remaining = seconds;
 
     const update = () => {
-      const m = Math.floor(remaining / 60).toString().padStart(2, "0");
+      const m = Math.floor(remaining / 60)
+        .toString()
+        .padStart(2, "0");
       const s = (remaining % 60).toString().padStart(2, "0");
       invoiceCountdownLabel.textContent = `${m}:${s}`;
       remaining -= 1;
@@ -474,34 +443,32 @@ document.addEventListener("DOMContentLoaded", () => {
     async function tick() {
       try {
         const res = await safeFetch(
-          `${PAYMENT_API_BASE_URL}/payments/status/${encodeURIComponent(
-            invoiceId
-          )}`,
+          `${PAYMENT_API_BASE_URL}/payments/status/${encodeURIComponent(invoiceId)}`,
           {
             timeoutMs: 12000,
             retries: 0,
             headers: {
               Authorization: `Bearer ${getToken()}`,
-              "Content-Type": "application/json",
-            },
+              "Content-Type": "application/json"
+            }
           }
         );
 
         const data = await safeJson(res);
 
         if (res.status === 401) {
-          handleAuthFailure(
-            data?.error || "Session expired. Please log in again."
-          );
+          handleAuthFailure(data?.error || "Session expired. Please log in again.");
           return;
         }
 
         if (!res.ok) return;
 
+        // Update status
         if (invoiceStatusLabel) {
           invoiceStatusLabel.textContent = data.status || "pending";
         }
 
+        // Update confirmations
         if (
           typeof data.confirmations === "number" &&
           typeof data.required_confirmations === "number" &&
@@ -515,12 +482,9 @@ document.addEventListener("DOMContentLoaded", () => {
           confirmationsBar.style.width = `${pct}%`;
         }
 
+        // Confirmed
         if (data.status === "confirmed") {
-          showToast(
-            "Payment confirmed. Your account will upgrade shortly.",
-            "success",
-            5000
-          );
+          showToast("Payment confirmed. Your account will upgrade shortly.", "success", 5000);
           clearInterval(statusPollId);
           statusPollId = null;
           loadSubscriptionStatus();
@@ -558,51 +522,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // =========================
-  // PLAN SLUG FIX (IMPORTANT)
-  // =========================
-
-  function getPlanCandidates(plan) {
-    // We will TRY these in order until the backend accepts one.
-    // This fixes “Unknown plan” without you guessing the backend string.
-    if (plan === "yearly") {
-      return ["yearly", "verified_yearly", "verified-yearly", "annual", "annually"];
-    }
-    return ["monthly", "verified_monthly", "verified-monthly", "month", "mo"];
-  }
-
-  function isUnknownPlanError(data) {
-    const msg = (data?.error || data?.message || "").toString().toLowerCase();
-    return msg.includes("unknown plan") || msg.includes("invalid plan") || msg.includes("plan");
-  }
-
-  async function tryCreateInvoiceWithPlanSlug(planSlug, amountXmr) {
-    const res = await safeFetch(`${PAYMENT_API_BASE_URL}/payments/create`, {
-      method: "POST",
-      timeoutMs: 15000,
-      retries: 0,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getToken()}`,
-      },
-      body: JSON.stringify({
-        plan: selectedPlan, // keep your friendly plan name
-        plan_slug: planSlug, // backend slug candidate
-        currency: "XMR",
-        amount_crypto: Number(Number(amountXmr).toFixed(12)),
-        // send USD too (harmless if backend ignores)
-        amount_usd: Number(selectedPlanUsd.toFixed(2)),
-      }),
-    });
-
-    const data = await safeJson(res);
-    return { res, data };
-  }
-
-  // =========================
-  // CREATE INVOICE
+  // CREATE INVOICE - MAIN FIX
   // =========================
 
   async function handleGenerateInvoice() {
+    // must be logged in
     if (!isLoggedIn()) {
       handleAuthFailure("Please log in to subscribe.");
       return;
@@ -629,84 +553,99 @@ document.addEventListener("DOMContentLoaded", () => {
     if (generateInvoiceBtn) generateInvoiceBtn.disabled = true;
 
     try {
-      // Try multiple plan slugs until backend accepts one
-      const candidates = getPlanCandidates(selectedPlan);
+      // FIX: Send the correct plan slug that matches your database
+      const planSlug = selectedPlan; // This should be "monthly" or "yearly"
+      
+      // DEBUG: Log what we're sending
+      console.log("Sending request to create invoice:", {
+        plan: planSlug,
+        plan_slug: planSlug,
+        currency: "XMR",
+        amount_crypto: Number(amountXmr.toFixed(12)),
+        amount_usd: selectedPlanUsd
+      });
 
-      let finalInvoice = null;
-      let lastError = null;
+      const res = await safeFetch(`${PAYMENT_API_BASE_URL}/payments/create`, {
+        method: "POST",
+        timeoutMs: 15000,
+        retries: 0,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`
+        },
+        body: JSON.stringify({
+          plan: planSlug,            // "monthly" or "yearly"
+          plan_slug: planSlug,       // Same as plan
+          currency: "XMR",
+          amount_crypto: Number(amountXmr.toFixed(12)),
+          amount_usd: selectedPlanUsd // Send USD amount for backend calculation
+        })
+      });
 
-      for (const candidate of candidates) {
-        const { res, data } = await tryCreateInvoiceWithPlanSlug(candidate, amountXmr);
+      const data = await safeJson(res);
 
-        if (res.status === 401) {
-          handleAuthFailure(data?.error || "Session expired. Please log in again.");
-          return;
-        }
+      // DEBUG: Log response
+      console.log("Invoice creation response:", data);
 
-        if (res.ok) {
-          finalInvoice = data?.invoice || data;
-          break;
-        }
-
-        // If backend says unknown plan, keep trying other candidates
-        if (isUnknownPlanError(data)) {
-          lastError = data?.error || data?.message || `Unknown plan (${candidate})`;
-          continue;
-        }
-
-        // Any other error: stop immediately
-        showToast(data?.error || `Failed to create invoice (HTTP ${res.status})`, "error", 4500);
+      if (res.status === 401) {
+        handleAuthFailure(data?.error || "Session expired. Please log in again.");
         return;
       }
 
-      if (!finalInvoice) {
-        showToast(lastError || "Unknown plan. Backend rejected all plan IDs.", "error", 4500);
+      if (!res.ok) {
+        const errorMsg = data?.error || `Failed to create invoice (HTTP ${res.status})`;
+        console.error("Invoice creation failed:", errorMsg);
+        showToast(errorMsg, "error", 4500);
         return;
       }
 
-      currentInvoiceId = finalInvoice.id;
+      // success
+      const invoice = data?.invoice || data;
+      currentInvoiceId = invoice.id;
 
+      // Fill invoice UI
       if (invoicePlanLabel) {
         invoicePlanLabel.textContent = selectedPlan === "yearly" ? "Yearly" : "Monthly";
       }
 
       if (invoiceAmountLabel) {
-        const cryptoAmt = (finalInvoice.amount_crypto ?? amountXmr);
-        const usdAmt = (finalInvoice.amount_usd ?? selectedPlanUsd);
+        const cryptoAmt = (invoice.amount_crypto ?? amountXmr);
+        const usdAmt = (invoice.amount_usd ?? selectedPlanUsd);
         invoiceAmountLabel.textContent = `${Number(cryptoAmt).toFixed(6)} XMR (≈ $${Number(usdAmt).toFixed(2)})`;
       }
 
-      if (invoiceCurrencyLabel) invoiceCurrencyLabel.textContent = finalInvoice.currency || "XMR";
-      if (invoiceStatusLabel) invoiceStatusLabel.textContent = finalInvoice.status || "pending";
-      if (invoiceAddressText) invoiceAddressText.textContent = finalInvoice.address || "—";
+      if (invoiceCurrencyLabel) invoiceCurrencyLabel.textContent = invoice.currency || "XMR";
+      if (invoiceStatusLabel) invoiceStatusLabel.textContent = invoice.status || "pending";
+      if (invoiceAddressText) invoiceAddressText.textContent = invoice.address || "—";
 
+      // QR
       const qrString =
-        finalInvoice.qr_string ||
-        (finalInvoice.address
-          ? buildMoneroUri(finalInvoice.address, finalInvoice.amount_crypto ?? amountXmr)
-          : "");
+        invoice.qr_string ||
+        (invoice.address ? buildMoneroUri(invoice.address, invoice.amount_crypto ?? amountXmr) : "");
 
       setQrFromString(qrString);
 
+      // Confirmations
       if (confirmationsLabel) {
-        const conf = Number(finalInvoice.confirmations || 0);
-        const req = Number(finalInvoice.required_confirmations || 10);
+        const conf = Number(invoice.confirmations || 0);
+        const req = Number(invoice.required_confirmations || 10);
         confirmationsLabel.textContent = `${conf} / ${req}`;
       }
       if (confirmationsBar) confirmationsBar.style.width = "0%";
 
+      // Show section + timers
       showInvoiceUi();
 
       if (countdownTimerId) clearInterval(countdownTimerId);
       if (statusPollId) clearInterval(statusPollId);
 
       startCountdown(invoiceLifetimeSeconds);
-      pollInvoiceStatus(finalInvoice.id);
+      pollInvoiceStatus(invoice.id);
 
       showToast("Invoice created. Send the exact amount from your Monero wallet.", "success", 4500);
     } catch (err) {
       console.error("Create invoice error:", err);
-      showToast("Failed to create invoice. Try again.", "error");
+      showToast("Failed to create invoice. Check console for details.", "error");
     } finally {
       if (generateInvoiceBtn) generateInvoiceBtn.disabled = false;
     }
@@ -742,7 +681,7 @@ document.addEventListener("DOMContentLoaded", () => {
   resetInvoiceUi();
 
   // =========================
-  // DEBUG (SAFE)
+  // DEBUG FUNCTION
   // =========================
 
   window.__paymentDebug = function () {
@@ -754,11 +693,7 @@ document.addEventListener("DOMContentLoaded", () => {
       hasPrices: !!prices,
       xmrPrice: prices?.XMR ?? null,
       tokenPresent: !!getToken(),
-      invoiceId: currentInvoiceId,
+      invoiceId: currentInvoiceId
     };
   };
-
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
 });
