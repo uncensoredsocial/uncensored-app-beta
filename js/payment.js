@@ -518,7 +518,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // =========================
-  // CREATE INVOICE - FULLY FIXED
+  // CREATE INVOICE - WORKING VERSION
   // =========================
 
   async function handleGenerateInvoice() {
@@ -549,20 +549,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if (generateInvoiceBtn) generateInvoiceBtn.disabled = true;
 
     try {
-      // Use exact plan slugs from your database
-      const planSlug = selectedPlan === "yearly" ? "yearly" : "monthly";
+      // Use simple plan values (now that SQL is fixed)
+      const planValue = selectedPlan === "yearly" ? "yearly" : "monthly";
       
-      // Calculate amount in cents for the payments table
-      const amountCents = selectedPlan === "yearly" ? 6000 : 800;
-      
-      // Build request body that matches both tables
+      // Send all required fields based on your tables
       const requestBody = {
-        plan: planSlug,
-        plan_slug: planSlug,
-        amount_cents: amountCents,
+        plan: planValue,
+        plan_slug: planValue,
         currency: "XMR",
         amount_crypto: Number(amountXmr.toFixed(12)),
-        amount_usd: selectedPlanUsd
+        amount_usd: selectedPlanUsd,
+        amount_cents: selectedPlan === "yearly" ? 6000 : 800
       };
 
       const res = await safeFetch(`${PAYMENT_API_BASE_URL}/payments/create`, {
@@ -584,18 +581,12 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (!res.ok) {
-        let errorMsg = data?.error || `Failed to create invoice (HTTP ${res.status})`;
-        
-        // Provide specific guidance for common errors
-        if (errorMsg.toLowerCase().includes('unknown plan')) {
-          errorMsg = "Plan validation failed. Please ensure 'monthly' and 'yearly' plans exist in the database.";
-        }
-        
+        const errorMsg = data?.error || data?.message || `Failed to create invoice (HTTP ${res.status})`;
         showToast(errorMsg, "error", 4500);
         return;
       }
 
-      // success - handle response
+      // SUCCESS - invoice created
       const invoice = data?.invoice || data;
       currentInvoiceId = invoice.id;
 
