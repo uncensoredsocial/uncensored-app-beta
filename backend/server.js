@@ -1647,82 +1647,169 @@ app.post('/api/posts/upload-media', authMiddleware, async (req, res) => {
 //             Simple plans + payments + subscription
 // ======================================================
 
-// Optional: hard-code some plans for now
-const PLANS = [
-  {
-    slug: 'business',
-    name: 'Business Account',
-    price_cents: 990, // $9.90
-    currency: 'usd'
-  },
-  {
-    slug: 'creator',
-    name: 'Creator Plus',
-    price_cents: 1490, // $14.90
-    currency: 'usd'
-  }
-];
+// OPTION 1: USING DATABASE FOR PLANS - UPDATED VERSION
 
-// Get available plans
-app.get('/api/payments/plans', (req, res) => {
-  res.json({ plans: PLANS });
+// Get available plans FROM DATABASE
+app.get('/api/payments/plans', async (req, res) => {
+  try {
+    const { data: plans, error } = await supabase
+      .from('plans')
+      .select('*')
+      .order('price_cents', { ascending: true });
+
+    if (error) {
+      console.error('Get plans error:', error);
+      return res.status(500).json({ error: 'Failed to load plans' });
+    }
+
+    res.json({ plans: plans || [] });
+  } catch (err) {
+    console.error('GET /api/payments/plans error:', err);
+    res.status(500).json({ error: 'Server error loading plans' });
+  }
 });
 
-// Create a "payment" entry (pending)
-// Frontend can call this when user clicks "Buy"
+// Create an invoice for Monero payment
 app.post('/api/payments/create', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { plan_slug, payment_method } = req.body || {};
+    const { plan_slug, currency, amount_crypto, amount_usd } = req.body || {};
 
     if (!plan_slug) {
       return res.status(400).json({ error: 'Missing plan_slug' });
     }
 
-    const plan = PLANS.find((p) => p.slug === plan_slug) || null;
-    if (!plan) {
+    if (!currency) {
+      return res.status(400).json({ error: 'Missing currency' });
+    }
+
+    // Only support XMR for now
+    if (currency !== 'XMR') {
+      return res.status(400).json({ error: 'Only XMR is supported at this time' });
+    }
+
+    // Look up plan from database
+    const { data: plan, error: planError } = await supabase
+      .from('plans')
+      .select('*')
+      .eq('slug', plan_slug)
+      .single();
+
+    if (planError || !plan) {
+      console.error('Plan lookup error:', planError);
       return res.status(400).json({ error: 'Unknown plan' });
     }
 
-    const method = payment_method || 'manual'; // e.g. 'monero', 'stripe', etc.
+    // Calculate USD amount from plan price_cents
+    const calculatedUsdAmount = plan.price_cents / 100;
+    
+    // Use provided amount_usd or calculate from plan
+    const finalUsdAmount = amount_usd || calculatedUsdAmount;
+    
+    // Validate crypto amount is provided
+    if (!amount_crypto || amount_crypto <= 0) {
+      return res.status(400).json({ error: 'Invalid crypto amount' });
+    }
+
+    // Generate a unique payment address (in production, use Monero wallet RPC)
+    // For now, use a placeholder that includes user ID and timestamp
+    const paymentId = uuidv4().replace(/-/g, '').substring(0, 16);
+    const placeholderAddress = `4${paymentId}xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`.substring(0, 95);
+
+    // Create the invoice in the invoices table
+    const invoice = {
+      id: uuidv4(),
+      user_id: userId,
+      plan: plan_slug,
+      currency: currency,
+      amount_usd: finalUsdAmount,
+      amount_crypto: amount_crypto,
+      address: placeholderAddress,
+      subaddr_index: Math.floor(Math.random() * 1000000), // Random index for demo
+      qr_string: `monero:${placeholderAddress}?tx_amount=${amount_crypto}`,
+      status: 'pending',
+      confirmations: 0,
+      required_confirmations: 10,
+      created_at: new Date().toISOString()
+    };
 
     const { data, error } = await supabase
-      .from('payments')
-      .insert({
-        user_id: userId,
-        plan_slug: plan.slug,
-        amount_cents: plan.price_cents,
-        currency: plan.currency,
-        status: 'pending',
-        payment_method: method
-      })
+      .from('invoices')
+      .insert(invoice)
       .select('*')
       .single();
 
     if (error) {
-      console.error('Supabase create payment error:', error);
-      return res.status(500).json({ error: 'Failed to create payment.' });
+      console.error('Supabase create invoice error:', error);
+      return res.status(500).json({ error: 'Failed to create invoice.' });
     }
 
-    // Later you can attach Monero / Stripe here (return address, checkout URL, etc.)
+    // Return the invoice in the format your frontend expects
     res.json({
-      payment: data,
-      message: 'Payment created. Complete your payment to activate your plan.'
+      id: data.id,
+      plan: data.plan,
+      currency: data.currency,
+      amount_usd: data.amount_usd,
+      amount_crypto: data.amount_crypto,
+      address: data.address,
+      qr_string: data.qr_string,
+      status: data.status,
+      confirmations: data.confirmations,
+      required_confirmations: data.required_confirmations,
+      created_at: data.created_at
     });
+
   } catch (err) {
     console.error('POST /api/payments/create error:', err);
-    res.status(500).json({ error: 'Server error creating payment.' });
+    res.status(500).json({ error: 'Server error creating invoice.' });
   }
 });
 
-// Get a single payment (for this user)
+// Get payment/invoice status
+app.get('/api/payments/status/:invoiceId', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { invoiceId } = req.params;
+
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('id', invoiceId)
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !data) {
+      console.error('Get invoice status error:', error);
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    res.json({
+      id: data.id,
+      status: data.status,
+      confirmations: data.confirmations,
+      required_confirmations: data.required_confirmations,
+      address: data.address,
+      amount_crypto: data.amount_crypto,
+      amount_usd: data.amount_usd,
+      currency: data.currency,
+      created_at: data.created_at,
+      paid_at: data.paid_at,
+      confirmed_at: data.confirmed_at
+    });
+  } catch (err) {
+    console.error('GET /api/payments/status/:invoiceId error:', err);
+    res.status(500).json({ error: 'Server error fetching invoice status.' });
+  }
+});
+
+// Get a single payment (for this user) - legacy endpoint, kept for compatibility
 app.get('/api/payments/:paymentId', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     const { paymentId } = req.params;
 
     const { data, error } = await supabase
-      .from('payments')
+      .from('invoices')
       .select('*')
       .eq('id', paymentId)
       .eq('user_id', userId)
@@ -1750,9 +1837,9 @@ app.post(
       const userId = req.user.id;
       const { paymentId } = req.params;
 
-      // 1) Load payment
+      // 1) Load payment/invoice
       const { data: payment, error: fetchErr } = await supabase
-        .from('payments')
+        .from('invoices')
         .select('*')
         .eq('id', paymentId)
         .eq('user_id', userId)
@@ -1765,10 +1852,10 @@ app.post(
 
       // 2) Update payment -> completed
       const { data: updatedPayment, error: updateErr } = await supabase
-        .from('payments')
+        .from('invoices')
         .update({
           status: 'completed',
-          updated_at: new Date().toISOString()
+          confirmed_at: new Date().toISOString()
         })
         .eq('id', paymentId)
         .select('*')
@@ -1786,8 +1873,9 @@ app.post(
       const { error: userUpdateErr } = await supabase
         .from('users')
         .update({
-          plan_slug: payment.plan_slug,
-          subscription_expires_at: thirtyDaysFromNow.toISOString()
+          plan_slug: payment.plan,
+          subscription_expires_at: thirtyDaysFromNow.toISOString(),
+          is_verified: true
         })
         .eq('id', userId);
 
@@ -1820,7 +1908,7 @@ app.get(
 
       const { data: user, error } = await supabase
         .from('users')
-        .select('plan_slug, subscription_expires_at')
+        .select('plan_slug, subscription_expires_at, is_verified')
         .eq('id', userId)
         .single();
 
@@ -1841,6 +1929,38 @@ app.get(
     }
   }
 );
+
+// Get subscription status (for frontend compatibility)
+app.get('/api/subscription/me', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('plan_slug, subscription_expires_at, is_verified')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      console.error('Get subscription error:', error);
+      return res.status(404).json({ error: 'Subscription not found' });
+    }
+
+    const active = user.is_verified && user.subscription_expires_at && new Date(user.subscription_expires_at) > new Date();
+    
+    res.json({
+      active: active,
+      subscription: {
+        plan: user.plan_slug,
+        expires_at: user.subscription_expires_at,
+        is_verified: user.is_verified
+      }
+    });
+  } catch (err) {
+    console.error('GET /api/subscription/me error:', err);
+    res.status(500).json({ error: 'Server error fetching subscription.' });
+  }
+});
 
 // ======================================================
 //                      START SERVER
