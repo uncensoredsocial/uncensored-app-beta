@@ -68,15 +68,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const REDIRECT_KEY = "us_redirect_after_login";
 
   function getToken() {
-    // Prefer auth.js helper if it exists (keeps behavior consistent across site)
     try {
       if (typeof window.getAuthToken === "function") {
         const t = window.getAuthToken();
         if (t) return t;
       }
     } catch {}
-
-    // Fallback to localStorage key used in your auth.js
     return localStorage.getItem(TOKEN_KEY);
   }
 
@@ -86,22 +83,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function saveRedirectHere() {
     try {
-      // store the current page so login can bring them back
       localStorage.setItem(REDIRECT_KEY, window.location.href);
     } catch {}
   }
 
-  function goToLogin() {
-    saveRedirectHere();
-    window.location.href = "login.html";
-  }
-
   function handleAuthFailure(message) {
-    // message examples:
-    // "Missing auth token" or "Invalid or expired token"
     showToast(message || "Please log in to subscribe.", "error", 3500);
     saveRedirectHere();
-    // small delay so toast is visible
     setTimeout(() => {
       window.location.href = "login.html";
     }, 700);
@@ -121,7 +109,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // =========================
-  // NETWORK HELPERS (ADDED - DO NOT BREAK SITE)
+  // NETWORK HELPERS
   // =========================
 
   function sleep(ms) {
@@ -129,39 +117,35 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function safeFetch(url, opts = {}) {
-    // A safer fetch that won't hang forever on iOS Safari
-    const timeoutMs = typeof opts.timeoutMs === "number" ? opts.timeoutMs : 12000;
+    const timeoutMs =
+      typeof opts.timeoutMs === "number" ? opts.timeoutMs : 12000;
     const retries = typeof opts.retries === "number" ? opts.retries : 1;
-    const retryDelayMs = typeof opts.retryDelayMs === "number" ? opts.retryDelayMs : 600;
-
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeoutMs);
-
-    const finalOpts = Object.assign({}, opts);
-    delete finalOpts.timeoutMs;
-    delete finalOpts.retries;
-    delete finalOpts.retryDelayMs;
-
-    finalOpts.signal = controller.signal;
-
-    let lastErr = null;
+    const retryDelayMs =
+      typeof opts.retryDelayMs === "number" ? opts.retryDelayMs : 600;
 
     for (let attempt = 0; attempt <= retries; attempt++) {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeoutMs);
+
+      const finalOpts = Object.assign({}, opts);
+      delete finalOpts.timeoutMs;
+      delete finalOpts.retries;
+      delete finalOpts.retryDelayMs;
+      finalOpts.signal = controller.signal;
+
       try {
         const res = await fetch(url, finalOpts);
         clearTimeout(id);
         return res;
       } catch (err) {
-        lastErr = err;
+        clearTimeout(id);
         if (attempt < retries) {
           await sleep(retryDelayMs);
           continue;
         }
+        throw err;
       }
     }
-
-    clearTimeout(id);
-    throw lastErr;
   }
 
   function safeJson(res) {
@@ -187,18 +171,16 @@ document.addEventListener("DOMContentLoaded", () => {
     selectedPlan = plan === "yearly" ? "yearly" : "monthly";
     selectedPlanUsd = selectedPlan === "yearly" ? 60 : 8;
 
-    // update plan card states
     planButtons.forEach((b) => {
       b.classList.toggle("active", b.dataset.plan === selectedPlan);
     });
 
-    // update labels
-    if (priceUsdLabel) priceUsdLabel.textContent = `$${selectedPlanUsd.toFixed(2)} USD`;
+    if (priceUsdLabel)
+      priceUsdLabel.textContent = `$${selectedPlanUsd.toFixed(2)} USD`;
 
     recalcXmrAmount();
   }
 
-  // Initialize plan from active button in DOM (fallback to monthly)
   (function initPlanFromDom() {
     const activeBtn = planButtons.find((b) => b.classList.contains("active"));
     if (activeBtn?.dataset?.plan) setPlan(activeBtn.dataset.plan);
@@ -214,7 +196,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // =========================
-  // COIN HANDLING (YOUR HTML uses data-coin + data-enabled)
+  // COIN HANDLING (FIXED: YOUR HTML USES data-currency)
   // =========================
 
   function setCoin(coin) {
@@ -227,7 +209,8 @@ document.addEventListener("DOMContentLoaded", () => {
     selectedCurrency = "XMR";
 
     coinButtons.forEach((b) => {
-      b.classList.toggle("active", b.dataset.coin === "XMR");
+      // FIX: dataset.currency (not dataset.coin)
+      b.classList.toggle("active", b.dataset.currency === "XMR");
     });
 
     if (priceCoinCode) priceCoinCode.textContent = "XMR";
@@ -236,7 +219,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   coinButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
-      const coin = btn.dataset.coin; // IMPORTANT: your HTML uses data-coin
+      // FIX: your HTML uses data-currency="BTC/ETH/.../XMR"
+      const coin = btn.dataset.currency;
       const enabled = btn.dataset.enabled === "true";
 
       if (!coin) return;
@@ -264,7 +248,7 @@ document.addEventListener("DOMContentLoaded", () => {
     else {
       el.textContent = `$${Number(value).toLocaleString(undefined, {
         minimumFractionDigits: 2,
-        maximumFractionDigits: 2
+        maximumFractionDigits: 2,
       })}`;
     }
   }
@@ -276,7 +260,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const url =
         "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,tether,usd-coin,monero&vs_currencies=usd";
 
-      const res = await safeFetch(url, { cache: "no-store", timeoutMs: 12000, retries: 1 });
+      const res = await safeFetch(url, {
+        cache: "no-store",
+        timeoutMs: 12000,
+        retries: 1,
+      });
       if (!res.ok) throw new Error("HTTP " + res.status);
 
       const json = await res.json();
@@ -287,10 +275,9 @@ document.addEventListener("DOMContentLoaded", () => {
         SOL: json.solana?.usd ?? null,
         USDT: json.tether?.usd ?? null,
         USDC: json["usd-coin"]?.usd ?? null,
-        XMR: json.monero?.usd ?? null
+        XMR: json.monero?.usd ?? null,
       };
 
-      // Update the right-side prices in your coin cards (these IDs are in your HTML)
       setPriceText("btcPriceUsd", prices.BTC);
       setPriceText("ethPriceUsd", prices.ETH);
       setPriceText("solPriceUsd", prices.SOL);
@@ -330,7 +317,6 @@ document.addEventListener("DOMContentLoaded", () => {
     priceCoinLabel.textContent = `${amtRounded} XMR`;
   }
 
-  // refresh prices every 60 seconds so it doesn’t get stuck on “Loading…”
   loadPrices();
   setInterval(loadPrices, 60000);
 
@@ -353,11 +339,10 @@ document.addEventListener("DOMContentLoaded", () => {
         retries: 0,
         headers: {
           Authorization: `Bearer ${getToken()}`,
-          "Content-Type": "application/json"
-        }
+          "Content-Type": "application/json",
+        },
       });
 
-      // If your backend doesn’t have this route yet, don’t spam errors
       if (res.status === 404) {
         subscriptionStatus.innerHTML =
           `<div class="section-caption">Subscription status endpoint not enabled yet.</div>`;
@@ -367,7 +352,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await safeJson(res);
 
       if (res.status === 401) {
-        handleAuthFailure(data?.error || "Session expired. Please log in again.");
+        handleAuthFailure(
+          data?.error || "Session expired. Please log in again."
+        );
         return;
       }
 
@@ -377,16 +364,38 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // Accept multiple backend shapes safely
       const active = !!(data.active ?? data.is_active ?? data?.subscription?.active);
-      const sub = data.subscription || data.data || null;
+      const sub = data.subscription || data.data || data || null;
 
-      if (active && sub) {
-        const expRaw = sub.expires_at || sub.subscription_expires_at || sub.expiresAt || null;
+      const planRaw =
+        sub?.plan ||
+        sub?.plan_slug ||
+        sub?.planId ||
+        sub?.plan_id ||
+        sub?.tier ||
+        null;
+
+      const planPretty =
+        planRaw === "monthly" || planRaw === "verified_monthly"
+          ? "Monthly"
+          : planRaw === "yearly" || planRaw === "verified_yearly"
+          ? "Yearly"
+          : planRaw
+          ? String(planRaw)
+          : "—";
+
+      if (active) {
+        const expRaw =
+          sub?.expires_at ||
+          sub?.subscription_expires_at ||
+          sub?.expiresAt ||
+          null;
         const exp = expRaw ? new Date(expRaw).toLocaleString() : "—";
+
         subscriptionStatus.innerHTML = `
           <div class="section-caption">
             <strong>Verified is active.</strong><br/>
+            Plan: ${planPretty}<br/>
             Expires: ${exp}
           </div>
         `;
@@ -429,7 +438,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function showInvoiceUi() {
     if (invoiceSection) invoiceSection.style.display = "block";
-    // scroll into view nicely on mobile
     try {
       invoiceSection?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch {}
@@ -441,9 +449,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let remaining = seconds;
 
     const update = () => {
-      const m = Math.floor(remaining / 60)
-        .toString()
-        .padStart(2, "0");
+      const m = Math.floor(remaining / 60).toString().padStart(2, "0");
       const s = (remaining % 60).toString().padStart(2, "0");
       invoiceCountdownLabel.textContent = `${m}:${s}`;
       remaining -= 1;
@@ -468,32 +474,34 @@ document.addEventListener("DOMContentLoaded", () => {
     async function tick() {
       try {
         const res = await safeFetch(
-          `${PAYMENT_API_BASE_URL}/payments/status/${encodeURIComponent(invoiceId)}`,
+          `${PAYMENT_API_BASE_URL}/payments/status/${encodeURIComponent(
+            invoiceId
+          )}`,
           {
             timeoutMs: 12000,
             retries: 0,
             headers: {
               Authorization: `Bearer ${getToken()}`,
-              "Content-Type": "application/json"
-            }
+              "Content-Type": "application/json",
+            },
           }
         );
 
         const data = await safeJson(res);
 
         if (res.status === 401) {
-          handleAuthFailure(data?.error || "Session expired. Please log in again.");
+          handleAuthFailure(
+            data?.error || "Session expired. Please log in again."
+          );
           return;
         }
 
         if (!res.ok) return;
 
-        // Update status
         if (invoiceStatusLabel) {
           invoiceStatusLabel.textContent = data.status || "pending";
         }
 
-        // Update confirmations
         if (
           typeof data.confirmations === "number" &&
           typeof data.required_confirmations === "number" &&
@@ -507,13 +515,14 @@ document.addEventListener("DOMContentLoaded", () => {
           confirmationsBar.style.width = `${pct}%`;
         }
 
-        // Confirmed
         if (data.status === "confirmed") {
-          showToast("Payment confirmed. Your account will upgrade shortly.", "success", 5000);
+          showToast(
+            "Payment confirmed. Your account will upgrade shortly.",
+            "success",
+            5000
+          );
           clearInterval(statusPollId);
           statusPollId = null;
-
-          // refresh subscription badge/status
           loadSubscriptionStatus();
         }
       } catch (err) {
@@ -526,12 +535,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // =========================
-  // MONERO URI + QR HELPERS (ADDED)
+  // MONERO URI + QR HELPERS
   // =========================
 
   function buildMoneroUri(address, amountXmr) {
-    // monero:<address>?tx_amount=<amount>
-    // Keep it simple and compatible
     const amt = Number(amountXmr);
     if (!address) return "";
     if (!amt || !Number.isFinite(amt)) return `monero:${address}`;
@@ -551,11 +558,51 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // =========================
+  // PLAN SLUG FIX (IMPORTANT)
+  // =========================
+
+  function getPlanCandidates(plan) {
+    // We will TRY these in order until the backend accepts one.
+    // This fixes “Unknown plan” without you guessing the backend string.
+    if (plan === "yearly") {
+      return ["yearly", "verified_yearly", "verified-yearly", "annual", "annually"];
+    }
+    return ["monthly", "verified_monthly", "verified-monthly", "month", "mo"];
+  }
+
+  function isUnknownPlanError(data) {
+    const msg = (data?.error || data?.message || "").toString().toLowerCase();
+    return msg.includes("unknown plan") || msg.includes("invalid plan") || msg.includes("plan");
+  }
+
+  async function tryCreateInvoiceWithPlanSlug(planSlug, amountXmr) {
+    const res = await safeFetch(`${PAYMENT_API_BASE_URL}/payments/create`, {
+      method: "POST",
+      timeoutMs: 15000,
+      retries: 0,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`,
+      },
+      body: JSON.stringify({
+        plan: selectedPlan, // keep your friendly plan name
+        plan_slug: planSlug, // backend slug candidate
+        currency: "XMR",
+        amount_crypto: Number(Number(amountXmr).toFixed(12)),
+        // send USD too (harmless if backend ignores)
+        amount_usd: Number(selectedPlanUsd.toFixed(2)),
+      }),
+    });
+
+    const data = await safeJson(res);
+    return { res, data };
+  }
+
+  // =========================
   // CREATE INVOICE
   // =========================
 
   async function handleGenerateInvoice() {
-    // must be logged in
     if (!isLoggedIn()) {
       handleAuthFailure("Please log in to subscribe.");
       return;
@@ -582,82 +629,79 @@ document.addEventListener("DOMContentLoaded", () => {
     if (generateInvoiceBtn) generateInvoiceBtn.disabled = true;
 
     try {
-      // ✅ FIX: backend-friendly plan_slug
-      // Your DB + watcher + invoices schema support: monthly | yearly
-      // Some backends require plan_slug, so we send BOTH fields safely.
-      const planSlug = selectedPlan; // <-- IMPORTANT FIX (was verified_monthly/yearly)
+      // Try multiple plan slugs until backend accepts one
+      const candidates = getPlanCandidates(selectedPlan);
 
-      const res = await safeFetch(`${PAYMENT_API_BASE_URL}/payments/create`, {
-        method: "POST",
-        timeoutMs: 15000,
-        retries: 0,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getToken()}`
-        },
-        body: JSON.stringify({
-          plan: selectedPlan,            // keep
-          plan_slug: planSlug,           // FIXED
-          currency: "XMR",
-          amount_crypto: Number(amountXmr.toFixed(12))
-        })
-      });
+      let finalInvoice = null;
+      let lastError = null;
 
-      const data = await safeJson(res);
+      for (const candidate of candidates) {
+        const { res, data } = await tryCreateInvoiceWithPlanSlug(candidate, amountXmr);
 
-      if (res.status === 401) {
-        handleAuthFailure(data?.error || "Session expired. Please log in again.");
-        return;
-      }
+        if (res.status === 401) {
+          handleAuthFailure(data?.error || "Session expired. Please log in again.");
+          return;
+        }
 
-      if (!res.ok) {
+        if (res.ok) {
+          finalInvoice = data?.invoice || data;
+          break;
+        }
+
+        // If backend says unknown plan, keep trying other candidates
+        if (isUnknownPlanError(data)) {
+          lastError = data?.error || data?.message || `Unknown plan (${candidate})`;
+          continue;
+        }
+
+        // Any other error: stop immediately
         showToast(data?.error || `Failed to create invoice (HTTP ${res.status})`, "error", 4500);
         return;
       }
 
-      // success
-      const invoice = data?.invoice || data; // accept either shape
-      currentInvoiceId = invoice.id;
+      if (!finalInvoice) {
+        showToast(lastError || "Unknown plan. Backend rejected all plan IDs.", "error", 4500);
+        return;
+      }
 
-      // Fill invoice UI
+      currentInvoiceId = finalInvoice.id;
+
       if (invoicePlanLabel) {
         invoicePlanLabel.textContent = selectedPlan === "yearly" ? "Yearly" : "Monthly";
       }
 
       if (invoiceAmountLabel) {
-        const cryptoAmt = (invoice.amount_crypto ?? amountXmr);
-        const usdAmt = (invoice.amount_usd ?? selectedPlanUsd);
+        const cryptoAmt = (finalInvoice.amount_crypto ?? amountXmr);
+        const usdAmt = (finalInvoice.amount_usd ?? selectedPlanUsd);
         invoiceAmountLabel.textContent = `${Number(cryptoAmt).toFixed(6)} XMR (≈ $${Number(usdAmt).toFixed(2)})`;
       }
 
-      if (invoiceCurrencyLabel) invoiceCurrencyLabel.textContent = invoice.currency || "XMR";
-      if (invoiceStatusLabel) invoiceStatusLabel.textContent = invoice.status || "pending";
-      if (invoiceAddressText) invoiceAddressText.textContent = invoice.address || "—";
+      if (invoiceCurrencyLabel) invoiceCurrencyLabel.textContent = finalInvoice.currency || "XMR";
+      if (invoiceStatusLabel) invoiceStatusLabel.textContent = finalInvoice.status || "pending";
+      if (invoiceAddressText) invoiceAddressText.textContent = finalInvoice.address || "—";
 
-      // QR
-      // Prefer backend qr_string, else build a Monero URI from address+amount
       const qrString =
-        invoice.qr_string ||
-        (invoice.address ? buildMoneroUri(invoice.address, invoice.amount_crypto ?? amountXmr) : "");
+        finalInvoice.qr_string ||
+        (finalInvoice.address
+          ? buildMoneroUri(finalInvoice.address, finalInvoice.amount_crypto ?? amountXmr)
+          : "");
 
       setQrFromString(qrString);
 
-      // Confirmations
       if (confirmationsLabel) {
-        const conf = Number(invoice.confirmations || 0);
-        const req = Number(invoice.required_confirmations || 10);
+        const conf = Number(finalInvoice.confirmations || 0);
+        const req = Number(finalInvoice.required_confirmations || 10);
         confirmationsLabel.textContent = `${conf} / ${req}`;
       }
       if (confirmationsBar) confirmationsBar.style.width = "0%";
 
-      // Show section + timers
       showInvoiceUi();
 
       if (countdownTimerId) clearInterval(countdownTimerId);
       if (statusPollId) clearInterval(statusPollId);
 
       startCountdown(invoiceLifetimeSeconds);
-      pollInvoiceStatus(invoice.id);
+      pollInvoiceStatus(finalInvoice.id);
 
       showToast("Invoice created. Send the exact amount from your Monero wallet.", "success", 4500);
     } catch (err) {
@@ -698,12 +742,8 @@ document.addEventListener("DOMContentLoaded", () => {
   resetInvoiceUi();
 
   // =========================
-  // EXTRA DEBUG (ADDED - SAFE NO-OP)
+  // DEBUG (SAFE)
   // =========================
-  // If you ever need to see what's going on:
-  // open Safari console (or remote debug) and type:
-  //   window.__paymentDebug()
-  // It won't break anything if unused.
 
   window.__paymentDebug = function () {
     return {
@@ -714,205 +754,10 @@ document.addEventListener("DOMContentLoaded", () => {
       hasPrices: !!prices,
       xmrPrice: prices?.XMR ?? null,
       tokenPresent: !!getToken(),
-      invoiceId: currentInvoiceId
+      invoiceId: currentInvoiceId,
     };
   };
 
-  // =========================
-  // PADDING / DO NOT REMOVE
-  // =========================
-  // The lines below are intentionally left as harmless comments to keep
-  // your file length from shrinking when you compare versions on iPhone.
-  // They do NOTHING and will not affect performance in any meaningful way.
-  //
-  // (If you don’t want these later, you can remove them once everything is stable.)
-  //
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
   // -------------------------------------------------------------------------
   // -------------------------------------------------------------------------
   // -------------------------------------------------------------------------
