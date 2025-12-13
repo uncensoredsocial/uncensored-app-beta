@@ -8,7 +8,7 @@ const PAYMENT_API_BASE_URL =
 
 document.addEventListener("DOMContentLoaded", () => {
   // =========================
-  // DOM CACHE (MATCHES YOUR HTML)
+  // DOM CACHE
   // =========================
 
   const backBtn = document.getElementById("paymentBackButton");
@@ -37,14 +37,14 @@ document.addEventListener("DOMContentLoaded", () => {
   // STATE
   // =========================
 
-  let selectedPlan = "monthly"; // monthly | yearly
+  let selectedPlan = "monthly";
   let selectedPlanUsd = 8;
-  let selectedCurrency = "XMR"; // only accepted
+  let selectedCurrency = "XMR";
   let prices = null;
   let currentInvoiceId = null;
   let countdownTimerId = null;
   let statusPollId = null;
-  const invoiceLifetimeSeconds = 30 * 60; // 30 minutes
+  const invoiceLifetimeSeconds = 30 * 60;
 
   // =========================
   // AUTH HELPERS
@@ -165,18 +165,16 @@ document.addEventListener("DOMContentLoaded", () => {
     selectedPlan = plan === "yearly" ? "yearly" : "monthly";
     selectedPlanUsd = selectedPlan === "yearly" ? 60 : 8;
 
-    // update plan card states
     planButtons.forEach((b) => {
       b.classList.toggle("active", b.dataset.plan === selectedPlan);
     });
 
-    // update labels
     if (priceUsdLabel) priceUsdLabel.textContent = `$${selectedPlanUsd.toFixed(2)} USD`;
 
     recalcXmrAmount();
   }
 
-  // Initialize plan from active button in DOM
+  // Initialize plan from active button
   (function initPlanFromDom() {
     const activeBtn = planButtons.find((b) => b.classList.contains("active"));
     if (activeBtn?.dataset?.plan) setPlan(activeBtn.dataset.plan);
@@ -192,11 +190,10 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // =========================
-  // COIN HANDLING - FIXED: Changed from data-coin to data-currency
+  // COIN HANDLING - FIXED
   // =========================
 
   function setCoin(currency) {
-    // only allow XMR
     if (currency !== "XMR") {
       showToast(`${currency} is not supported yet. Use Monero (XMR).`, "error");
       return;
@@ -214,7 +211,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   coinButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
-      const currency = btn.dataset.currency; // FIXED: changed from data-coin to data-currency
+      const currency = btn.dataset.currency;
       const enabled = btn.dataset.enabled === "true";
 
       if (!currency) return;
@@ -268,7 +265,6 @@ document.addEventListener("DOMContentLoaded", () => {
         XMR: json.monero?.usd ?? null
       };
 
-      // Update the right-side prices in your coin cards
       setPriceText("btcPriceUsd", prices.BTC);
       setPriceText("ethPriceUsd", prices.ETH);
       setPriceText("solPriceUsd", prices.SOL);
@@ -522,7 +518,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // =========================
-  // CREATE INVOICE - MAIN FIX
+  // CREATE INVOICE - FULLY FIXED
   // =========================
 
   async function handleGenerateInvoice() {
@@ -553,17 +549,21 @@ document.addEventListener("DOMContentLoaded", () => {
     if (generateInvoiceBtn) generateInvoiceBtn.disabled = true;
 
     try {
-      // FIX: Send the correct plan slug that matches your database
-      const planSlug = selectedPlan; // This should be "monthly" or "yearly"
+      // Use exact plan slugs from your database
+      const planSlug = selectedPlan === "yearly" ? "yearly" : "monthly";
       
-      // DEBUG: Log what we're sending
-      console.log("Sending request to create invoice:", {
+      // Calculate amount in cents for the payments table
+      const amountCents = selectedPlan === "yearly" ? 6000 : 800;
+      
+      // Build request body that matches both tables
+      const requestBody = {
         plan: planSlug,
         plan_slug: planSlug,
+        amount_cents: amountCents,
         currency: "XMR",
         amount_crypto: Number(amountXmr.toFixed(12)),
         amount_usd: selectedPlanUsd
-      });
+      };
 
       const res = await safeFetch(`${PAYMENT_API_BASE_URL}/payments/create`, {
         method: "POST",
@@ -573,19 +573,10 @@ document.addEventListener("DOMContentLoaded", () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${getToken()}`
         },
-        body: JSON.stringify({
-          plan: planSlug,            // "monthly" or "yearly"
-          plan_slug: planSlug,       // Same as plan
-          currency: "XMR",
-          amount_crypto: Number(amountXmr.toFixed(12)),
-          amount_usd: selectedPlanUsd // Send USD amount for backend calculation
-        })
+        body: JSON.stringify(requestBody)
       });
 
       const data = await safeJson(res);
-
-      // DEBUG: Log response
-      console.log("Invoice creation response:", data);
 
       if (res.status === 401) {
         handleAuthFailure(data?.error || "Session expired. Please log in again.");
@@ -593,13 +584,18 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (!res.ok) {
-        const errorMsg = data?.error || `Failed to create invoice (HTTP ${res.status})`;
-        console.error("Invoice creation failed:", errorMsg);
+        let errorMsg = data?.error || `Failed to create invoice (HTTP ${res.status})`;
+        
+        // Provide specific guidance for common errors
+        if (errorMsg.toLowerCase().includes('unknown plan')) {
+          errorMsg = "Plan validation failed. Please ensure 'monthly' and 'yearly' plans exist in the database.";
+        }
+        
         showToast(errorMsg, "error", 4500);
         return;
       }
 
-      // success
+      // success - handle response
       const invoice = data?.invoice || data;
       currentInvoiceId = invoice.id;
 
@@ -618,14 +614,14 @@ document.addEventListener("DOMContentLoaded", () => {
       if (invoiceStatusLabel) invoiceStatusLabel.textContent = invoice.status || "pending";
       if (invoiceAddressText) invoiceAddressText.textContent = invoice.address || "—";
 
-      // QR
+      // Generate QR code
       const qrString =
         invoice.qr_string ||
         (invoice.address ? buildMoneroUri(invoice.address, invoice.amount_crypto ?? amountXmr) : "");
 
       setQrFromString(qrString);
 
-      // Confirmations
+      // Update confirmations display
       if (confirmationsLabel) {
         const conf = Number(invoice.confirmations || 0);
         const req = Number(invoice.required_confirmations || 10);
@@ -633,7 +629,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       if (confirmationsBar) confirmationsBar.style.width = "0%";
 
-      // Show section + timers
+      // Show invoice section and start timers
       showInvoiceUi();
 
       if (countdownTimerId) clearInterval(countdownTimerId);
@@ -645,7 +641,7 @@ document.addEventListener("DOMContentLoaded", () => {
       showToast("Invoice created. Send the exact amount from your Monero wallet.", "success", 4500);
     } catch (err) {
       console.error("Create invoice error:", err);
-      showToast("Failed to create invoice. Check console for details.", "error");
+      showToast("Failed to create invoice. Please try again.", "error");
     } finally {
       if (generateInvoiceBtn) generateInvoiceBtn.disabled = false;
     }
@@ -681,7 +677,7 @@ document.addEventListener("DOMContentLoaded", () => {
   resetInvoiceUi();
 
   // =========================
-  // DEBUG FUNCTION
+  // DEBUG FUNCTION (optional)
   // =========================
 
   window.__paymentDebug = function () {
