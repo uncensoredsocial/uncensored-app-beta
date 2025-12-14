@@ -148,14 +148,17 @@ class SearchManager {
       const allResults = await this.fetchAllSearchResults(query);
       this.allResults = allResults;
       
+      // Hide loading animation
+      this.hideLoadingAnimation();
+      
       // Display results based on current filter
       this.displayFilteredResults();
     } catch (err) {
       console.error("Search error:", err);
+      this.hideLoadingAnimation();
       this.showErrorState();
     } finally {
       this.isSearching = false;
-      this.hideLoadingAnimation();
     }
   }
 
@@ -178,6 +181,7 @@ class SearchManager {
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       };
 
+      console.log("Fetching search results for:", query);
       const response = await fetch(`${FEED_API_BASE_URL}/search?q=${encodeURIComponent(query)}`, {
         method: 'GET',
         headers
@@ -188,6 +192,7 @@ class SearchManager {
       }
 
       const data = await response.json();
+      console.log("Search API response:", data);
       
       // Map backend response to your frontend format
       results.users = (data.users || []).map(user => ({
@@ -224,6 +229,12 @@ class SearchManager {
         count: 0
       }));
 
+      console.log("Mapped results:", {
+        users: results.users.length,
+        posts: results.posts.length,
+        hashtags: results.hashtags.length
+      });
+
       // Save search to history if user is logged in
       if (token && query) {
         try {
@@ -257,6 +268,7 @@ class SearchManager {
     
     // Check follow status for users
     if (currentUser && results.users.length > 0) {
+      console.log("Enriching user follow status...");
       const usersWithFollowStatus = await Promise.all(
         results.users.map(async (user) => {
           let isFollowing = false;
@@ -281,11 +293,13 @@ class SearchManager {
 
     // Enrich posts with engagement numbers if needed
     if (results.posts.length > 0) {
+      console.log("Enriching posts...");
       await this.enrichPostsFromApi(results.posts);
     }
   }
 
   async fallbackSearch(query, results) {
+    console.log("Using fallback search for:", query);
     const pattern = `%${query}%`;
     const currentUser = typeof getCurrentUser === "function" ? getCurrentUser() : null;
     
@@ -299,6 +313,7 @@ class SearchManager {
       .limit(10);
     
     if (!usersError && users) {
+      console.log("Fallback found users:", users.length);
       const usersWithFollowStatus = await Promise.all(
         users.map(async (user) => {
           let isFollowing = false;
@@ -340,6 +355,7 @@ class SearchManager {
       .limit(20);
     
     if (!postsError && posts) {
+      console.log("Fallback found posts:", posts.length);
       results.posts = posts.map(post => ({
         id: post.id,
         userId: post.user_id,
@@ -373,6 +389,7 @@ class SearchManager {
       .limit(10);
     
     if (!hashtagsError && hashtags) {
+      console.log("Fallback found hashtags:", hashtags.length);
       results.hashtags = hashtags.map(tag => ({
         name: tag.tag,
         count: 0
@@ -381,13 +398,21 @@ class SearchManager {
   }
 
   displayFilteredResults() {
+    console.log("Displaying filtered results for filter:", this.currentFilter);
+    console.log("All results:", this.allResults);
+    
+    // First, hide everything
     this.hideAllStates();
+    this.hideLoadingAnimation();
 
     const state = document.getElementById("searchResultsState");
     const title = document.getElementById("resultsTitle");
     const count = document.getElementById("resultsCount");
 
-    if (!state || !title || !count) return;
+    if (!state || !title || !count) {
+      console.error("Missing required elements for search results display");
+      return;
+    }
 
     state.style.display = "block";
     title.textContent = `Results for "${this.currentQuery}"`;
@@ -430,13 +455,20 @@ class SearchManager {
         break;
     }
 
+    console.log("Filtered results:", filteredResults);
+    console.log("Total results:", totalResults);
+
     count.textContent = `${totalResults} results`;
 
+    // Display each section
     this.displayUsersResults(filteredResults.users);
     this.displayPostsResults(filteredResults.posts);
     this.displayHashtagsResults(filteredResults.hashtags);
 
-    if (totalResults === 0) this.showNoResults();
+    if (totalResults === 0) {
+      console.log("No results, showing no results state");
+      this.showNoResults();
+    }
   }
 
   /* ---------- USERS SECTION ---------- */
@@ -444,20 +476,22 @@ class SearchManager {
   displayUsersResults(users) {
     const list = document.getElementById("usersList");
     const section = document.getElementById("usersResults");
-    if (!list || !section) return;
+    if (!list || !section) {
+      console.error("Missing users list or section element");
+      return;
+    }
 
     if (!users.length) {
+      console.log("No users to display");
       section.style.display = "none";
       return;
     }
 
-    const currentUser =
-      typeof getCurrentUser === "function" ? getCurrentUser() : null;
-
+    console.log("Displaying", users.length, "users");
     section.style.display = "block";
     list.innerHTML = users
       .map((user) => {
-        const isMe = currentUser && currentUser.id === user.id;
+        const isMe = typeof getCurrentUser === "function" ? getCurrentUser()?.id === user.id : false;
 
         const followButtonHtml = isMe
           ? `<span class="you-pill">You</span>`
@@ -500,8 +534,7 @@ class SearchManager {
       card.addEventListener("click", (e) => {
         if (e.target.closest(".follow-btn")) return;
         const username = card.dataset.username;
-        const me =
-          typeof getCurrentUser === "function" ? getCurrentUser() : null;
+        const me = typeof getCurrentUser === "function" ? getCurrentUser() : null;
         if (me && me.username === username) {
           // UPDATED: go to profile with flag so back button knows we came from search
           window.location.href = "profile.html?from=search";
@@ -519,13 +552,18 @@ class SearchManager {
   displayPostsResults(posts) {
     const list = document.getElementById("postsList");
     const section = document.getElementById("postsResults");
-    if (!list || !section) return;
+    if (!list || !section) {
+      console.error("Missing posts list or section element");
+      return;
+    }
 
     if (!posts.length) {
+      console.log("No posts to display");
       section.style.display = "none";
       return;
     }
 
+    console.log("Displaying", posts.length, "posts");
     section.style.display = "block";
     list.innerHTML = posts
       .map((post) => {
@@ -717,13 +755,18 @@ class SearchManager {
   displayHashtagsResults(hashtags) {
     const list = document.getElementById("hashtagsList");
     const section = document.getElementById("hashtagsResults");
-    if (!list || !section) return;
+    if (!list || !section) {
+      console.error("Missing hashtags list or section element");
+      return;
+    }
 
     if (!hashtags.length) {
+      console.log("No hashtags to display");
       section.style.display = "none";
       return;
     }
 
+    console.log("Displaying", hashtags.length, "hashtags");
     section.style.display = "block";
     list.innerHTML = hashtags
       .map(
@@ -1086,7 +1129,10 @@ class SearchManager {
   showNoResults() {
     const noResults = document.getElementById("noResults");
     const state = document.getElementById("searchResultsState");
-    if (state) state.style.display = "block";
+    if (state) {
+      state.style.display = "block";
+      state.innerHTML = '<div class="no-results-message">No results found</div>';
+    }
     if (noResults) noResults.style.display = "block";
   }
 
@@ -1099,12 +1145,23 @@ class SearchManager {
     ["searchDefault", "searchLoading", "searchResultsState", "noResults"].forEach(
       (id) => {
         const el = document.getElementById(id);
-        if (el) el.style.display = "none";
+        if (el) {
+          el.style.display = "none";
+          // Don't clear innerHTML for searchResultsState as we need to keep the structure
+          if (id !== "searchResultsState") {
+            el.innerHTML = "";
+          }
+        }
       }
     );
     ["usersResults", "postsResults", "hashtagsResults"].forEach((id) => {
       const el = document.getElementById(id);
-      if (el) el.style.display = "none";
+      if (el) {
+        el.style.display = "none";
+        if (id === "usersList" || id === "postsList" || id === "hashtagsList") {
+          el.innerHTML = "";
+        }
+      }
     });
     this.hideLoadingAnimation();
   }
