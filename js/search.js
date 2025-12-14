@@ -72,12 +72,15 @@ class SearchManager {
 
     filterTabs.forEach((tab) => {
       tab.addEventListener("click", (e) => {
-        const filter = e.target.dataset.filter;
+        // ✅ FIX: always read from the tab element, not a child span/icon
+        const tabEl = e.currentTarget || tab;
+        const filter = tabEl?.dataset?.filter;
+
         this.handleFilterChange(filter);
-        
+
         // Update active state
-        filterTabs.forEach(t => t.classList.remove("active"));
-        e.target.classList.add("active");
+        filterTabs.forEach((t) => t.classList.remove("active"));
+        tabEl.classList.add("active");
       });
     });
 
@@ -158,8 +161,23 @@ class SearchManager {
   }
 
   handleFilterChange(filter) {
-    if (!filter || filter === this.currentFilter) return;
-    this.currentFilter = filter;
+    if (!filter) return;
+
+    // ✅ FIX: normalize filter values so tabs always work
+    const map = {
+      all: "all",
+      users: "users",
+      people: "users",
+      posts: "posts",
+      content: "posts",
+      hashtags: "hashtags",
+      tags: "hashtags",
+    };
+
+    const normalized = map[filter] || "all";
+
+    if (normalized === this.currentFilter) return;
+    this.currentFilter = normalized;
 
     if (this.currentQuery && this.currentQuery.length >= 2) {
       this.performSearch(this.currentQuery);
@@ -168,39 +186,43 @@ class SearchManager {
 
   async fetchSearchResults(query, filter) {
     const results = { users: [], posts: [], hashtags: [] };
-    const currentUser = typeof getCurrentUser === "function" ? getCurrentUser() : null;
+    const currentUser =
+      typeof getCurrentUser === "function" ? getCurrentUser() : null;
 
     try {
       // Use your backend API for search
       const token = this.getAuthToken();
       const headers = {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       };
 
-      const response = await fetch(`${FEED_API_BASE_URL}/search?q=${encodeURIComponent(query)}`, {
-        method: 'GET',
-        headers
-      });
+      const response = await fetch(
+        `${FEED_API_BASE_URL}/search?q=${encodeURIComponent(query)}`,
+        {
+          method: "GET",
+          headers,
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Search failed: ${response.status}`);
       }
 
       const data = await response.json();
-      
+
       // Always get ALL results from backend
-      const allUsers = (data.users || []).map(user => ({
+      const allUsers = (data.users || []).map((user) => ({
         id: user.id,
         username: user.username,
         displayName: user.display_name || user.username,
-        avatar: user.avatar_url || 'default-profile.PNG',
-        bio: user.bio || '',
+        avatar: user.avatar_url || "default-profile.PNG",
+        bio: user.bio || "",
         followersCount: 0,
-        isFollowing: false
+        isFollowing: false,
       }));
 
-      const allPosts = (data.posts || []).map(post => ({
+      const allPosts = (data.posts || []).map((post) => ({
         id: post.id,
         userId: post.user_id,
         content: post.content,
@@ -213,25 +235,25 @@ class SearchManager {
         liked_by_me: post.liked_by_me || false,
         saved_by_me: post.saved_by_me || false,
         user: post.user || {
-          username: 'unknown',
-          displayName: 'Unknown User',
-          avatar: 'default-profile.PNG'
-        }
+          username: "unknown",
+          displayName: "Unknown User",
+          avatar: "default-profile.PNG",
+        },
       }));
 
-      const allHashtags = (data.hashtags || []).map(tag => ({
+      const allHashtags = (data.hashtags || []).map((tag) => ({
         name: tag.tag,
-        count: 0
+        count: 0,
       }));
 
       // Filter based on selected filter
-      if (filter === 'all' || filter === 'users') {
+      if (filter === "all" || filter === "users") {
         results.users = allUsers;
       }
-      if (filter === 'all' || filter === 'posts') {
+      if (filter === "all" || filter === "posts") {
         results.posts = allPosts;
       }
-      if (filter === 'all' || filter === 'hashtags') {
+      if (filter === "all" || filter === "hashtags") {
         results.hashtags = allHashtags;
       }
 
@@ -252,15 +274,18 @@ class SearchManager {
 
             return {
               ...user,
-              isFollowing
+              isFollowing,
             };
           })
         );
         results.users = usersWithFollowStatus;
       }
 
-      // Enrich posts with engagement numbers
-      if (results.posts.length > 0) {
+      // ✅ FIX: only enrich posts when posts are actually requested
+      if (
+        (filter === "all" || filter === "posts") &&
+        results.posts.length > 0
+      ) {
         await this.enrichPostsFromApi(results.posts);
       }
 
@@ -268,20 +293,19 @@ class SearchManager {
       if (token && query) {
         try {
           await fetch(`${FEED_API_BASE_URL}/search/history`, {
-            method: 'POST',
+            method: "POST",
             headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify({ query })
+            body: JSON.stringify({ query }),
           });
         } catch (err) {
-          console.error('Failed to save search history:', err);
+          console.error("Failed to save search history:", err);
         }
       }
-
     } catch (err) {
-      console.error('Search API error:', err);
+      console.error("Search API error:", err);
       // Fallback to direct Supabase query if backend fails
       await this.fallbackSearch(query, filter, results, currentUser);
     }
@@ -291,15 +315,15 @@ class SearchManager {
 
   async fallbackSearch(query, filter, results, currentUser) {
     const pattern = `%${query}%`;
-    
+
     // Simple fallback search
-    if (filter === 'all' || filter === 'users') {
+    if (filter === "all" || filter === "users") {
       const { data: users, error } = await this.supabase
-        .from('users')
-        .select('id,username,display_name,avatar_url,bio')
+        .from("users")
+        .select("id,username,display_name,avatar_url,bio")
         .or(`username.ilike.${pattern},display_name.ilike.${pattern}`)
         .limit(10);
-      
+
       if (!error && users) {
         const usersWithFollowStatus = await Promise.all(
           users.map(async (user) => {
@@ -320,10 +344,10 @@ class SearchManager {
               id: user.id,
               username: user.username,
               displayName: user.display_name || user.username,
-              avatar: user.avatar_url || 'default-profile.PNG',
-              bio: user.bio || '',
+              avatar: user.avatar_url || "default-profile.PNG",
+              bio: user.bio || "",
               followersCount: 0,
-              isFollowing
+              isFollowing,
             };
           })
         );
@@ -331,19 +355,21 @@ class SearchManager {
       }
     }
 
-    if (filter === 'all' || filter === 'posts') {
+    if (filter === "all" || filter === "posts") {
       const { data: posts, error } = await this.supabase
-        .from('posts')
-        .select(`
+        .from("posts")
+        .select(
+          `
           id, user_id, content, created_at, media_url, media_type,
           user:users (id, username, display_name, avatar_url)
-        `)
-        .ilike('content', pattern)
-        .order('created_at', { ascending: false })
+        `
+        )
+        .ilike("content", pattern)
+        .order("created_at", { ascending: false })
         .limit(20);
-      
+
       if (!error && posts) {
-        results.posts = posts.map(post => ({
+        results.posts = posts.map((post) => ({
           id: post.id,
           userId: post.user_id,
           content: post.content,
@@ -356,30 +382,33 @@ class SearchManager {
           liked_by_me: false,
           saved_by_me: false,
           user: post.user || {
-            username: 'unknown',
-            displayName: 'Unknown User',
-            avatar: 'default-profile.PNG'
-          }
+            username: "unknown",
+            displayName: "Unknown User",
+            avatar: "default-profile.PNG",
+          },
         }));
 
         // Enrich these posts with engagement numbers
-        if (results.posts.length) {
+        if (
+          (filter === "all" || filter === "posts") &&
+          results.posts.length
+        ) {
           await this.enrichPostsFromApi(results.posts);
         }
       }
     }
 
-    if (filter === 'all' || filter === 'hashtags') {
+    if (filter === "all" || filter === "hashtags") {
       const { data: hashtags, error } = await this.supabase
-        .from('hashtags')
-        .select('id,tag')
-        .ilike('tag', pattern)
+        .from("hashtags")
+        .select("id,tag")
+        .ilike("tag", pattern)
         .limit(10);
-      
+
       if (!error && hashtags) {
-        results.hashtags = hashtags.map(tag => ({
+        results.hashtags = hashtags.map((tag) => ({
           name: tag.tag,
-          count: 0
+          count: 0,
         }));
       }
     }
@@ -444,6 +473,12 @@ class SearchManager {
     this.hideAllStates();
     this.hideLoadingAnimation();
 
+    // ✅ FIX: reset results sections visibility each render (prevents tabs appearing "dead")
+    ["usersResults", "postsResults", "hashtagsResults"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = "none";
+    });
+
     const state = document.getElementById("searchResultsState");
     const title = document.getElementById("resultsTitle");
     const count = document.getElementById("resultsCount");
@@ -478,7 +513,8 @@ class SearchManager {
       return;
     }
 
-    const currentUser = typeof getCurrentUser === "function" ? getCurrentUser() : null;
+    const currentUser =
+      typeof getCurrentUser === "function" ? getCurrentUser() : null;
 
     section.style.display = "block";
     list.innerHTML = users
@@ -530,7 +566,9 @@ class SearchManager {
         if (me && me.username === username) {
           window.location.href = "profile.html?from=search";
         } else {
-          window.location.href = `user.html?user=${encodeURIComponent(username)}`;
+          window.location.href = `user.html?user=${encodeURIComponent(
+            username
+          )}`;
         }
       });
     });
@@ -571,7 +609,9 @@ class SearchManager {
             <img class="post-avatar" src="${avatar}"
               onerror="this.src='default-profile.PNG'">
             <div class="post-user-meta">
-              <span class="post-display-name">${this.escapeHtml(displayName)}</span>
+              <span class="post-display-name">${this.escapeHtml(
+                displayName
+              )}</span>
               <span class="post-username">@${this.escapeHtml(username)}</span>
             </div>
           </div>
@@ -656,7 +696,8 @@ class SearchManager {
 
       // click whole card -> post page (unless clicking actions / user)
       postEl.addEventListener("click", (e) => {
-        if (e.target.closest(".post-actions") || e.target.closest(".post-user")) return;
+        if (e.target.closest(".post-actions") || e.target.closest(".post-user"))
+          return;
         window.location.href = `post.html?id=${postId}`;
       });
 
@@ -666,11 +707,14 @@ class SearchManager {
         userEl.addEventListener("click", (e) => {
           e.stopPropagation();
           const username = userEl.dataset.username;
-          const me = typeof getCurrentUser === "function" ? getCurrentUser() : null;
+          const me =
+            typeof getCurrentUser === "function" ? getCurrentUser() : null;
           if (me && me.username === username) {
             window.location.href = "profile.html";
           } else {
-            window.location.href = `user.html?user=${encodeURIComponent(username)}`;
+            window.location.href = `user.html?user=${encodeURIComponent(
+              username
+            )}`;
           }
         });
       }
@@ -727,7 +771,9 @@ class SearchManager {
     list.innerHTML = hashtags
       .map(
         (h) => `
-      <a href="hashtag.html?tag=${encodeURIComponent(h.name)}" class="hashtag-item">
+      <a href="hashtag.html?tag=${encodeURIComponent(
+        h.name
+      )}" class="hashtag-item">
         <span class="icon icon-feeds hashtag-icon"></span>
         <div class="hashtag-info">
           <div class="hashtag-name">#${h.name}</div>
@@ -745,14 +791,14 @@ class SearchManager {
   }
 
   /* ---------- LOADING ANIMATION ---------- */
-  
+
   showLoadingAnimation() {
     this.hideAllStates();
-    
+
     // Remove any existing loading animation
     const existingLoader = document.getElementById("searchLoadingAnimation");
     if (existingLoader) existingLoader.remove();
-    
+
     // Create loading animation
     const loader = document.createElement("div");
     loader.id = "searchLoadingAnimation";
@@ -767,7 +813,7 @@ class SearchManager {
         </div>
       </div>
     `;
-    
+
     // Add CSS for the animation
     const style = document.createElement("style");
     style.textContent = `
@@ -779,7 +825,7 @@ class SearchManager {
         padding: 40px 20px;
         text-align: center;
       }
-      
+
       .loading-spinner {
         width: 50px;
         height: 50px;
@@ -789,19 +835,19 @@ class SearchManager {
         animation: spin 1s ease-in-out infinite;
         margin-bottom: 20px;
       }
-      
+
       .loading-text {
         font-size: 18px;
         font-weight: 500;
         color: var(--text-color, #333);
         margin-bottom: 15px;
       }
-      
+
       .loading-dots {
         display: flex;
         gap: 8px;
       }
-      
+
       .loading-dots .dot {
         width: 12px;
         height: 12px;
@@ -809,39 +855,40 @@ class SearchManager {
         background-color: var(--primary-color, #3498db);
         animation: bounce 1.4s infinite ease-in-out both;
       }
-      
+
       .loading-dots .dot:nth-child(1) {
         animation-delay: -0.32s;
       }
-      
+
       .loading-dots .dot:nth-child(2) {
         animation-delay: -0.16s;
       }
-      
+
       @keyframes spin {
         to { transform: rotate(360deg); }
       }
-      
+
       @keyframes bounce {
-        0%, 80%, 100% { 
+        0%, 80%, 100% {
           transform: scale(0);
           opacity: 0.5;
         }
-        40% { 
+        40% {
           transform: scale(1);
           opacity: 1;
         }
       }
     `;
-    
+
     document.head.appendChild(style);
-    
+
     // Find where to insert the loader
-    const resultsContainer = document.getElementById("searchResultsState") || 
-                            document.getElementById("searchDefault") ||
-                            document.querySelector(".search-results") ||
-                            document.querySelector(".search-container");
-    
+    const resultsContainer =
+      document.getElementById("searchResultsState") ||
+      document.getElementById("searchDefault") ||
+      document.querySelector(".search-results") ||
+      document.querySelector(".search-container");
+
     if (resultsContainer) {
       resultsContainer.style.display = "block";
       resultsContainer.innerHTML = "";
@@ -851,7 +898,7 @@ class SearchManager {
       document.body.insertBefore(loader, document.body.firstChild);
     }
   }
-  
+
   hideLoadingAnimation() {
     const loader = document.getElementById("searchLoadingAnimation");
     if (loader) loader.remove();
@@ -860,7 +907,8 @@ class SearchManager {
   /* ---------- FOLLOW / LIKE / SAVE ---------- */
 
   async handleFollow(userId, button) {
-    const currentUser = typeof getCurrentUser === "function" ? getCurrentUser() : null;
+    const currentUser =
+      typeof getCurrentUser === "function" ? getCurrentUser() : null;
     if (!currentUser) {
       this.showMessage("Please log in to follow users", "error");
       return;
@@ -947,7 +995,12 @@ class SearchManager {
 
       if (!res.ok) throw new Error(data.error || "Failed to update like");
 
-      const serverLikes = typeof data.likes === "number" ? data.likes : typeof data.like_count === "number" ? data.like_count : null;
+      const serverLikes =
+        typeof data.likes === "number"
+          ? data.likes
+          : typeof data.like_count === "number"
+          ? data.like_count
+          : null;
 
       if (serverLikes !== null) {
         countEl.textContent = String(serverLikes);
@@ -1163,8 +1216,8 @@ class SearchManager {
     try {
       // Simple fallback: get hashtags with most posts
       const { data: hashtags, error } = await this.supabase
-        .from('hashtags')
-        .select('tag')
+        .from("hashtags")
+        .select("tag")
         .limit(10);
 
       const list = document.querySelector(".trending-list");
