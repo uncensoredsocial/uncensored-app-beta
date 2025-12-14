@@ -2,6 +2,8 @@
 
 const ADMIN_API_BASE = 'https://uncensored-app-beta-production.up.railway.app/api';
 
+let _adminPollTimer = null;
+
 document.addEventListener('DOMContentLoaded', () => {
     // Require login
     if (typeof isLoggedIn === 'function' && !isLoggedIn()) {
@@ -19,6 +21,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('moneroStatusFilter')?.addEventListener('change', () => {
         loadMoneroInvoices();
     });
+
+    // ✅ ADDED: live polling (stats + monero stats) so Overview is actually live
+    startLivePolling();
 });
 
 async function loadAdminData() {
@@ -26,6 +31,28 @@ async function loadAdminData() {
 
     // ✅ ADDED
     await loadMoneroData();
+}
+
+/* ✅ ADDED: live polling (keeps the dashboard updated without refresh clicks) */
+function startLivePolling() {
+    stopLivePolling();
+
+    // Refresh key stats frequently; tables less frequently to avoid hammering.
+    _adminPollTimer = setInterval(async () => {
+        try {
+            await loadStats();
+            await loadMoneroStats();
+        } catch {
+            // ignore
+        }
+    }, 15000); // 15s
+}
+
+function stopLivePolling() {
+    if (_adminPollTimer) {
+        clearInterval(_adminPollTimer);
+        _adminPollTimer = null;
+    }
 }
 
 /* ========== Helpers ========== */
@@ -125,8 +152,6 @@ async function loadStats() {
 
         if (res.status === 401 || res.status === 403) {
             showToast('Admin access required.', 'error');
-            // Optional: redirect to home
-            // window.location.href = 'index.html';
             return;
         }
 
@@ -136,6 +161,7 @@ async function loadStats() {
 
         const stats = await res.json();
 
+        // ✅ These must match your backend JSON keys
         document.getElementById('statTotalUsers').textContent = stats.total_users ?? '0';
         document.getElementById('statActive24h').textContent = stats.active_users_last_24h ?? '0';
         document.getElementById('statSignups24h').textContent = stats.signups_last_24h ?? '0';
@@ -171,6 +197,13 @@ async function loadUsers() {
             }
         });
 
+        if (res.status === 401 || res.status === 403) {
+            tbody.innerHTML = `
+                <tr><td colspan="5" class="admin-table-empty">Admin access required.</td></tr>
+            `;
+            return;
+        }
+
         if (!res.ok) {
             throw new Error('Failed to load users');
         }
@@ -195,13 +228,13 @@ async function loadUsers() {
 
             tr.innerHTML = `
                 <td>
-                    <div class="admin-user-name">${user.display_name || user.username}</div>
-                    <div class="admin-user-handle">@${user.username}</div>
+                    <div class="admin-user-name">${escapeHtml(user.display_name || user.username || '')}</div>
+                    <div class="admin-user-handle">@${escapeHtml(user.username || '')}</div>
                 </td>
-                <td>${user.email || '—'}</td>
+                <td>${escapeHtml(user.email || '—')}</td>
                 <td>${formatDateTime(user.created_at)}</td>
                 <td>${formatDateTime(user.last_login_at)}</td>
-                <td>${roleText}</td>
+                <td>${escapeHtml(roleText)}</td>
             `;
 
             tbody.appendChild(tr);
@@ -233,6 +266,13 @@ async function loadPosts() {
             }
         });
 
+        if (res.status === 401 || res.status === 403) {
+            tbody.innerHTML = `
+                <tr><td colspan="4" class="admin-table-empty">Admin access required.</td></tr>
+            `;
+            return;
+        }
+
         if (!res.ok) {
             throw new Error('Failed to load posts');
         }
@@ -251,17 +291,20 @@ async function loadPosts() {
             const tr = document.createElement('tr');
             const user = post.user || {};
 
+            const content = post.content || '';
+            const contentSafe = escapeHtml(content);
+
             tr.innerHTML = `
                 <td>
-                    <div class="admin-user-name">${user.display_name || user.username || 'Unknown'}</div>
-                    <div class="admin-user-handle">@${user.username || 'unknown'}</div>
+                    <div class="admin-user-name">${escapeHtml(user.display_name || user.username || 'Unknown')}</div>
+                    <div class="admin-user-handle">@${escapeHtml(user.username || 'unknown')}</div>
                 </td>
-                <td class="admin-post-content" title="${post.content || ''}">
-                    ${truncate(post.content || '', 120)}
+                <td class="admin-post-content" title="${contentSafe}">
+                    ${escapeHtml(truncate(content, 120))}
                 </td>
                 <td>${formatDateTime(post.created_at)}</td>
                 <td>
-                    <button class="btn btn-sm btn-secondary" data-post-id="${post.id}">
+                    <button class="btn btn-sm btn-secondary" data-post-id="${escapeHtml(post.id)}">
                         Delete
                     </button>
                 </td>
@@ -317,6 +360,9 @@ async function handleDeletePost(postId, buttonEl) {
         if (row) row.remove();
 
         showToast('Post deleted', 'success');
+
+        // ✅ ADDED: refresh totals after delete so dashboard stays accurate
+        loadStats();
     } catch (err) {
         console.error('handleDeletePost error:', err);
         showToast('Failed to delete post', 'error');
@@ -343,7 +389,6 @@ async function loadMoneroStats() {
         });
 
         if (res.status === 401 || res.status === 403) {
-            // Don’t spam; this is admin-only anyway
             return;
         }
 
@@ -351,7 +396,6 @@ async function loadMoneroStats() {
 
         const stats = await res.json();
 
-        // Expecting your monero.js to return view fields + recent_24h
         document.getElementById('statMoneroTotalInvoices').textContent = stats.total_invoices ?? '0';
         document.getElementById('statMoneroPendingInvoices').textContent = stats.pending_invoices ?? '0';
         document.getElementById('statMoneroPaidInvoices').textContent = stats.paid_invoices ?? '0';
@@ -364,7 +408,6 @@ async function loadMoneroStats() {
 
     } catch (err) {
         console.error('loadMoneroStats error:', err);
-        // fail silently (dashboard still usable)
     }
 }
 
@@ -460,7 +503,7 @@ async function loadMoneroInvoices() {
                 <td>${created}</td>
                 <td>
                     <div class="admin-actions">
-                        <button class="btn btn-sm btn-secondary" data-monero-delete-seeds="${inv.id}" ${canDeleteSeeds ? '' : 'disabled'}>
+                        <button class="btn btn-sm btn-secondary" data-monero-delete-seeds="${escapeHtml(inv.id)}" ${canDeleteSeeds ? '' : 'disabled'}>
                             Delete Seeds
                         </button>
                     </div>
