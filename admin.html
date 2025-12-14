@@ -124,12 +124,315 @@
                 </p>
             </div>
         </section>
+
+        <!-- ===== MONERO PAYMENTS SECTION ===== -->
+        <section class="admin-section">
+            <div class="admin-section-header">
+                <h2>Monero Payments</h2>
+                <div>
+                    <button class="btn btn-primary btn-sm" id="createInvoiceBtn">
+                        + New Invoice
+                    </button>
+                    <button class="btn btn-ghost btn-sm" id="refreshMoneroBtn">
+                        Refresh
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Monero Stats -->
+            <div class="stats-grid" id="moneroStats">
+                <div class="stat-card">
+                    <div class="stat-label">Total XMR Received</div>
+                    <div class="stat-value" id="statTotalXMR">—</div>
+                    <div class="stat-footnote">All confirmed payments</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Pending Invoices</div>
+                    <div class="stat-value" id="statPendingInvoices">—</div>
+                    <div class="stat-footnote">Awaiting payment</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Paid Invoices</div>
+                    <div class="stat-value" id="statPaidInvoices">—</div>
+                    <div class="stat-footnote">Completed payments</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Seeds Deleted</div>
+                    <div class="stat-value" id="statSeedsDeleted">—</div>
+                    <div class="stat-footnote">Safely removed</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Monero Invoices Panel -->
+        <section class="admin-panel">
+            <div class="admin-section-header">
+                <h3>Recent Invoices</h3>
+                <div class="filter-controls">
+                    <select id="invoiceFilter" class="select-sm">
+                        <option value="all">All Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="paid">Paid</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="expired">Expired</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="admin-table-wrapper">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Amount</th>
+                            <th>Address</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="invoicesTableBody">
+                        <tr>
+                            <td colspan="6" class="admin-table-empty">
+                                Loading invoices...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </main>
+
+    <!-- Create Invoice Modal -->
+    <div id="createInvoiceModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create Monero Invoice</h3>
+                <button class="modal-close" onclick="closeInvoiceModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="invoiceForm">
+                    <div class="form-group">
+                        <label for="invoiceOrderId">Order ID *</label>
+                        <input type="text" id="invoiceOrderId" required placeholder="order_123456">
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="invoiceAmountXMR">Amount (XMR) *</label>
+                            <input type="number" id="invoiceAmountXMR" step="0.000000000001" required placeholder="0.1">
+                        </div>
+                        <div class="form-group">
+                            <label for="invoiceAmountUSD">Amount (USD)</label>
+                            <input type="number" id="invoiceAmountUSD" step="0.01" placeholder="15.00">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="invoiceCustomerEmail">Customer Email</label>
+                        <input type="email" id="invoiceCustomerEmail" placeholder="customer@example.com">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="invoiceDescription">Description</label>
+                        <textarea id="invoiceDescription" rows="3" placeholder="Payment for premium subscription"></textarea>
+                    </div>
+                    
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeInvoiceModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="submitInvoiceBtn">Create Invoice</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <!-- Toast / status messages -->
     <div id="adminToastContainer" class="admin-toast-container"></div>
 
     <script src="js/auth.js"></script>
     <script src="js/admin.js"></script>
+    
+    <!-- Monero Payment Functions -->
+    <script>
+    // ========== MONERO PAYMENT FUNCTIONS ==========
+    
+    async function loadMoneroData() {
+        try {
+            // Load Monero stats
+            const statsRes = await fetch(`${ADMIN_API_BASE}/admin/monero/stats`, {
+                headers: getAuthHeader()
+            });
+            
+            if (statsRes.ok) {
+                const stats = await statsRes.json();
+                document.getElementById('statTotalXMR').textContent = 
+                    parseFloat(stats.total_xmr_received || 0).toFixed(6) + ' XMR';
+                document.getElementById('statPendingInvoices').textContent = 
+                    stats.pending_invoices || '0';
+                document.getElementById('statPaidInvoices').textContent = 
+                    stats.paid_invoices || '0';
+                document.getElementById('statSeedsDeleted').textContent = 
+                    stats.seeds_deleted || '0';
+            }
+        } catch (error) {
+            console.error('Monero stats error:', error);
+        }
+        
+        try {
+            // Load invoices
+            const status = document.getElementById('invoiceFilter').value;
+            const statusParam = status === 'all' ? '' : `&status=${status}`;
+            
+            const invoicesRes = await fetch(`${ADMIN_API_BASE}/admin/monero/invoices?limit=10${statusParam}`, {
+                headers: getAuthHeader()
+            });
+            
+            if (invoicesRes.ok) {
+                const invoices = await invoicesRes.json();
+                const tbody = document.getElementById('invoicesTableBody');
+                
+                if (!invoices || invoices.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="admin-table-empty">No invoices found.</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = invoices.map(invoice => `
+                    <tr>
+                        <td><strong>${invoice.order_id}</strong></td>
+                        <td>
+                            <div>${parseFloat(invoice.amount_xmr).toFixed(6)} XMR</div>
+                            <small>$${parseFloat(invoice.amount_usd || 0).toFixed(2)}</small>
+                        </td>
+                        <td><code style="font-size: 11px;">${invoice.address?.slice(0, 16)}...</code></td>
+                        <td>
+                            <span class="badge" style="background: ${getStatusColor(invoice.status)}">
+                                ${invoice.status}
+                            </span>
+                        </td>
+                        <td>${formatDateTime(invoice.created_at)}</td>
+                        <td>
+                            <button class="btn btn-sm btn-ghost" onclick="copyToClipboard('${invoice.address}')">
+                                Copy
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        } catch (error) {
+            console.error('Monero invoices error:', error);
+            const tbody = document.getElementById('invoicesTableBody');
+            tbody.innerHTML = '<tr><td colspan="6" class="admin-table-empty">Failed to load invoices.</td></tr>';
+        }
+    }
+    
+    function getStatusColor(status) {
+        switch(status) {
+            case 'confirmed': return '#10b981';
+            case 'paid': return '#f59e0b';
+            case 'pending': return '#3b82f6';
+            case 'expired': return '#6b7280';
+            default: return '#9ca3af';
+        }
+    }
+    
+    function showInvoiceModal() {
+        document.getElementById('createInvoiceModal').style.display = 'block';
+    }
+    
+    function closeInvoiceModal() {
+        document.getElementById('createInvoiceModal').style.display = 'none';
+    }
+    
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            showToast('Address copied to clipboard');
+        });
+    }
+    
+    // Initialize Monero functions
+    document.addEventListener('DOMContentLoaded', () => {
+        // Add event listeners for Monero buttons
+        setTimeout(() => {
+            // Create invoice button
+            const createBtn = document.getElementById('createInvoiceBtn');
+            if (createBtn) {
+                createBtn.addEventListener('click', showInvoiceModal);
+            }
+            
+            // Refresh Monero button
+            const refreshBtn = document.getElementById('refreshMoneroBtn');
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', loadMoneroData);
+            }
+            
+            // Invoice filter
+            const filter = document.getElementById('invoiceFilter');
+            if (filter) {
+                filter.addEventListener('change', loadMoneroData);
+            }
+            
+            // Invoice form submission
+            const invoiceForm = document.getElementById('invoiceForm');
+            if (invoiceForm) {
+                invoiceForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    const submitBtn = document.getElementById('submitInvoiceBtn');
+                    const originalText = submitBtn.textContent;
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Creating...';
+                    
+                    try {
+                        const invoiceData = {
+                            orderId: document.getElementById('invoiceOrderId').value,
+                            amountXMR: parseFloat(document.getElementById('invoiceAmountXMR').value),
+                            amountUSD: document.getElementById('invoiceAmountUSD').value ? 
+                                parseFloat(document.getElementById('invoiceAmountUSD').value) : null,
+                            customerEmail: document.getElementById('invoiceCustomerEmail').value || null,
+                            description: document.getElementById('invoiceDescription').value || null
+                        };
+                        
+                        const res = await fetch(`${ADMIN_API_BASE}/admin/monero/invoices`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                ...getAuthHeader()
+                            },
+                            body: JSON.stringify(invoiceData)
+                        });
+                        
+                        if (res.ok) {
+                            const result = await res.json();
+                            showToast('Invoice created successfully');
+                            closeInvoiceModal();
+                            loadMoneroData();
+                        } else {
+                            const error = await res.json();
+                            showToast(error.error || 'Failed to create invoice', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Create invoice error:', error);
+                        showToast('Failed to create invoice', 'error');
+                    } finally {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = originalText;
+                    }
+                });
+            }
+            
+            // Load Monero data after a short delay
+            setTimeout(loadMoneroData, 1500);
+        }, 500);
+    });
+    
+    // Modal close on outside click
+    window.addEventListener('click', (e) => {
+        const modal = document.getElementById('createInvoiceModal');
+        if (e.target === modal) {
+            closeInvoiceModal();
+        }
+    });
+    </script>
 </body>
 </html>
