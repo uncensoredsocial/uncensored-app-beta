@@ -33,10 +33,23 @@ class SearchManager {
   }
 
   initializeSupabase() {
-    this.supabase = supabase.createClient(
-      "https://hbbbsreonwhvqfvbszne.supabase.co",
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyOTc5ODYsImV4cCI6MjA3OTg3Mzk4Nn0.LvqmdOqetnMrH8bnkJY6_S-dsGD8gnvpFczSCJPy-Q4"
-    );
+    // ✅ FIX: don't crash the whole search page if supabase-js isn't loaded
+    // This allows search (via backend /api/search) + tabs to work even if Supabase client isn't available.
+    try {
+      if (!window.supabase || typeof window.supabase.createClient !== "function") {
+        console.warn("Supabase client not found on window. Supabase-only features (follow/trending/fallback) disabled.");
+        this.supabase = null;
+        return;
+      }
+
+      this.supabase = window.supabase.createClient(
+        "https://hbbbsreonwhvqfvbszne.supabase.co",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyOTc5ODYsImV4cCI6MjA3OTg3Mzk4Nn0.LvqmdOqetnMrH8bnkJY6_S-dsGD8gnvpFczSCJPy-Q4"
+      );
+    } catch (e) {
+      console.error("Failed to initialize Supabase client:", e);
+      this.supabase = null;
+    }
   }
 
   setupEventListeners() {
@@ -72,7 +85,7 @@ class SearchManager {
 
     filterTabs.forEach((tab) => {
       tab.addEventListener("click", (e) => {
-        // ✅ FIX: always read from the tab element, not a child span/icon
+        // ✅ FIX: always read dataset from the actual tab element (not inner spans/icons)
         const tabEl = e.currentTarget || tab;
         const filter = tabEl?.dataset?.filter;
 
@@ -163,18 +176,26 @@ class SearchManager {
   handleFilterChange(filter) {
     if (!filter) return;
 
-    // ✅ FIX: normalize filter values so tabs always work
+    // ✅ FIX: normalize filter values (covers singular/plural + common variants)
+    const f = String(filter).toLowerCase().trim();
     const map = {
       all: "all",
+
       users: "users",
+      user: "users",
       people: "users",
+
       posts: "posts",
+      post: "posts",
       content: "posts",
+
       hashtags: "hashtags",
+      hashtag: "hashtags",
       tags: "hashtags",
+      tag: "hashtags",
     };
 
-    const normalized = map[filter] || "all";
+    const normalized = map[f] || "all";
 
     if (normalized === this.currentFilter) return;
     this.currentFilter = normalized;
@@ -222,6 +243,7 @@ class SearchManager {
         isFollowing: false,
       }));
 
+      // backend returns posts already shaped by shapePostRow (created_at, likes, comments_count, saves_count, liked_by_me, saved_by_me)
       const allPosts = (data.posts || []).map((post) => ({
         id: post.id,
         userId: post.user_id,
@@ -257,36 +279,41 @@ class SearchManager {
         results.hashtags = allHashtags;
       }
 
-      // Check follow status for users
-      if (currentUser && results.users.length > 0) {
-        const usersWithFollowStatus = await Promise.all(
-          results.users.map(async (user) => {
-            let isFollowing = false;
+      // ✅ If supabase client isn't available, skip follow-status + fallback-only features
+      if (this.supabase) {
+        // Check follow status for users
+        if (currentUser && results.users.length > 0) {
+          const usersWithFollowStatus = await Promise.all(
+            results.users.map(async (user) => {
+              let isFollowing = false;
 
-            const { data: follow } = await this.supabase
-              .from("follows")
-              .select("id")
-              .eq("follower_id", currentUser.id)
-              .eq("followed_id", user.id)
-              .maybeSingle();
+              const { data: follow } = await this.supabase
+                .from("follows")
+                .select("id")
+                .eq("follower_id", currentUser.id)
+                .eq("followed_id", user.id)
+                .maybeSingle();
 
-            isFollowing = !!follow;
+              isFollowing = !!follow;
 
-            return {
-              ...user,
-              isFollowing,
-            };
-          })
-        );
-        results.users = usersWithFollowStatus;
+              return {
+                ...user,
+                isFollowing,
+              };
+            })
+          );
+          results.users = usersWithFollowStatus;
+        }
       }
 
-      // ✅ FIX: only enrich posts when posts are actually requested
-      if (
-        (filter === "all" || filter === "posts") &&
-        results.posts.length > 0
-      ) {
-        await this.enrichPostsFromApi(results.posts);
+      // Enrich posts with engagement numbers (optional)
+      // ✅ FIX: only do this when posts are requested AND don't crash the UI if it fails
+      if ((filter === "all" || filter === "posts") && results.posts.length > 0) {
+        try {
+          await this.enrichPostsFromApi(results.posts);
+        } catch (e) {
+          console.warn("Post enrichment failed (non-fatal):", e);
+        }
       }
 
       // Save search to history if user is logged in
@@ -306,8 +333,11 @@ class SearchManager {
       }
     } catch (err) {
       console.error("Search API error:", err);
-      // Fallback to direct Supabase query if backend fails
-      await this.fallbackSearch(query, filter, results, currentUser);
+
+      // Fallback to direct Supabase query if backend fails (only if supabase client exists)
+      if (this.supabase) {
+        await this.fallbackSearch(query, filter, results, currentUser);
+      }
     }
 
     return results;
@@ -389,10 +419,7 @@ class SearchManager {
         }));
 
         // Enrich these posts with engagement numbers
-        if (
-          (filter === "all" || filter === "posts") &&
-          results.posts.length
-        ) {
+        if (results.posts.length) {
           await this.enrichPostsFromApi(results.posts);
         }
       }
@@ -472,12 +499,6 @@ class SearchManager {
   displaySearchResults(results, query) {
     this.hideAllStates();
     this.hideLoadingAnimation();
-
-    // ✅ FIX: reset results sections visibility each render (prevents tabs appearing "dead")
-    ["usersResults", "postsResults", "hashtagsResults"].forEach((id) => {
-      const el = document.getElementById(id);
-      if (el) el.style.display = "none";
-    });
 
     const state = document.getElementById("searchResultsState");
     const title = document.getElementById("resultsTitle");
@@ -562,7 +583,8 @@ class SearchManager {
       card.addEventListener("click", (e) => {
         if (e.target.closest(".follow-btn")) return;
         const username = card.dataset.username;
-        const me = typeof getCurrentUser === "function" ? getCurrentUser() : null;
+        const me =
+          typeof getCurrentUser === "function" ? getCurrentUser() : null;
         if (me && me.username === username) {
           window.location.href = "profile.html?from=search";
         } else {
@@ -589,6 +611,7 @@ class SearchManager {
     section.style.display = "block";
     list.innerHTML = posts
       .map((post) => {
+        // (server gives user.display_name + avatar_url; keep your existing behavior)
         const avatar = post.user.avatar || "default-profile.PNG";
         const username = post.user.username || "unknown";
         const displayName = post.user.displayName || username;
@@ -609,9 +632,7 @@ class SearchManager {
             <img class="post-avatar" src="${avatar}"
               onerror="this.src='default-profile.PNG'">
             <div class="post-user-meta">
-              <span class="post-display-name">${this.escapeHtml(
-                displayName
-              )}</span>
+              <span class="post-display-name">${this.escapeHtml(displayName)}</span>
               <span class="post-username">@${this.escapeHtml(username)}</span>
             </div>
           </div>
@@ -696,7 +717,10 @@ class SearchManager {
 
       // click whole card -> post page (unless clicking actions / user)
       postEl.addEventListener("click", (e) => {
-        if (e.target.closest(".post-actions") || e.target.closest(".post-user"))
+        if (
+          e.target.closest(".post-actions") ||
+          e.target.closest(".post-user")
+        )
           return;
         window.location.href = `post.html?id=${postId}`;
       });
@@ -771,9 +795,7 @@ class SearchManager {
     list.innerHTML = hashtags
       .map(
         (h) => `
-      <a href="hashtag.html?tag=${encodeURIComponent(
-        h.name
-      )}" class="hashtag-item">
+      <a href="hashtag.html?tag=${encodeURIComponent(h.name)}" class="hashtag-item">
         <span class="icon icon-feeds hashtag-icon"></span>
         <div class="hashtag-info">
           <div class="hashtag-name">#${h.name}</div>
@@ -914,6 +936,12 @@ class SearchManager {
       return;
     }
 
+    // ✅ FIX: if supabase client isn't available, don't crash
+    if (!this.supabase) {
+      this.showMessage("Follow is unavailable right now (Supabase client missing).", "error");
+      return;
+    }
+
     try {
       const isFollowing = button.textContent.trim() === "Following";
 
@@ -951,9 +979,14 @@ class SearchManager {
 
   getAuthToken() {
     try {
-      return typeof getAuthToken === "function"
-        ? getAuthToken()
-        : localStorage.getItem("authToken");
+      // Prefer auth.js helper (uses correct TOKEN_KEY), fallback to a couple common keys
+      if (typeof getAuthToken === "function") return getAuthToken();
+      return (
+        localStorage.getItem("us_auth_token") ||
+        localStorage.getItem("authToken") ||
+        localStorage.getItem("token") ||
+        null
+      );
     } catch {
       return null;
     }
@@ -1176,6 +1209,16 @@ class SearchManager {
   /* ---------- TRENDING ---------- */
 
   async loadTrendingHashtags() {
+    // ✅ FIX: don't crash if supabase isn't available
+    if (!this.supabase) {
+      const list = document.querySelector(".trending-list");
+      if (list) {
+        list.innerHTML =
+          '<div class="trending-empty">No trending hashtags yet</div>';
+      }
+      return;
+    }
+
     try {
       const { data: trending, error } = await this.supabase.rpc(
         "get_trending_hashtags",
