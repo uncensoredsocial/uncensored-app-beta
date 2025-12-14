@@ -73,7 +73,7 @@
                     <button class="btn btn-ghost btn-sm" id="refreshUsersBtn">Refresh</button>
                 </div>
                 <div class="admin-table-wrapper">
-                    <table class="admin-table" id="adminUsersTable">
+                    <table class="admin-table">
                         <thead>
                             <tr>
                                 <th>User</th>
@@ -102,6 +102,13 @@
                 </div>
                 <div class="admin-table-wrapper">
                     <table class="admin-table" id="adminPostsTable">
+                        <!-- ✅ ADDED: colgroup forces perfect alignment on iOS Safari -->
+                        <colgroup>
+                            <col style="width:32%">
+                            <col style="width:34%">
+                            <col style="width:22%">
+                            <col style="width:12%">
+                        </colgroup>
                         <thead>
                             <tr>
                                 <th>Author</th>
@@ -125,7 +132,7 @@
             </div>
         </section>
 
-        <!-- ✅ ADDED: Monero / Seed Management (no seed phrase exposure) -->
+        <!-- ✅ ADDED: Monero / Seed Management section -->
         <section class="admin-section">
             <div class="admin-section-header">
                 <h2>Monero Payments</h2>
@@ -207,7 +214,7 @@
                 </div>
 
                 <p class="admin-note">
-                    This section intentionally does <strong>not</strong> display seed phrases/private keys in the browser. You can permanently delete stored encrypted seeds after a transaction is completed.
+                    You can permanently delete stored encrypted seeds after a transaction is completed.
                 </p>
             </div>
         </section>
