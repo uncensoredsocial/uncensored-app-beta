@@ -456,3 +456,26 @@
     padding-left: 10px;
     padding-right: 10px;
 }
+
+/* ================================
+   FINAL FIX: Recent Posts alignment
+   ================================ */
+
+/* Override the bad vertical centering */
+#adminPostsTable th,
+#adminPostsTable td {
+    vertical-align: top !important;
+}
+
+/* Ensure consistent row layout */
+#adminPostsTable {
+    table-layout: fixed;
+    width: 100%;
+}
+
+/* Content column behaves like text, not flex */
+#adminPostsTable td.admin-post-content {
+    display: block;
+    white-space: normal;
+    line-height: 1.35;
+}
