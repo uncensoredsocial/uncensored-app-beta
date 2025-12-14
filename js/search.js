@@ -18,8 +18,8 @@ class SearchManager {
     this.recentSearches = [];
     this.recentVisibleCount = 5;
 
-    // keep last results so we can update them if needed
-    this.lastResults = { users: [], posts: [], hashtags: [] };
+    // keep ALL results so we can filter them
+    this.allResults = { users: [], posts: [], hashtags: [] };
 
     this.init();
   }
@@ -70,10 +70,16 @@ class SearchManager {
       clearSearch.addEventListener("click", () => this.clearSearch());
     }
 
+    // Update filter tabs to trigger filtering of already loaded results
     filterTabs.forEach((tab) => {
-      tab.addEventListener("click", (e) =>
-        this.handleFilterChange(e.target.dataset.filter)
-      );
+      tab.addEventListener("click", (e) => {
+        const filter = e.target.dataset.filter;
+        this.handleFilterChange(filter);
+        
+        // Update active state
+        filterTabs.forEach(t => t.classList.remove("active"));
+        e.target.classList.add("active");
+      });
     });
 
     // recent searches: click anywhere on the row to search, X to remove
@@ -133,23 +139,23 @@ class SearchManager {
 
     this.currentQuery = query;
     this.isSearching = true;
-    this.showLoadingState();
+    this.showLoadingAnimation();
 
     try {
       this.saveToRecentSearches(query);
 
-      const results = await this.fetchSearchResults(
-        query,
-        this.currentFilter
-      );
-
-      this.lastResults = results;
-      this.displaySearchResults(results, query);
+      // Fetch ALL results once
+      const allResults = await this.fetchAllSearchResults(query);
+      this.allResults = allResults;
+      
+      // Display results based on current filter
+      this.displayFilteredResults();
     } catch (err) {
       console.error("Search error:", err);
       this.showErrorState();
     } finally {
       this.isSearching = false;
+      this.hideLoadingAnimation();
     }
   }
 
@@ -157,12 +163,11 @@ class SearchManager {
     if (!filter || filter === this.currentFilter) return;
     this.currentFilter = filter;
 
-    if (this.currentQuery && this.currentQuery.length >= 2) {
-      this.performSearch(this.currentQuery);
-    }
+    // Just filter and display the already loaded results
+    this.displayFilteredResults();
   }
 
-  async fetchSearchResults(query, filter) {
+  async fetchAllSearchResults(query) {
     const results = { users: [], posts: [], hashtags: [] };
     
     try {
@@ -173,14 +178,7 @@ class SearchManager {
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       };
 
-      // Build the API URL with parameters
-      const params = new URLSearchParams();
-      params.append('q', query);
-      if (filter !== 'all') {
-        // Note: backend doesn't support filter param yet, but we'll implement fallback
-      }
-
-      const response = await fetch(`${FEED_API_BASE_URL}/search?${params.toString()}`, {
+      const response = await fetch(`${FEED_API_BASE_URL}/search?q=${encodeURIComponent(query)}`, {
         method: 'GET',
         headers
       });
@@ -198,8 +196,8 @@ class SearchManager {
         displayName: user.display_name || user.username,
         avatar: user.avatar_url || 'default-profile.PNG',
         bio: user.bio || '',
-        followersCount: 0, // We'll fetch this separately if needed
-        isFollowing: false // We'll check this separately
+        followersCount: 0,
+        isFollowing: false
       }));
 
       results.posts = (data.posts || []).map(post => ({
@@ -223,7 +221,7 @@ class SearchManager {
 
       results.hashtags = (data.hashtags || []).map(tag => ({
         name: tag.tag,
-        count: 0 // You might need to add post counts to your backend
+        count: 0
       }));
 
       // Save search to history if user is logged in
@@ -243,18 +241,18 @@ class SearchManager {
       }
 
       // Now check follow status for users and enrich posts if needed
-      await this.enrichSearchResults(results, query, filter);
+      await this.enrichSearchResults(results, query);
 
     } catch (err) {
       console.error('Search API error:', err);
       // Fallback to direct Supabase query if backend fails
-      await this.fallbackSearch(query, filter, results);
+      await this.fallbackSearch(query, results);
     }
 
     return results;
   }
 
-  async enrichSearchResults(results, query, filter) {
+  async enrichSearchResults(results, query) {
     const currentUser = typeof getCurrentUser === "function" ? getCurrentUser() : null;
     
     // Check follow status for users
@@ -285,171 +283,104 @@ class SearchManager {
     if (results.posts.length > 0) {
       await this.enrichPostsFromApi(results.posts);
     }
-
-    // Optional logging
-    if (currentUser) {
-      const totalResults = Object.values(results).reduce(
-        (total, section) => total + section.length,
-        0
-      );
-      // You might want to log this to your backend instead
-      console.log(`User ${currentUser.id} searched for "${query}" (${filter}): ${totalResults} results`);
-    }
   }
 
-  async fallbackSearch(query, filter, results) {
+  async fallbackSearch(query, results) {
     const pattern = `%${query}%`;
     const currentUser = typeof getCurrentUser === "function" ? getCurrentUser() : null;
     
     // Simple fallback search without RPC functions
-    if (filter === 'all' || filter === 'users') {
-      const { data: users, error } = await this.supabase
-        .from('users')
-        .select('id,username,display_name,avatar_url,bio')
-        .or(`username.ilike.${pattern},display_name.ilike.${pattern}`)
-        .limit(10);
-      
-      if (!error && users) {
-        const usersWithFollowStatus = await Promise.all(
-          users.map(async (user) => {
-            let isFollowing = false;
+    
+    // Search users
+    const { data: users, error: usersError } = await this.supabase
+      .from('users')
+      .select('id,username,display_name,avatar_url,bio')
+      .or(`username.ilike.${pattern},display_name.ilike.${pattern}`)
+      .limit(10);
+    
+    if (!usersError && users) {
+      const usersWithFollowStatus = await Promise.all(
+        users.map(async (user) => {
+          let isFollowing = false;
 
-            if (currentUser) {
-              const { data: follow } = await this.supabase
-                .from("follows")
-                .select("id")
-                .eq("follower_id", currentUser.id)
-                .eq("followed_id", user.id)
-                .maybeSingle();
+          if (currentUser) {
+            const { data: follow } = await this.supabase
+              .from("follows")
+              .select("id")
+              .eq("follower_id", currentUser.id)
+              .eq("followed_id", user.id)
+              .maybeSingle();
 
-              isFollowing = !!follow;
-            }
-
-            return {
-              id: user.id,
-              username: user.username,
-              displayName: user.display_name || user.username,
-              avatar: user.avatar_url || 'default-profile.PNG',
-              bio: user.bio || '',
-              followersCount: 0,
-              isFollowing
-            };
-          })
-        );
-        results.users = usersWithFollowStatus;
-      }
-    }
-
-    if (filter === 'all' || filter === 'posts') {
-      const { data: posts, error } = await this.supabase
-        .from('posts')
-        .select(`
-          id, user_id, content, created_at, media_url, media_type,
-          user:users (id, username, display_name, avatar_url)
-        `)
-        .ilike('content', pattern)
-        .order('created_at', { ascending: false })
-        .limit(20);
-      
-      if (!error && posts) {
-        results.posts = posts.map(post => ({
-          id: post.id,
-          userId: post.user_id,
-          content: post.content,
-          createdAt: post.created_at,
-          likes: 0,
-          comments: 0,
-          saves: 0,
-          media_url: post.media_url,
-          media_type: post.media_type,
-          liked_by_me: false,
-          saved_by_me: false,
-          user: post.user || {
-            username: 'unknown',
-            displayName: 'Unknown User',
-            avatar: 'default-profile.PNG'
+            isFollowing = !!follow;
           }
-        }));
 
-        // Enrich these posts with engagement numbers
-        if (results.posts.length) {
-          await this.enrichPostsFromApi(results.posts);
+          return {
+            id: user.id,
+            username: user.username,
+            displayName: user.display_name || user.username,
+            avatar: user.avatar_url || 'default-profile.PNG',
+            bio: user.bio || '',
+            followersCount: 0,
+            isFollowing
+          };
+        })
+      );
+      results.users = usersWithFollowStatus;
+    }
+
+    // Search posts
+    const { data: posts, error: postsError } = await this.supabase
+      .from('posts')
+      .select(`
+        id, user_id, content, created_at, media_url, media_type,
+        user:users (id, username, display_name, avatar_url)
+      `)
+      .ilike('content', pattern)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    
+    if (!postsError && posts) {
+      results.posts = posts.map(post => ({
+        id: post.id,
+        userId: post.user_id,
+        content: post.content,
+        createdAt: post.created_at,
+        likes: 0,
+        comments: 0,
+        saves: 0,
+        media_url: post.media_url,
+        media_type: post.media_type,
+        liked_by_me: false,
+        saved_by_me: false,
+        user: post.user || {
+          username: 'unknown',
+          displayName: 'Unknown User',
+          avatar: 'default-profile.PNG'
         }
+      }));
+
+      // Enrich these posts with engagement numbers
+      if (results.posts.length) {
+        await this.enrichPostsFromApi(results.posts);
       }
     }
 
-    if (filter === 'all' || filter === 'hashtags') {
-      const { data: hashtags, error } = await this.supabase
-        .from('hashtags')
-        .select('id,tag')
-        .ilike('tag', pattern)
-        .limit(10);
-      
-      if (!error && hashtags) {
-        results.hashtags = hashtags.map(tag => ({
-          name: tag.tag,
-          count: 0
-        }));
-      }
+    // Search hashtags
+    const { data: hashtags, error: hashtagsError } = await this.supabase
+      .from('hashtags')
+      .select('id,tag')
+      .ilike('tag', pattern)
+      .limit(10);
+    
+    if (!hashtagsError && hashtags) {
+      results.hashtags = hashtags.map(tag => ({
+        name: tag.tag,
+        count: 0
+      }));
     }
   }
 
-  /**
-   * Enrich posts with real engagement numbers from backend API
-   * Uses the same endpoint the feed / post page uses, so counts match everywhere.
-   */
-  async enrichPostsFromApi(posts) {
-    const token = this.getAuthToken();
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-    await Promise.all(
-      posts.map(async (post) => {
-        try {
-          const res = await fetch(`${FEED_API_BASE_URL}/posts/${post.id}`, {
-            method: "GET",
-            headers,
-          });
-
-          if (!res.ok) return;
-
-          const data = await res.json();
-          const row = data.post || data; // depending on how your API wraps it
-          if (!row) return;
-
-          const likes =
-            typeof row.likes === "number"
-              ? row.likes
-              : row.like_count ?? row.likes_count ?? 0;
-
-          const comments =
-            typeof row.comments === "number"
-              ? row.comments
-              : row.comment_count ?? row.comments_count ?? 0;
-
-          const saves =
-            typeof row.saves === "number"
-              ? row.saves
-              : row.save_count ??
-                row.saves_count ??
-                row.bookmarks_count ??
-                0;
-
-          post.likes = likes;
-          post.comments = comments;
-          post.saves = saves;
-
-          post.liked_by_me =
-            row.liked_by_me ?? row.is_liked ?? post.liked_by_me;
-          post.saved_by_me =
-            row.saved_by_me ?? row.is_saved ?? post.saved_by_me;
-        } catch (err) {
-          console.error("Failed to enrich post engagement", err);
-        }
-      })
-    );
-  }
-
-  displaySearchResults(results, query) {
+  displayFilteredResults() {
     this.hideAllStates();
 
     const state = document.getElementById("searchResultsState");
@@ -459,17 +390,51 @@ class SearchManager {
     if (!state || !title || !count) return;
 
     state.style.display = "block";
-    title.textContent = `Results for "${query}"`;
+    title.textContent = `Results for "${this.currentQuery}"`;
 
-    const totalResults = Object.values(results).reduce(
-      (total, section) => total + section.length,
-      0
-    );
+    // Filter results based on current filter
+    let filteredResults;
+    let totalResults = 0;
+
+    switch(this.currentFilter) {
+      case 'users':
+        filteredResults = { 
+          users: this.allResults.users || [], 
+          posts: [], 
+          hashtags: [] 
+        };
+        totalResults = filteredResults.users.length;
+        break;
+      case 'posts':
+        filteredResults = { 
+          users: [], 
+          posts: this.allResults.posts || [], 
+          hashtags: [] 
+        };
+        totalResults = filteredResults.posts.length;
+        break;
+      case 'hashtags':
+        filteredResults = { 
+          users: [], 
+          posts: [], 
+          hashtags: this.allResults.hashtags || [] 
+        };
+        totalResults = filteredResults.hashtags.length;
+        break;
+      case 'all':
+      default:
+        filteredResults = this.allResults;
+        totalResults = (this.allResults.users?.length || 0) + 
+                      (this.allResults.posts?.length || 0) + 
+                      (this.allResults.hashtags?.length || 0);
+        break;
+    }
+
     count.textContent = `${totalResults} results`;
 
-    this.displayUsersResults(results.users);
-    this.displayPostsResults(results.posts);
-    this.displayHashtagsResults(results.hashtags);
+    this.displayUsersResults(filteredResults.users);
+    this.displayPostsResults(filteredResults.posts);
+    this.displayHashtagsResults(filteredResults.hashtags);
 
     if (totalResults === 0) this.showNoResults();
   }
@@ -782,6 +747,119 @@ class SearchManager {
       .join("");
   }
 
+  /* ---------- LOADING ANIMATION ---------- */
+  
+  showLoadingAnimation() {
+    this.hideAllStates();
+    
+    // Remove any existing loading animation
+    const existingLoader = document.getElementById("searchLoadingAnimation");
+    if (existingLoader) existingLoader.remove();
+    
+    // Create loading animation
+    const loader = document.createElement("div");
+    loader.id = "searchLoadingAnimation";
+    loader.innerHTML = `
+      <div class="loading-animation">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Searching...</div>
+        <div class="loading-dots">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+      </div>
+    `;
+    
+    // Add CSS for the animation
+    const style = document.createElement("style");
+    style.textContent = `
+      .loading-animation {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+        text-align: center;
+      }
+      
+      .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid rgba(0, 0, 0, 0.1);
+        border-radius: 50%;
+        border-top-color: var(--primary-color, #3498db);
+        animation: spin 1s ease-in-out infinite;
+        margin-bottom: 20px;
+      }
+      
+      .loading-text {
+        font-size: 18px;
+        font-weight: 500;
+        color: var(--text-color, #333);
+        margin-bottom: 15px;
+      }
+      
+      .loading-dots {
+        display: flex;
+        gap: 8px;
+      }
+      
+      .loading-dots .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background-color: var(--primary-color, #3498db);
+        animation: bounce 1.4s infinite ease-in-out both;
+      }
+      
+      .loading-dots .dot:nth-child(1) {
+        animation-delay: -0.32s;
+      }
+      
+      .loading-dots .dot:nth-child(2) {
+        animation-delay: -0.16s;
+      }
+      
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      
+      @keyframes bounce {
+        0%, 80%, 100% { 
+          transform: scale(0);
+          opacity: 0.5;
+        }
+        40% { 
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+    `;
+    
+    document.head.appendChild(style);
+    
+    // Find where to insert the loader
+    const resultsContainer = document.getElementById("searchResultsState") || 
+                            document.getElementById("searchDefault") ||
+                            document.querySelector(".search-results") ||
+                            document.querySelector(".search-container");
+    
+    if (resultsContainer) {
+      resultsContainer.style.display = "block";
+      resultsContainer.innerHTML = "";
+      resultsContainer.appendChild(loader);
+    } else {
+      // Fallback: insert at beginning of body
+      document.body.insertBefore(loader, document.body.firstChild);
+    }
+  }
+  
+  hideLoadingAnimation() {
+    const loader = document.getElementById("searchLoadingAnimation");
+    if (loader) loader.remove();
+  }
+
   /* ---------- FOLLOW / LIKE / SAVE ---------- */
 
   async handleFollow(userId, button) {
@@ -924,6 +1002,61 @@ class SearchManager {
     }
   }
 
+  /**
+   * Enrich posts with real engagement numbers from backend API
+   * Uses the same endpoint the feed / post page uses, so counts match everywhere.
+   */
+  async enrichPostsFromApi(posts) {
+    const token = this.getAuthToken();
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+    await Promise.all(
+      posts.map(async (post) => {
+        try {
+          const res = await fetch(`${FEED_API_BASE_URL}/posts/${post.id}`, {
+            method: "GET",
+            headers,
+          });
+
+          if (!res.ok) return;
+
+          const data = await res.json();
+          const row = data.post || data; // depending on how your API wraps it
+          if (!row) return;
+
+          const likes =
+            typeof row.likes === "number"
+              ? row.likes
+              : row.like_count ?? row.likes_count ?? 0;
+
+          const comments =
+            typeof row.comments === "number"
+              ? row.comments
+              : row.comment_count ?? row.comments_count ?? 0;
+
+          const saves =
+            typeof row.saves === "number"
+              ? row.saves
+              : row.save_count ??
+                row.saves_count ??
+                row.bookmarks_count ??
+                0;
+
+          post.likes = likes;
+          post.comments = comments;
+          post.saves = saves;
+
+          post.liked_by_me =
+            row.liked_by_me ?? row.is_liked ?? post.liked_by_me;
+          post.saved_by_me =
+            row.saved_by_me ?? row.is_saved ?? post.saved_by_me;
+        } catch (err) {
+          console.error("Failed to enrich post engagement", err);
+        }
+      })
+    );
+  }
+
   /* ---------- STATE HELPERS ---------- */
 
   clearSearch() {
@@ -947,8 +1080,7 @@ class SearchManager {
 
   showLoadingState() {
     this.hideAllStates();
-    const el = document.getElementById("searchLoading");
-    if (el) el.style.display = "block";
+    this.showLoadingAnimation();
   }
 
   showNoResults() {
@@ -974,6 +1106,7 @@ class SearchManager {
       const el = document.getElementById(id);
       if (el) el.style.display = "none";
     });
+    this.hideLoadingAnimation();
   }
 
   /* ---------- RECENT SEARCHES ---------- */
@@ -1123,33 +1256,6 @@ class SearchManager {
           '<div class="trending-empty">No trending hashtags yet</div>';
       }
     }
-  }
-
-  // (loadMockTrendingHashtags left here but no longer used – no fake tags shown)
-
-  loadMockTrendingHashtags() {
-    const mock = [
-      { tag: "SocialMedia", posts_count: 2540 },
-      { tag: "Tech", posts_count: 1820 },
-      { tag: "Uncensored", posts_count: 1200 },
-      { tag: "Freedom", posts_count: 950 },
-      { tag: "Community", posts_count: 870 },
-    ];
-    const list = document.querySelector(".trending-list");
-    if (!list) return;
-    list.innerHTML = mock
-      .map(
-        (item, index) => `
-      <div class="trending-item" onclick="searchManager.searchHashtag('${item.tag}')">
-        <span class="trending-rank">${index + 1}</span>
-        <div class="trending-content">
-          <span class="trending-tag">#${item.tag}</span>
-          <span class="trending-count">${item.posts_count.toLocaleString()} posts</span>
-        </div>
-      </div>
-    `
-      )
-      .join("");
   }
 
   searchHashtag(tag) {
