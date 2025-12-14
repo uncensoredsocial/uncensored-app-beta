@@ -227,7 +227,84 @@
     font-size: var(--font-size-sm);
 }
 
-/* ✅ ADDED: Monero/seed management UI helpers (minimal) */
+/* Responsive */
+
+@media (max-width: 900px) {
+    .admin-main {
+        padding: var(--space-3);
+    }
+
+    .admin-grid-2 {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .admin-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-2);
+    }
+
+    .admin-section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-2);
+    }
+
+    .admin-table th,
+    .admin-table td {
+        padding: var(--space-2);
+    }
+}
+
+/* =========================================================
+   ✅ ADDED ONLY: Make panels not scroll forever
+   (table scrolls inside the panel)
+   ========================================================= */
+
+.admin-grid-2 {
+    align-items: start;
+}
+
+.admin-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.admin-panel .admin-table-wrapper {
+    /* Keeps the table from expanding the entire page */
+    max-height: 420px;
+    overflow: auto;
+}
+
+/* =========================================================
+   ✅ ADDED ONLY: Recent Posts alignment fix (Safari/iOS)
+   You already added <colgroup> in admin.html
+   This just stabilizes the table layout.
+   ========================================================= */
+
+#adminPostsTable {
+    table-layout: fixed;
+    width: 100%;
+}
+
+/* Keep content from forcing column width changes */
+#adminPostsTable td.admin-post-content {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Keep Actions column tight */
+#adminPostsTable td:last-child .btn {
+    white-space: nowrap;
+}
+
+/* =========================================================
+   ✅ ADDED ONLY: Monero section helper classes
+   (your HTML uses these)
+   ========================================================= */
 
 .admin-actions-row {
     display: flex;
@@ -315,167 +392,4 @@
     cursor: pointer;
     padding: 0;
     font-size: var(--font-size-sm);
-}
-
-/* Responsive */
-
-@media (max-width: 900px) {
-    .admin-main {
-        padding: var(--space-3);
-    }
-
-    .admin-grid-2 {
-        grid-template-columns: 1fr;
-    }
-}
-
-@media (max-width: 600px) {
-    .admin-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: var(--space-2);
-    }
-
-    .admin-section-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: var(--space-2);
-    }
-
-    .admin-table th,
-    .admin-table td {
-        padding: var(--space-2);
-    }
-}
-
-/* ================================
-   ADDED: Better dashboard layout
-   ================================ */
-
-/* Make the two panels same “row height” and stop endless page scroll */
-.admin-grid-2 {
-    align-items: start;
-}
-
-/* Give panels a capped height */
-.admin-panel {
-    display: flex;
-    flex-direction: column;
-    min-height: 520px;
-}
-
-/* The table wrapper becomes the scroll area */
-.admin-table-wrapper {
-    flex: 1;
-    max-height: 420px;          /* <- adjust if you want taller/shorter */
-    overflow: auto;
-}
-
-/* Keep headers visible while scrolling */
-.admin-table thead th {
-    position: sticky;
-    top: 0;
-    z-index: 5;
-}
-
-/* Slightly nicer content cell wrapping in admin tables */
-.admin-table td {
-    line-height: 1.35;
-}
-
-/* ✅ IMPORTANT: Make the 2-line clamp reliably win over the earlier nowrap rule */
-#adminPostsTable td.admin-post-content {
-    max-width: 320px;
-    white-space: normal;
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-}
-
-/* Better spacing on small screens */
-@media (max-width: 900px) {
-    .admin-panel {
-        min-height: 420px;
-    }
-    .admin-table-wrapper {
-        max-height: 360px;
-    }
-}
-
-/* ================================
-   FIX: Recent Posts column alignment
-   ================================ */
-
-#adminPostsTable {
-    table-layout: fixed; /* forces consistent column widths */
-    width: 100%;
-}
-
-#adminPostsTable th,
-#adminPostsTable td {
-    vertical-align: middle; /* makes each row look aligned */
-}
-
-/* Column widths (mobile-friendly) */
-#adminPostsTable th:nth-child(1),
-#adminPostsTable td:nth-child(1) {
-    width: 32%;
-}
-
-#adminPostsTable th:nth-child(2),
-#adminPostsTable td:nth-child(2) {
-    width: 34%;
-}
-
-#adminPostsTable th:nth-child(3),
-#adminPostsTable td:nth-child(3) {
-    width: 22%;
-}
-
-#adminPostsTable th:nth-child(4),
-#adminPostsTable td:nth-child(4) {
-    width: 12%;
-}
-
-/* Content cell: clamp neatly and never push columns around */
-#adminPostsTable td.admin-post-content {
-    white-space: normal;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    word-break: break-word;
-
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-}
-
-/* Buttons fit the Actions column on small screens */
-#adminPostsTable td:nth-child(4) .btn {
-    width: 100%;
-    padding-left: 10px;
-    padding-right: 10px;
-}
-
-/* ================================
-   FINAL FIX: Recent Posts alignment
-   ================================ */
-
-/* Override the bad vertical centering */
-#adminPostsTable th,
-#adminPostsTable td {
-    vertical-align: top !important;
-}
-
-/* Ensure consistent row layout */
-#adminPostsTable {
-    table-layout: fixed;
-    width: 100%;
-}
-
-/* Content column behaves like text, not flex */
-#adminPostsTable td.admin-post-content {
-    display: block;
-    white-space: normal;
-    line-height: 1.35;
 }
