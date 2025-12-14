@@ -1,282 +1,530 @@
-// js/admin.js
+// ========== MONERO INVOICE FUNCTIONS ==========
 
-const ADMIN_API_BASE = 'https://uncensored-app-beta-production.up.railway.app/api';
+let currentInvoicePage = 1;
+const INVOICES_PER_PAGE = 20;
 
-document.addEventListener('DOMContentLoaded', () => {
-    // Require login
-    if (typeof isLoggedIn === 'function' && !isLoggedIn()) {
-        window.location.href = 'login.html';
-        return;
-    }
-
-    loadAdminData();
-
-    document.getElementById('refreshUsersBtn')?.addEventListener('click', loadUsers);
-    document.getElementById('refreshPostsBtn')?.addEventListener('click', loadPosts);
-});
-
-async function loadAdminData() {
-    await Promise.all([loadStats(), loadUsers(), loadPosts()]);
+// Load Monero data
+async function loadMoneroData() {
+    await Promise.all([
+        loadMoneroStats(),
+        loadMoneroInvoices()
+    ]);
 }
 
-/* ========== Helpers ========== */
-
-function getAuthHeader() {
-    if (typeof getAuthToken !== 'function') return {};
-    const token = getAuthToken();
-    return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-function formatDateTime(iso) {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-}
-
-function truncate(str, max = 100) {
-    if (!str) return '';
-    if (str.length <= max) return str;
-    return str.slice(0, max - 1) + '…';
-}
-
-function showToast(message, type = 'success') {
-    const container = document.getElementById('adminToastContainer');
-    if (!container) return;
-
-    const toast = document.createElement('div');
-    toast.className = `admin-toast admin-toast-${type}`;
-    toast.innerHTML = `
-        <span>${message}</span>
-        <button aria-label="Dismiss">&times;</button>
-    `;
-
-    const closeBtn = toast.querySelector('button');
-    closeBtn.addEventListener('click', () => {
-        toast.remove();
-    });
-
-    container.appendChild(toast);
-
-    setTimeout(() => {
-        toast.remove();
-    }, 4000);
-}
-
-/* ========== Load Stats ========== */
-
-async function loadStats() {
+// Load Monero stats
+async function loadMoneroStats() {
     try {
-        const res = await fetch(`${ADMIN_API_BASE}/admin/stats`, {
-            headers: {
-                'Content-Type': 'application/json',
-                ...getAuthHeader()
-            }
+        const res = await fetch(`${ADMIN_API_BASE}/admin/monero/stats`, {
+            headers: getAuthHeader()
         });
-
-        if (res.status === 401 || res.status === 403) {
-            showToast('Admin access required.', 'error');
-            // Optional: redirect to home
-            // window.location.href = 'index.html';
-            return;
-        }
-
-        if (!res.ok) {
-            throw new Error('Failed to load stats');
-        }
-
+        
+        if (!res.ok) throw new Error('Failed to load Monero stats');
+        
         const stats = await res.json();
-
-        document.getElementById('statTotalUsers').textContent = stats.total_users ?? '0';
-        document.getElementById('statActive24h').textContent = stats.active_users_last_24h ?? '0';
-        document.getElementById('statSignups24h').textContent = stats.signups_last_24h ?? '0';
-        document.getElementById('statTotalPosts').textContent = stats.total_posts ?? '0';
-        document.getElementById('statTotalLikes').textContent = stats.total_likes ?? '0';
-        document.getElementById('statTotalFollows').textContent = stats.total_follows ?? '0';
-
-        const lastUpdated = document.getElementById('lastUpdated');
-        if (lastUpdated) {
-            lastUpdated.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
-        }
-    } catch (err) {
-        console.error('loadStats error:', err);
-        showToast('Failed to load stats', 'error');
+        
+        document.getElementById('statTotalXMR').textContent = 
+            parseFloat(stats.total_xmr_received || 0).toFixed(6) + ' XMR';
+        document.getElementById('statPendingInvoices').textContent = 
+            stats.pending_invoices || '0';
+        document.getElementById('statPaidInvoices').textContent = 
+            stats.paid_invoices || '0';
+        document.getElementById('statSeedsDeleted').textContent = 
+            stats.seeds_deleted || '0';
+    } catch (error) {
+        console.error('loadMoneroStats error:', error);
+        showToast('Failed to load Monero stats', 'error');
     }
 }
 
-/* ========== Load Users ========== */
-
-async function loadUsers() {
-    const tbody = document.getElementById('usersTableBody');
+// Load invoices
+async function loadMoneroInvoices(page = 1) {
+    const tbody = document.getElementById('invoicesTableBody');
     if (!tbody) return;
-
+    
+    const status = document.getElementById('invoiceFilter')?.value || 'all';
+    const statusParam = status === 'all' ? '' : status;
+    
     tbody.innerHTML = `
-        <tr><td colspan="5" class="admin-table-empty">Loading users...</td></tr>
+        <tr><td colspan="6" class="admin-table-empty">Loading invoices...</td></tr>
     `;
-
+    
     try {
-        const res = await fetch(`${ADMIN_API_BASE}/admin/users?limit=50`, {
-            headers: {
-                'Content-Type': 'application/json',
-                ...getAuthHeader()
-            }
+        const offset = (page - 1) * INVOICES_PER_PAGE;
+        const url = `${ADMIN_API_BASE}/admin/monero/invoices?status=${statusParam}&limit=${INVOICES_PER_PAGE}&offset=${offset}`;
+        
+        const res = await fetch(url, {
+            headers: getAuthHeader()
         });
-
-        if (!res.ok) {
-            throw new Error('Failed to load users');
-        }
-
-        const users = await res.json();
-
-        if (!users || users.length === 0) {
+        
+        if (!res.ok) throw new Error('Failed to load invoices');
+        
+        const invoices = await res.json();
+        
+        if (!invoices || invoices.length === 0) {
             tbody.innerHTML = `
-                <tr><td colspan="5" class="admin-table-empty">No users found.</td></tr>
+                <tr><td colspan="6" class="admin-table-empty">No invoices found.</td></tr>
             `;
+            updatePagination(0, page);
             return;
         }
-
+        
         tbody.innerHTML = '';
-        users.forEach(user => {
+        invoices.forEach(invoice => {
             const tr = document.createElement('tr');
-
-            const roleParts = [];
-            if (user.is_admin) roleParts.push('Admin');
-            if (user.is_moderator) roleParts.push('Mod');
-            const roleText = roleParts.length ? roleParts.join(', ') : 'User';
-
-            tr.innerHTML = `
-                <td>
-                    <div class="admin-user-name">${user.display_name || user.username}</div>
-                    <div class="admin-user-handle">@${user.username}</div>
-                </td>
-                <td>${user.email || '—'}</td>
-                <td>${formatDateTime(user.created_at)}</td>
-                <td>${formatDateTime(user.last_login_at)}</td>
-                <td>${roleText}</td>
-            `;
-
-            tbody.appendChild(tr);
-        });
-    } catch (err) {
-        console.error('loadUsers error:', err);
-        tbody.innerHTML = `
-            <tr><td colspan="5" class="admin-table-empty">Failed to load users.</td></tr>
-        `;
-        showToast('Failed to load users', 'error');
-    }
-}
-
-/* ========== Load Posts ========== */
-
-async function loadPosts() {
-    const tbody = document.getElementById('postsTableBody');
-    if (!tbody) return;
-
-    tbody.innerHTML = `
-        <tr><td colspan="4" class="admin-table-empty">Loading posts...</td></tr>
-    `;
-
-    try {
-        const res = await fetch(`${ADMIN_API_BASE}/admin/posts?limit=100`, {
-            headers: {
-                'Content-Type': 'application/json',
-                ...getAuthHeader()
+            
+            // Status badge
+            let statusClass = '';
+            switch(invoice.status) {
+                case 'confirmed': statusClass = 'badge-success'; break;
+                case 'paid': statusClass = 'badge-warning'; break;
+                case 'pending': statusClass = 'badge-info'; break;
+                case 'expired': statusClass = 'badge-secondary'; break;
+                default: statusClass = 'badge-default';
             }
-        });
-
-        if (!res.ok) {
-            throw new Error('Failed to load posts');
-        }
-
-        const posts = await res.json();
-
-        if (!posts || posts.length === 0) {
-            tbody.innerHTML = `
-                <tr><td colspan="4" class="admin-table-empty">No posts found.</td></tr>
-            `;
-            return;
-        }
-
-        tbody.innerHTML = '';
-        posts.forEach(post => {
-            const tr = document.createElement('tr');
-            const user = post.user || {};
-
+            
             tr.innerHTML = `
                 <td>
-                    <div class="admin-user-name">${user.display_name || user.username || 'Unknown'}</div>
-                    <div class="admin-user-handle">@${user.username || 'unknown'}</div>
+                    <strong>${invoice.order_id}</strong>
+                    ${invoice.customer_email ? `<br><small>${invoice.customer_email}</small>` : ''}
                 </td>
-                <td class="admin-post-content" title="${post.content || ''}">
-                    ${truncate(post.content || '', 120)}
-                </td>
-                <td>${formatDateTime(post.created_at)}</td>
                 <td>
-                    <button class="btn btn-sm btn-secondary" data-post-id="${post.id}">
-                        Delete
+                    <div>${parseFloat(invoice.amount_xmr).toFixed(6)} XMR</div>
+                    <small>$${parseFloat(invoice.amount_usd).toFixed(2)}</small>
+                </td>
+                <td>
+                    <code class="address-small">${invoice.address.slice(0, 16)}...${invoice.address.slice(-8)}</code>
+                </td>
+                <td>
+                    <span class="badge ${statusClass}">${invoice.status}</span>
+                    ${invoice.confirmations > 0 ? `<br><small>${invoice.confirmations} conf</small>` : ''}
+                </td>
+                <td>${formatDateTime(invoice.created_at)}</td>
+                <td>
+                    <button class="btn btn-sm btn-ghost" onclick="viewInvoice(${invoice.id})">
+                        View
+                    </button>
+                    <button class="btn btn-sm btn-ghost" onclick="viewSeed(${invoice.id})" 
+                            ${invoice.seed_deleted_at ? 'disabled' : ''}>
+                        Seed
                     </button>
                 </td>
             `;
-
+            
             tbody.appendChild(tr);
         });
-
-        // Attach delete handlers
-        tbody.querySelectorAll('button[data-post-id]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const postId = btn.getAttribute('data-post-id');
-                if (!postId) return;
-                handleDeletePost(postId, btn);
-            });
-        });
-    } catch (err) {
-        console.error('loadPosts error:', err);
+        
+        updatePagination(invoices.length, page);
+    } catch (error) {
+        console.error('loadMoneroInvoices error:', error);
         tbody.innerHTML = `
-            <tr><td colspan="4" class="admin-table-empty">Failed to load posts.</td></tr>
+            <tr><td colspan="6" class="admin-table-empty">Failed to load invoices.</td></tr>
         `;
-        showToast('Failed to load posts', 'error');
+        showToast('Failed to load invoices', 'error');
     }
 }
 
-/* ========== Delete Post ========== */
-
-async function handleDeletePost(postId, buttonEl) {
-    const confirmDelete = confirm(
-        'Are you sure you want to permanently delete this post? This cannot be undone.'
-    );
-    if (!confirmDelete) return;
-
-    const originalText = buttonEl.textContent;
-    buttonEl.disabled = true;
-    buttonEl.textContent = 'Deleting...';
-
+// View invoice details
+async function viewInvoice(invoiceId) {
     try {
-        const res = await fetch(`${ADMIN_API_BASE}/admin/posts/${postId}`, {
-            method: 'DELETE',
+        const res = await fetch(`${ADMIN_API_BASE}/admin/monero/invoices/${invoiceId}/status`, {
+            headers: getAuthHeader()
+        });
+        
+        if (!res.ok) throw new Error('Failed to load invoice');
+        
+        const invoice = await res.json();
+        
+        // Create modal with invoice details
+        const modalContent = `
+            <div class="modal-content modal-lg">
+                <div class="modal-header">
+                    <h3>Invoice Details: ${invoice.order_id}</h3>
+                    <button class="modal-close" onclick="closeModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="invoice-details">
+                        <div class="detail-row">
+                            <span class="detail-label">Status:</span>
+                            <span class="detail-value badge badge-${invoice.status}">
+                                ${invoice.status.toUpperCase()}
+                            </span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Amount:</span>
+                            <span class="detail-value">
+                                ${parseFloat(invoice.amount_xmr).toFixed(6)} XMR 
+                                ($${parseFloat(invoice.amount_usd).toFixed(2)})
+                            </span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Address:</span>
+                            <span class="detail-value">
+                                <code>${invoice.address}</code>
+                                <button class="btn btn-xs" onclick="copyToClipboard('${invoice.address}')">
+                                    Copy
+                                </button>
+                            </span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Confirmations:</span>
+                            <span class="detail-value">
+                                ${invoice.confirmations || 0} / ${invoice.required_confirmations || 10}
+                            </span>
+                        </div>
+                        ${invoice.tx_hash ? `
+                            <div class="detail-row">
+                                <span class="detail-label">Transaction:</span>
+                                <span class="detail-value">
+                                    <a href="https://xmrchain.net/tx/${invoice.tx_hash}" target="_blank">
+                                        ${invoice.tx_hash.slice(0, 16)}...
+                                    </a>
+                                </span>
+                            </div>
+                        ` : ''}
+                        
+                        ${invoice.transactions && invoice.transactions.length > 0 ? `
+                            <h4>Transactions</h4>
+                            <div class="transactions-list">
+                                ${invoice.transactions.map(tx => `
+                                    <div class="transaction-item">
+                                        <div class="tx-hash">
+                                            <a href="https://xmrchain.net/tx/${tx.tx_hash}" target="_blank">
+                                                ${tx.tx_hash.slice(0, 16)}...
+                                            </a>
+                                        </div>
+                                        <div class="tx-amount">
+                                            ${parseFloat(tx.amount).toFixed(6)} XMR
+                                        </div>
+                                        <div class="tx-confirmations">
+                                            ${tx.confirmations} conf
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        showModal(modalContent);
+    } catch (error) {
+        console.error('viewInvoice error:', error);
+        showToast('Failed to load invoice details', 'error');
+    }
+}
+
+// View seed phrases
+let currentSeedInvoiceId = null;
+
+async function viewSeed(invoiceId) {
+    currentSeedInvoiceId = invoiceId;
+    
+    try {
+        const res = await fetch(`${ADMIN_API_BASE}/admin/monero/invoices/${invoiceId}/seed`, {
+            headers: getAuthHeader()
+        });
+        
+        if (!res.ok) {
+            if (res.status === 400) {
+                const data = await res.json();
+                if (data.error.includes('deleted')) {
+                    // Show deleted state
+                    document.getElementById('seedDeletedAlert').style.display = 'block';
+                    document.getElementById('seedPhrase').innerHTML = 
+                        '<em>Seed phrases have been permanently deleted</em>';
+                    
+                    // Try to get invoice to show deletion time
+                    const invoiceRes = await fetch(`${ADMIN_API_BASE}/admin/monero/invoices/${invoiceId}`, {
+                        headers: getAuthHeader()
+                    });
+                    if (invoiceRes.ok) {
+                        const invoice = await invoiceRes.json();
+                        if (invoice.seed_deleted_at) {
+                            document.getElementById('deletedTime').textContent = 
+                                formatDateTime(invoice.seed_deleted_at);
+                        }
+                    }
+                }
+            }
+            throw new Error('Failed to load seed');
+        }
+        
+        const seedData = await res.json();
+        
+        // Display seed phrases
+        document.getElementById('seedPhrase').textContent = seedData.seed;
+        document.getElementById('viewKey').textContent = seedData.viewKey;
+        document.getElementById('spendKey').textContent = seedData.spendKey;
+        document.getElementById('walletAddress').textContent = 
+            await getInvoiceAddress(invoiceId);
+        
+        // Hide deleted alert
+        document.getElementById('seedDeletedAlert').style.display = 'none';
+        
+        // Show modal
+        document.getElementById('seedModal').style.display = 'block';
+    } catch (error) {
+        console.error('viewSeed error:', error);
+        showToast('Failed to load seed phrases', 'error');
+    }
+}
+
+// Get invoice address
+async function getInvoiceAddress(invoiceId) {
+    try {
+        const res = await fetch(`${ADMIN_API_BASE}/admin/monero/invoices/${invoiceId}`, {
+            headers: getAuthHeader()
+        });
+        if (res.ok) {
+            const invoice = await res.json();
+            return invoice.address;
+        }
+    } catch (error) {
+        console.error('getInvoiceAddress error:', error);
+    }
+    return 'Unknown';
+}
+
+// Delete seed phrases
+async function deleteSeedPhrases() {
+    if (!currentSeedInvoiceId) return;
+    
+    const confirmDelete = confirm(
+        '⚠️ PERMANENT DELETION\n\n' +
+        'This will permanently delete all seed phrases and private keys for this wallet.\n' +
+        'You will NOT be able to recover or access the funds in this wallet again.\n\n' +
+        'Type "DELETE" to confirm:'
+    );
+    
+    if (!confirmDelete) return;
+    
+    const userInput = prompt('Type DELETE to confirm permanent deletion:');
+    if (userInput !== 'DELETE') {
+        showToast('Deletion cancelled', 'error');
+        return;
+    }
+    
+    try {
+        const res = await fetch(
+            `${ADMIN_API_BASE}/admin/monero/invoices/${currentSeedInvoiceId}/seed`,
+            {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...getAuthHeader()
+                },
+                body: JSON.stringify({ confirm: 'DELETE' })
+            }
+        );
+        
+        if (!res.ok) throw new Error('Failed to delete seed');
+        
+        showToast('Seed phrases permanently deleted', 'success');
+        closeSeedModal();
+        loadMoneroInvoices(currentInvoicePage);
+        loadMoneroStats();
+    } catch (error) {
+        console.error('deleteSeedPhrases error:', error);
+        showToast('Failed to delete seed phrases', 'error');
+    }
+}
+
+// Create new invoice
+async function createInvoice(invoiceData) {
+    try {
+        const res = await fetch(`${ADMIN_API_BASE}/admin/monero/invoices`, {
+            method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 ...getAuthHeader()
-            }
+            },
+            body: JSON.stringify(invoiceData)
         });
+        
+        if (!res.ok) throw new Error('Failed to create invoice');
+        
+        const result = await res.json();
+        
+        showToast('Invoice created successfully', 'success');
+        closeInvoiceModal();
+        loadMoneroInvoices(1);
+        loadMoneroStats();
+        
+        // Show success with address
+        const modalContent = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Invoice Created</h3>
+                    <button class="modal-close" onclick="closeModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-success">
+                        Invoice created successfully!
+                    </div>
+                    <div class="invoice-success">
+                        <p><strong>Order ID:</strong> ${result.invoice.orderId}</p>
+                        <p><strong>Amount:</strong> ${result.invoice.amountXMR} XMR</p>
+                        <p><strong>Address:</strong></p>
+                        <code class="address-block">${result.invoice.address}</code>
+                        <div class="qr-container">
+                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=monero:${result.invoice.address}?tx_amount=${result.invoice.amountXMR}" 
+                                 alt="Monero QR Code">
+                        </div>
+                        <button class="btn btn-primary" onclick="copyToClipboard('${result.invoice.address}')">
+                            Copy Address
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        showModal(modalContent);
+    } catch (error) {
+        console.error('createInvoice error:', error);
+        showToast('Failed to create invoice', 'error');
+    }
+}
 
-        if (!res.ok) {
-            throw new Error('Failed to delete post');
+// Modal functions
+function showInvoiceModal() {
+    document.getElementById('createInvoiceModal').style.display = 'block';
+    document.getElementById('invoiceForm').reset();
+}
+
+function closeInvoiceModal() {
+    document.getElementById('createInvoiceModal').style.display = 'none';
+}
+
+function closeSeedModal() {
+    document.getElementById('seedModal').style.display = 'none';
+    currentSeedInvoiceId = null;
+}
+
+// Copy functions
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('Copied to clipboard', 'success');
+    }).catch(err => {
+        console.error('Copy failed:', err);
+        showToast('Copy failed', 'error');
+    });
+}
+
+function copySeed() {
+    const seed = document.getElementById('seedPhrase').textContent;
+    copyToClipboard(seed);
+}
+
+function copyViewKey() {
+    const key = document.getElementById('viewKey').textContent;
+    copyToClipboard(key);
+}
+
+function copySpendKey() {
+    const key = document.getElementById('spendKey').textContent;
+    copyToClipboard(key);
+}
+
+function copyAddress() {
+    const address = document.getElementById('walletAddress').textContent;
+    copyToClipboard(address);
+}
+
+// Pagination
+function updatePagination(totalItems, currentPage) {
+    const totalPages = Math.ceil(totalItems / INVOICES_PER_PAGE);
+    document.getElementById('pageInfo').textContent = 
+        `Page ${currentPage} of ${totalPages}`;
+    
+    document.getElementById('prevPageBtn').disabled = currentPage <= 1;
+    document.getElementById('nextPageBtn').disabled = currentPage >= totalPages;
+    
+    if (totalPages <= 1) {
+        document.getElementById('prevPageBtn').style.display = 'none';
+        document.getElementById('nextPageBtn').style.display = 'none';
+    } else {
+        document.getElementById('prevPageBtn').style.display = 'inline-block';
+        document.getElementById('nextPageBtn').style.display = 'inline-block';
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+    // ... existing auth check ...
+    
+    // Load Monero data
+    loadMoneroData();
+    
+    // Event listeners
+    document.getElementById('createInvoiceBtn')?.addEventListener('click', showInvoiceModal);
+    document.getElementById('refreshMoneroBtn')?.addEventListener('click', () => {
+        loadMoneroData();
+    });
+    
+    document.getElementById('invoiceFilter')?.addEventListener('change', () => {
+        loadMoneroInvoices(1);
+    });
+    
+    document.getElementById('prevPageBtn')?.addEventListener('click', () => {
+        if (currentInvoicePage > 1) {
+            currentInvoicePage--;
+            loadMoneroInvoices(currentInvoicePage);
         }
+    });
+    
+    document.getElementById('nextPageBtn')?.addEventListener('click', () => {
+        currentInvoicePage++;
+        loadMoneroInvoices(currentInvoicePage);
+    });
+    
+    // Invoice form submission
+    document.getElementById('invoiceForm')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const invoiceData = {
+            orderId: document.getElementById('invoiceOrderId').value,
+            amountXMR: parseFloat(document.getElementById('invoiceAmountXMR').value),
+            amountUSD: document.getElementById('invoiceAmountUSD').value ? 
+                parseFloat(document.getElementById('invoiceAmountUSD').value) : null,
+            customerEmail: document.getElementById('invoiceCustomerEmail').value || null,
+            description: document.getElementById('invoiceDescription').value || null,
+            expiresIn: parseInt(document.getElementById('invoiceExpires').value)
+        };
+        
+        createInvoice(invoiceData);
+    });
+    
+    // Close modals on outside click
+    window.addEventListener('click', (e) => {
+        const modal = document.getElementById('createInvoiceModal');
+        const seedModal = document.getElementById('seedModal');
+        
+        if (e.target === modal) closeInvoiceModal();
+        if (e.target === seedModal) closeSeedModal();
+    });
+});
 
-        // Remove row from table
-        const row = buttonEl.closest('tr');
-        if (row) row.remove();
+// Helper function to show modal
+function showModal(content) {
+    const modalContainer = document.createElement('div');
+    modalContainer.className = 'modal';
+    modalContainer.style.display = 'block';
+    modalContainer.innerHTML = content;
+    
+    document.body.appendChild(modalContainer);
+    
+    // Add close on click outside
+    modalContainer.addEventListener('click', (e) => {
+        if (e.target === modalContainer) {
+            document.body.removeChild(modalContainer);
+        }
+    });
+}
 
-        showToast('Post deleted', 'success');
-    } catch (err) {
-        console.error('handleDeletePost error:', err);
-        showToast('Failed to delete post', 'error');
-        buttonEl.disabled = false;
-        buttonEl.textContent = originalText;
+function closeModal() {
+    const modal = document.querySelector('.modal');
+    if (modal && modal.parentNode) {
+        modal.parentNode.removeChild(modal);
     }
 }
