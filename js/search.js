@@ -164,16 +164,151 @@ class SearchManager {
 
   async fetchSearchResults(query, filter) {
     const results = { users: [], posts: [], hashtags: [] };
-    const currentUser =
-      typeof getCurrentUser === "function" ? getCurrentUser() : null;
+    
+    try {
+      // Use your backend API for search
+      const token = this.getAuthToken();
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      };
 
-    // USERS
-    if (filter === "all" || filter === "users") {
-      const { data: users, error } = await this.supabase.rpc("search_users", {
-        search_query: query,
-        result_limit: 20,
+      // Build the API URL with parameters
+      const params = new URLSearchParams();
+      params.append('q', query);
+      if (filter !== 'all') {
+        // Note: backend doesn't support filter param yet, but we'll implement fallback
+      }
+
+      const response = await fetch(`${FEED_API_BASE_URL}/search?${params.toString()}`, {
+        method: 'GET',
+        headers
       });
 
+      if (!response.ok) {
+        throw new Error(`Search failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // Map backend response to your frontend format
+      results.users = (data.users || []).map(user => ({
+        id: user.id,
+        username: user.username,
+        displayName: user.display_name || user.username,
+        avatar: user.avatar_url || 'default-profile.PNG',
+        bio: user.bio || '',
+        followersCount: 0, // We'll fetch this separately if needed
+        isFollowing: false // We'll check this separately
+      }));
+
+      results.posts = (data.posts || []).map(post => ({
+        id: post.id,
+        userId: post.user_id,
+        content: post.content,
+        createdAt: post.created_at,
+        likes: post.likes || 0,
+        comments: post.comments_count || 0,
+        saves: post.saves_count || 0,
+        media_url: post.media_url,
+        media_type: post.media_type,
+        liked_by_me: post.liked_by_me || false,
+        saved_by_me: post.saved_by_me || false,
+        user: post.user || {
+          username: 'unknown',
+          displayName: 'Unknown User',
+          avatar: 'default-profile.PNG'
+        }
+      }));
+
+      results.hashtags = (data.hashtags || []).map(tag => ({
+        name: tag.tag,
+        count: 0 // You might need to add post counts to your backend
+      }));
+
+      // Save search to history if user is logged in
+      if (token && query) {
+        try {
+          await fetch(`${FEED_API_BASE_URL}/search/history`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query })
+          });
+        } catch (err) {
+          console.error('Failed to save search history:', err);
+        }
+      }
+
+      // Now check follow status for users and enrich posts if needed
+      await this.enrichSearchResults(results, query, filter);
+
+    } catch (err) {
+      console.error('Search API error:', err);
+      // Fallback to direct Supabase query if backend fails
+      await this.fallbackSearch(query, filter, results);
+    }
+
+    return results;
+  }
+
+  async enrichSearchResults(results, query, filter) {
+    const currentUser = typeof getCurrentUser === "function" ? getCurrentUser() : null;
+    
+    // Check follow status for users
+    if (currentUser && results.users.length > 0) {
+      const usersWithFollowStatus = await Promise.all(
+        results.users.map(async (user) => {
+          let isFollowing = false;
+
+          const { data: follow } = await this.supabase
+            .from("follows")
+            .select("id")
+            .eq("follower_id", currentUser.id)
+            .eq("followed_id", user.id)
+            .maybeSingle();
+
+          isFollowing = !!follow;
+
+          return {
+            ...user,
+            isFollowing
+          };
+        })
+      );
+      results.users = usersWithFollowStatus;
+    }
+
+    // Enrich posts with engagement numbers if needed
+    if (results.posts.length > 0) {
+      await this.enrichPostsFromApi(results.posts);
+    }
+
+    // Optional logging
+    if (currentUser) {
+      const totalResults = Object.values(results).reduce(
+        (total, section) => total + section.length,
+        0
+      );
+      // You might want to log this to your backend instead
+      console.log(`User ${currentUser.id} searched for "${query}" (${filter}): ${totalResults} results`);
+    }
+  }
+
+  async fallbackSearch(query, filter, results) {
+    const pattern = `%${query}%`;
+    const currentUser = typeof getCurrentUser === "function" ? getCurrentUser() : null;
+    
+    // Simple fallback search without RPC functions
+    if (filter === 'all' || filter === 'users') {
+      const { data: users, error } = await this.supabase
+        .from('users')
+        .select('id,username,display_name,avatar_url,bio')
+        .or(`username.ilike.${pattern},display_name.ilike.${pattern}`)
+        .limit(10);
+      
       if (!error && users) {
         const usersWithFollowStatus = await Promise.all(
           users.map(async (user) => {
@@ -194,112 +329,69 @@ class SearchManager {
               id: user.id,
               username: user.username,
               displayName: user.display_name || user.username,
-              avatar: user.avatar_url || "default-profile.PNG",
-              bio: user.bio,
-              followersCount: user.followers_count || 0,
-              isFollowing,
+              avatar: user.avatar_url || 'default-profile.PNG',
+              bio: user.bio || '',
+              followersCount: 0,
+              isFollowing
             };
           })
         );
         results.users = usersWithFollowStatus;
-      } else {
-        console.error("Error searching users:", error);
       }
     }
 
-    // POSTS
-    if (filter === "all" || filter === "posts") {
-      const { data: posts, error } = await this.supabase.rpc("search_posts", {
-        search_query: query,
-        result_limit: 20,
-      });
-
+    if (filter === 'all' || filter === 'posts') {
+      const { data: posts, error } = await this.supabase
+        .from('posts')
+        .select(`
+          id, user_id, content, created_at, media_url, media_type,
+          user:users (id, username, display_name, avatar_url)
+        `)
+        .ilike('content', pattern)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      
       if (!error && posts) {
-        results.posts = posts.map((post) => ({
-          // keep original row in case you want it later
-          raw: post,
+        results.posts = posts.map(post => ({
           id: post.id,
           userId: post.user_id,
           content: post.content,
           createdAt: post.created_at,
-          likes:
-            typeof post.likes === "number"
-              ? post.likes
-              : post.like_count || post.likes_count || 0,
-          comments:
-            typeof post.comments === "number"
-              ? post.comments
-              : post.comment_count || post.comments_count || 0,
-          // NEW: normalize saves count
-          saves:
-            typeof post.saves === "number"
-              ? post.saves
-              : post.save_count ||
-                post.saves_count ||
-                post.bookmarks_count ||
-                0,
+          likes: 0,
+          comments: 0,
+          saves: 0,
           media_url: post.media_url,
           media_type: post.media_type,
-          liked_by_me:
-            post.liked_by_me === true ||
-            post.is_liked === true ||
-            post.isLiked === true,
-          saved_by_me:
-            post.saved_by_me === true ||
-            post.is_saved === true ||
-            post.isSaved === true,
-          user: {
-            username: post.username,
-            displayName: post.display_name || post.username,
-            avatar: post.avatar_url || "default-profile.PNG",
-          },
+          liked_by_me: false,
+          saved_by_me: false,
+          user: post.user || {
+            username: 'unknown',
+            displayName: 'Unknown User',
+            avatar: 'default-profile.PNG'
+          }
         }));
 
-        // Hydrate posts with real engagement numbers from backend API
+        // Enrich these posts with engagement numbers
         if (results.posts.length) {
           await this.enrichPostsFromApi(results.posts);
         }
-      } else {
-        console.error("Error searching posts:", error);
       }
     }
 
-    // HASHTAGS
-    if (filter === "all" || filter === "hashtags") {
-      const { data: hashtags, error } = await this.supabase.rpc(
-        "search_hashtags",
-        {
-          search_query: query,
-          result_limit: 20,
-        }
-      );
-
+    if (filter === 'all' || filter === 'hashtags') {
+      const { data: hashtags, error } = await this.supabase
+        .from('hashtags')
+        .select('id,tag')
+        .ilike('tag', pattern)
+        .limit(10);
+      
       if (!error && hashtags) {
-        results.hashtags = hashtags.map((h) => ({
-          name: h.tag,
-          count: h.posts_count || 0,
-          recentCount: h.recent_posts_count || 0,
+        results.hashtags = hashtags.map(tag => ({
+          name: tag.tag,
+          count: 0
         }));
-      } else {
-        console.error("Error searching hashtags:", error);
       }
     }
-
-    // optional logging
-    if (currentUser) {
-      const totalResults = Object.values(results).reduce(
-        (total, section) => total + section.length,
-        0
-      );
-      await this.supabase.rpc("log_search", {
-        search_user_id: currentUser.id,
-        search_query: query,
-        search_results_count: totalResults,
-        search_type: filter,
-      });
-    }
-
-    return results;
   }
 
   /**
@@ -983,12 +1075,48 @@ class SearchManager {
           )
           .join("");
       } else {
-        // no fake data – just show empty state
+        // Try a direct query if the RPC doesn't exist
+        await this.loadTrendingHashtagsFallback();
+      }
+    } catch (err) {
+      console.error("Error loading trending hashtags:", err);
+      await this.loadTrendingHashtagsFallback();
+    }
+  }
+
+  async loadTrendingHashtagsFallback() {
+    try {
+      // Simple fallback: get hashtags with most posts
+      const { data: hashtags, error } = await this.supabase
+        .from('hashtags')
+        .select('tag')
+        .limit(10);
+
+      const list = document.querySelector(".trending-list");
+      if (!list) return;
+
+      if (!error && hashtags && hashtags.length) {
+        list.innerHTML = hashtags
+          .map(
+            (item, index) => `
+            <div class="trending-item" onclick="searchManager.searchHashtag('${
+              item.tag
+            }')">
+              <span class="trending-rank">${index + 1}</span>
+              <div class="trending-content">
+                <span class="trending-tag">#${item.tag}</span>
+                <span class="trending-count">trending</span>
+              </div>
+            </div>
+          `
+          )
+          .join("");
+      } else {
         list.innerHTML =
           '<div class="trending-empty">No trending hashtags yet</div>';
       }
     } catch (err) {
-      console.error("Error loading trending hashtags:", err);
+      console.error("Fallback trending hashtags error:", err);
       const list = document.querySelector(".trending-list");
       if (list) {
         list.innerHTML =
