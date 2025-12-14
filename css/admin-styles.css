@@ -347,3 +347,58 @@
         padding: var(--space-2);
     }
 }
+
+/* ================================
+   ADDED: Better dashboard layout
+   ================================ */
+
+/* Make the two panels same “row height” and stop endless page scroll */
+.admin-grid-2 {
+    align-items: start;
+}
+
+/* Give panels a capped height */
+.admin-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 520px;
+}
+
+/* The table wrapper becomes the scroll area */
+.admin-table-wrapper {
+    flex: 1;
+    max-height: 420px;          /* <- adjust if you want taller/shorter */
+    overflow: auto;
+}
+
+/* Keep headers visible while scrolling */
+.admin-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+/* Slightly nicer content cell wrapping in admin tables */
+.admin-table td {
+    line-height: 1.35;
+}
+
+/* Posts content: allow 2 lines instead of 1 giant row */
+.admin-post-content {
+    max-width: 320px;
+    white-space: normal;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+/* Better spacing on small screens */
+@media (max-width: 900px) {
+    .admin-panel {
+        min-height: 420px;
+    }
+    .admin-table-wrapper {
+        max-height: 360px;
+    }
+}
