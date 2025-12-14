@@ -402,3 +402,57 @@
         max-height: 360px;
     }
 }
+
+/* ================================
+   FIX: Recent Posts column alignment
+   ================================ */
+
+#adminPostsTable {
+    table-layout: fixed; /* forces consistent column widths */
+    width: 100%;
+}
+
+#adminPostsTable th,
+#adminPostsTable td {
+    vertical-align: middle; /* makes each row look aligned */
+}
+
+/* Column widths (mobile-friendly) */
+#adminPostsTable th:nth-child(1),
+#adminPostsTable td:nth-child(1) {
+    width: 32%;
+}
+
+#adminPostsTable th:nth-child(2),
+#adminPostsTable td:nth-child(2) {
+    width: 34%;
+}
+
+#adminPostsTable th:nth-child(3),
+#adminPostsTable td:nth-child(3) {
+    width: 22%;
+}
+
+#adminPostsTable th:nth-child(4),
+#adminPostsTable td:nth-child(4) {
+    width: 12%;
+}
+
+/* Content cell: clamp neatly and never push columns around */
+#adminPostsTable td.admin-post-content {
+    white-space: normal;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-break: break-word;
+
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+/* Buttons fit the Actions column on small screens */
+#adminPostsTable td:nth-child(4) .btn {
+    width: 100%;
+    padding-left: 10px;
+    padding-right: 10px;
+}
