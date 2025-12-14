@@ -18,8 +18,8 @@ class SearchManager {
     this.recentSearches = [];
     this.recentVisibleCount = 5;
 
-    // keep ALL results so we can filter them
-    this.allResults = { users: [], posts: [], hashtags: [] };
+    // keep last results so we can update them if needed
+    this.lastResults = { users: [], posts: [], hashtags: [] };
 
     this.init();
   }
@@ -70,7 +70,6 @@ class SearchManager {
       clearSearch.addEventListener("click", () => this.clearSearch());
     }
 
-    // Update filter tabs to trigger filtering of already loaded results
     filterTabs.forEach((tab) => {
       tab.addEventListener("click", (e) => {
         const filter = e.target.dataset.filter;
@@ -144,15 +143,11 @@ class SearchManager {
     try {
       this.saveToRecentSearches(query);
 
-      // Fetch ALL results once
-      const allResults = await this.fetchAllSearchResults(query);
-      this.allResults = allResults;
-      
-      // Hide loading animation
+      const results = await this.fetchSearchResults(query, this.currentFilter);
+
+      this.lastResults = results;
       this.hideLoadingAnimation();
-      
-      // Display results based on current filter
-      this.displayFilteredResults();
+      this.displaySearchResults(results, query);
     } catch (err) {
       console.error("Search error:", err);
       this.hideLoadingAnimation();
@@ -166,13 +161,15 @@ class SearchManager {
     if (!filter || filter === this.currentFilter) return;
     this.currentFilter = filter;
 
-    // Just filter and display the already loaded results
-    this.displayFilteredResults();
+    if (this.currentQuery && this.currentQuery.length >= 2) {
+      this.performSearch(this.currentQuery);
+    }
   }
 
-  async fetchAllSearchResults(query) {
+  async fetchSearchResults(query, filter) {
     const results = { users: [], posts: [], hashtags: [] };
-    
+    const currentUser = typeof getCurrentUser === "function" ? getCurrentUser() : null;
+
     try {
       // Use your backend API for search
       const token = this.getAuthToken();
@@ -181,7 +178,6 @@ class SearchManager {
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       };
 
-      console.log("Fetching search results for:", query);
       const response = await fetch(`${FEED_API_BASE_URL}/search?q=${encodeURIComponent(query)}`, {
         method: 'GET',
         headers
@@ -192,10 +188,9 @@ class SearchManager {
       }
 
       const data = await response.json();
-      console.log("Search API response:", data);
       
-      // Map backend response to your frontend format
-      results.users = (data.users || []).map(user => ({
+      // Always get ALL results from backend
+      const allUsers = (data.users || []).map(user => ({
         id: user.id,
         username: user.username,
         displayName: user.display_name || user.username,
@@ -205,7 +200,7 @@ class SearchManager {
         isFollowing: false
       }));
 
-      results.posts = (data.posts || []).map(post => ({
+      const allPosts = (data.posts || []).map(post => ({
         id: post.id,
         userId: post.user_id,
         content: post.content,
@@ -224,16 +219,50 @@ class SearchManager {
         }
       }));
 
-      results.hashtags = (data.hashtags || []).map(tag => ({
+      const allHashtags = (data.hashtags || []).map(tag => ({
         name: tag.tag,
         count: 0
       }));
 
-      console.log("Mapped results:", {
-        users: results.users.length,
-        posts: results.posts.length,
-        hashtags: results.hashtags.length
-      });
+      // Filter based on selected filter
+      if (filter === 'all' || filter === 'users') {
+        results.users = allUsers;
+      }
+      if (filter === 'all' || filter === 'posts') {
+        results.posts = allPosts;
+      }
+      if (filter === 'all' || filter === 'hashtags') {
+        results.hashtags = allHashtags;
+      }
+
+      // Check follow status for users
+      if (currentUser && results.users.length > 0) {
+        const usersWithFollowStatus = await Promise.all(
+          results.users.map(async (user) => {
+            let isFollowing = false;
+
+            const { data: follow } = await this.supabase
+              .from("follows")
+              .select("id")
+              .eq("follower_id", currentUser.id)
+              .eq("followed_id", user.id)
+              .maybeSingle();
+
+            isFollowing = !!follow;
+
+            return {
+              ...user,
+              isFollowing
+            };
+          })
+        );
+        results.users = usersWithFollowStatus;
+      }
+
+      // Enrich posts with engagement numbers
+      if (results.posts.length > 0) {
+        await this.enrichPostsFromApi(results.posts);
+      }
 
       // Save search to history if user is logged in
       if (token && query) {
@@ -251,157 +280,167 @@ class SearchManager {
         }
       }
 
-      // Now check follow status for users and enrich posts if needed
-      await this.enrichSearchResults(results, query);
-
     } catch (err) {
       console.error('Search API error:', err);
       // Fallback to direct Supabase query if backend fails
-      await this.fallbackSearch(query, results);
+      await this.fallbackSearch(query, filter, results, currentUser);
     }
 
     return results;
   }
 
-  async enrichSearchResults(results, query) {
-    const currentUser = typeof getCurrentUser === "function" ? getCurrentUser() : null;
-    
-    // Check follow status for users
-    if (currentUser && results.users.length > 0) {
-      console.log("Enriching user follow status...");
-      const usersWithFollowStatus = await Promise.all(
-        results.users.map(async (user) => {
-          let isFollowing = false;
-
-          const { data: follow } = await this.supabase
-            .from("follows")
-            .select("id")
-            .eq("follower_id", currentUser.id)
-            .eq("followed_id", user.id)
-            .maybeSingle();
-
-          isFollowing = !!follow;
-
-          return {
-            ...user,
-            isFollowing
-          };
-        })
-      );
-      results.users = usersWithFollowStatus;
-    }
-
-    // Enrich posts with engagement numbers if needed
-    if (results.posts.length > 0) {
-      console.log("Enriching posts...");
-      await this.enrichPostsFromApi(results.posts);
-    }
-  }
-
-  async fallbackSearch(query, results) {
-    console.log("Using fallback search for:", query);
+  async fallbackSearch(query, filter, results, currentUser) {
     const pattern = `%${query}%`;
-    const currentUser = typeof getCurrentUser === "function" ? getCurrentUser() : null;
     
-    // Simple fallback search without RPC functions
-    
-    // Search users
-    const { data: users, error: usersError } = await this.supabase
-      .from('users')
-      .select('id,username,display_name,avatar_url,bio')
-      .or(`username.ilike.${pattern},display_name.ilike.${pattern}`)
-      .limit(10);
-    
-    if (!usersError && users) {
-      console.log("Fallback found users:", users.length);
-      const usersWithFollowStatus = await Promise.all(
-        users.map(async (user) => {
-          let isFollowing = false;
+    // Simple fallback search
+    if (filter === 'all' || filter === 'users') {
+      const { data: users, error } = await this.supabase
+        .from('users')
+        .select('id,username,display_name,avatar_url,bio')
+        .or(`username.ilike.${pattern},display_name.ilike.${pattern}`)
+        .limit(10);
+      
+      if (!error && users) {
+        const usersWithFollowStatus = await Promise.all(
+          users.map(async (user) => {
+            let isFollowing = false;
 
-          if (currentUser) {
-            const { data: follow } = await this.supabase
-              .from("follows")
-              .select("id")
-              .eq("follower_id", currentUser.id)
-              .eq("followed_id", user.id)
-              .maybeSingle();
+            if (currentUser) {
+              const { data: follow } = await this.supabase
+                .from("follows")
+                .select("id")
+                .eq("follower_id", currentUser.id)
+                .eq("followed_id", user.id)
+                .maybeSingle();
 
-            isFollowing = !!follow;
-          }
+              isFollowing = !!follow;
+            }
 
-          return {
-            id: user.id,
-            username: user.username,
-            displayName: user.display_name || user.username,
-            avatar: user.avatar_url || 'default-profile.PNG',
-            bio: user.bio || '',
-            followersCount: 0,
-            isFollowing
-          };
-        })
-      );
-      results.users = usersWithFollowStatus;
-    }
-
-    // Search posts
-    const { data: posts, error: postsError } = await this.supabase
-      .from('posts')
-      .select(`
-        id, user_id, content, created_at, media_url, media_type,
-        user:users (id, username, display_name, avatar_url)
-      `)
-      .ilike('content', pattern)
-      .order('created_at', { ascending: false })
-      .limit(20);
-    
-    if (!postsError && posts) {
-      console.log("Fallback found posts:", posts.length);
-      results.posts = posts.map(post => ({
-        id: post.id,
-        userId: post.user_id,
-        content: post.content,
-        createdAt: post.created_at,
-        likes: 0,
-        comments: 0,
-        saves: 0,
-        media_url: post.media_url,
-        media_type: post.media_type,
-        liked_by_me: false,
-        saved_by_me: false,
-        user: post.user || {
-          username: 'unknown',
-          displayName: 'Unknown User',
-          avatar: 'default-profile.PNG'
-        }
-      }));
-
-      // Enrich these posts with engagement numbers
-      if (results.posts.length) {
-        await this.enrichPostsFromApi(results.posts);
+            return {
+              id: user.id,
+              username: user.username,
+              displayName: user.display_name || user.username,
+              avatar: user.avatar_url || 'default-profile.PNG',
+              bio: user.bio || '',
+              followersCount: 0,
+              isFollowing
+            };
+          })
+        );
+        results.users = usersWithFollowStatus;
       }
     }
 
-    // Search hashtags
-    const { data: hashtags, error: hashtagsError } = await this.supabase
-      .from('hashtags')
-      .select('id,tag')
-      .ilike('tag', pattern)
-      .limit(10);
-    
-    if (!hashtagsError && hashtags) {
-      console.log("Fallback found hashtags:", hashtags.length);
-      results.hashtags = hashtags.map(tag => ({
-        name: tag.tag,
-        count: 0
-      }));
+    if (filter === 'all' || filter === 'posts') {
+      const { data: posts, error } = await this.supabase
+        .from('posts')
+        .select(`
+          id, user_id, content, created_at, media_url, media_type,
+          user:users (id, username, display_name, avatar_url)
+        `)
+        .ilike('content', pattern)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      
+      if (!error && posts) {
+        results.posts = posts.map(post => ({
+          id: post.id,
+          userId: post.user_id,
+          content: post.content,
+          createdAt: post.created_at,
+          likes: 0,
+          comments: 0,
+          saves: 0,
+          media_url: post.media_url,
+          media_type: post.media_type,
+          liked_by_me: false,
+          saved_by_me: false,
+          user: post.user || {
+            username: 'unknown',
+            displayName: 'Unknown User',
+            avatar: 'default-profile.PNG'
+          }
+        }));
+
+        // Enrich these posts with engagement numbers
+        if (results.posts.length) {
+          await this.enrichPostsFromApi(results.posts);
+        }
+      }
+    }
+
+    if (filter === 'all' || filter === 'hashtags') {
+      const { data: hashtags, error } = await this.supabase
+        .from('hashtags')
+        .select('id,tag')
+        .ilike('tag', pattern)
+        .limit(10);
+      
+      if (!error && hashtags) {
+        results.hashtags = hashtags.map(tag => ({
+          name: tag.tag,
+          count: 0
+        }));
+      }
     }
   }
 
-  displayFilteredResults() {
-    console.log("Displaying filtered results for filter:", this.currentFilter);
-    console.log("All results:", this.allResults);
-    
-    // First, hide everything
+  /**
+   * Enrich posts with real engagement numbers from backend API
+   * Uses the same endpoint the feed / post page uses, so counts match everywhere.
+   */
+  async enrichPostsFromApi(posts) {
+    const token = this.getAuthToken();
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+    await Promise.all(
+      posts.map(async (post) => {
+        try {
+          const res = await fetch(`${FEED_API_BASE_URL}/posts/${post.id}`, {
+            method: "GET",
+            headers,
+          });
+
+          if (!res.ok) return;
+
+          const data = await res.json();
+          const row = data.post || data;
+          if (!row) return;
+
+          const likes =
+            typeof row.likes === "number"
+              ? row.likes
+              : row.like_count ?? row.likes_count ?? 0;
+
+          const comments =
+            typeof row.comments === "number"
+              ? row.comments
+              : row.comment_count ?? row.comments_count ?? 0;
+
+          const saves =
+            typeof row.saves === "number"
+              ? row.saves
+              : row.save_count ??
+                row.saves_count ??
+                row.bookmarks_count ??
+                0;
+
+          post.likes = likes;
+          post.comments = comments;
+          post.saves = saves;
+
+          post.liked_by_me =
+            row.liked_by_me ?? row.is_liked ?? post.liked_by_me;
+          post.saved_by_me =
+            row.saved_by_me ?? row.is_saved ?? post.saved_by_me;
+        } catch (err) {
+          console.error("Failed to enrich post engagement", err);
+        }
+      })
+    );
+  }
+
+  displaySearchResults(results, query) {
     this.hideAllStates();
     this.hideLoadingAnimation();
 
@@ -409,66 +448,22 @@ class SearchManager {
     const title = document.getElementById("resultsTitle");
     const count = document.getElementById("resultsCount");
 
-    if (!state || !title || !count) {
-      console.error("Missing required elements for search results display");
-      return;
-    }
+    if (!state || !title || !count) return;
 
     state.style.display = "block";
-    title.textContent = `Results for "${this.currentQuery}"`;
+    title.textContent = `Results for "${query}"`;
 
-    // Filter results based on current filter
-    let filteredResults;
-    let totalResults = 0;
-
-    switch(this.currentFilter) {
-      case 'users':
-        filteredResults = { 
-          users: this.allResults.users || [], 
-          posts: [], 
-          hashtags: [] 
-        };
-        totalResults = filteredResults.users.length;
-        break;
-      case 'posts':
-        filteredResults = { 
-          users: [], 
-          posts: this.allResults.posts || [], 
-          hashtags: [] 
-        };
-        totalResults = filteredResults.posts.length;
-        break;
-      case 'hashtags':
-        filteredResults = { 
-          users: [], 
-          posts: [], 
-          hashtags: this.allResults.hashtags || [] 
-        };
-        totalResults = filteredResults.hashtags.length;
-        break;
-      case 'all':
-      default:
-        filteredResults = this.allResults;
-        totalResults = (this.allResults.users?.length || 0) + 
-                      (this.allResults.posts?.length || 0) + 
-                      (this.allResults.hashtags?.length || 0);
-        break;
-    }
-
-    console.log("Filtered results:", filteredResults);
-    console.log("Total results:", totalResults);
-
+    const totalResults = Object.values(results).reduce(
+      (total, section) => total + section.length,
+      0
+    );
     count.textContent = `${totalResults} results`;
 
-    // Display each section
-    this.displayUsersResults(filteredResults.users);
-    this.displayPostsResults(filteredResults.posts);
-    this.displayHashtagsResults(filteredResults.hashtags);
+    this.displayUsersResults(results.users);
+    this.displayPostsResults(results.posts);
+    this.displayHashtagsResults(results.hashtags);
 
-    if (totalResults === 0) {
-      console.log("No results, showing no results state");
-      this.showNoResults();
-    }
+    if (totalResults === 0) this.showNoResults();
   }
 
   /* ---------- USERS SECTION ---------- */
@@ -476,22 +471,19 @@ class SearchManager {
   displayUsersResults(users) {
     const list = document.getElementById("usersList");
     const section = document.getElementById("usersResults");
-    if (!list || !section) {
-      console.error("Missing users list or section element");
-      return;
-    }
+    if (!list || !section) return;
 
     if (!users.length) {
-      console.log("No users to display");
       section.style.display = "none";
       return;
     }
 
-    console.log("Displaying", users.length, "users");
+    const currentUser = typeof getCurrentUser === "function" ? getCurrentUser() : null;
+
     section.style.display = "block";
     list.innerHTML = users
       .map((user) => {
-        const isMe = typeof getCurrentUser === "function" ? getCurrentUser()?.id === user.id : false;
+        const isMe = currentUser && currentUser.id === user.id;
 
         const followButtonHtml = isMe
           ? `<span class="you-pill">You</span>`
@@ -536,12 +528,9 @@ class SearchManager {
         const username = card.dataset.username;
         const me = typeof getCurrentUser === "function" ? getCurrentUser() : null;
         if (me && me.username === username) {
-          // UPDATED: go to profile with flag so back button knows we came from search
           window.location.href = "profile.html?from=search";
         } else {
-          window.location.href = `user.html?user=${encodeURIComponent(
-            username
-          )}`;
+          window.location.href = `user.html?user=${encodeURIComponent(username)}`;
         }
       });
     });
@@ -552,18 +541,13 @@ class SearchManager {
   displayPostsResults(posts) {
     const list = document.getElementById("postsList");
     const section = document.getElementById("postsResults");
-    if (!list || !section) {
-      console.error("Missing posts list or section element");
-      return;
-    }
+    if (!list || !section) return;
 
     if (!posts.length) {
-      console.log("No posts to display");
       section.style.display = "none";
       return;
     }
 
-    console.log("Displaying", posts.length, "posts");
     section.style.display = "block";
     list.innerHTML = posts
       .map((post) => {
@@ -571,28 +555,14 @@ class SearchManager {
         const username = post.user.username || "unknown";
         const displayName = post.user.displayName || username;
         const time = this.formatTime(post.createdAt);
-        const liked =
-          post.liked_by_me === true ||
-          post.is_liked === true ||
-          post.isLiked === true;
-        const saved =
-          post.saved_by_me === true ||
-          post.is_saved === true ||
-          post.isSaved === true;
+        const liked = post.liked_by_me;
+        const saved = post.saved_by_me;
 
-        const likeCount =
-          typeof post.likes === "number" ? post.likes : post.likes || 0;
-        const commentCount =
-          typeof post.comments === "number"
-            ? post.comments
-            : post.comments || 0;
-        const saveCount =
-          typeof post.saves === "number" ? post.saves : post.saves || 0;
+        const likeCount = post.likes || 0;
+        const commentCount = post.comments || 0;
+        const saveCount = post.saves || 0;
 
-        const mediaHtml = this.renderMediaHtml(
-          post.media_url,
-          post.media_type
-        );
+        const mediaHtml = this.renderMediaHtml(post.media_url, post.media_type);
 
         return `
       <article class="post" data-post-id="${post.id}">
@@ -601,9 +571,7 @@ class SearchManager {
             <img class="post-avatar" src="${avatar}"
               onerror="this.src='default-profile.PNG'">
             <div class="post-user-meta">
-              <span class="post-display-name">${this.escapeHtml(
-                displayName
-              )}</span>
+              <span class="post-display-name">${this.escapeHtml(displayName)}</span>
               <span class="post-username">@${this.escapeHtml(username)}</span>
             </div>
           </div>
@@ -688,11 +656,7 @@ class SearchManager {
 
       // click whole card -> post page (unless clicking actions / user)
       postEl.addEventListener("click", (e) => {
-        if (
-          e.target.closest(".post-actions") ||
-          e.target.closest(".post-user")
-        )
-          return;
+        if (e.target.closest(".post-actions") || e.target.closest(".post-user")) return;
         window.location.href = `post.html?id=${postId}`;
       });
 
@@ -702,14 +666,11 @@ class SearchManager {
         userEl.addEventListener("click", (e) => {
           e.stopPropagation();
           const username = userEl.dataset.username;
-          const me =
-            typeof getCurrentUser === "function" ? getCurrentUser() : null;
+          const me = typeof getCurrentUser === "function" ? getCurrentUser() : null;
           if (me && me.username === username) {
             window.location.href = "profile.html";
           } else {
-            window.location.href = `user.html?user=${encodeURIComponent(
-              username
-            )}`;
+            window.location.href = `user.html?user=${encodeURIComponent(username)}`;
           }
         });
       }
@@ -755,25 +716,18 @@ class SearchManager {
   displayHashtagsResults(hashtags) {
     const list = document.getElementById("hashtagsList");
     const section = document.getElementById("hashtagsResults");
-    if (!list || !section) {
-      console.error("Missing hashtags list or section element");
-      return;
-    }
+    if (!list || !section) return;
 
     if (!hashtags.length) {
-      console.log("No hashtags to display");
       section.style.display = "none";
       return;
     }
 
-    console.log("Displaying", hashtags.length, "hashtags");
     section.style.display = "block";
     list.innerHTML = hashtags
       .map(
         (h) => `
-      <a href="hashtag.html?tag=${encodeURIComponent(
-        h.name
-      )}" class="hashtag-item">
+      <a href="hashtag.html?tag=${encodeURIComponent(h.name)}" class="hashtag-item">
         <span class="icon icon-feeds hashtag-icon"></span>
         <div class="hashtag-info">
           <div class="hashtag-name">#${h.name}</div>
@@ -906,8 +860,7 @@ class SearchManager {
   /* ---------- FOLLOW / LIKE / SAVE ---------- */
 
   async handleFollow(userId, button) {
-    const currentUser =
-      typeof getCurrentUser === "function" ? getCurrentUser() : null;
+    const currentUser = typeof getCurrentUser === "function" ? getCurrentUser() : null;
     if (!currentUser) {
       this.showMessage("Please log in to follow users", "error");
       return;
@@ -959,8 +912,7 @@ class SearchManager {
   }
 
   async handleLike(postId, btn) {
-    const user =
-      typeof getCurrentUser === "function" ? getCurrentUser() : null;
+    const user = typeof getCurrentUser === "function" ? getCurrentUser() : null;
     if (!user) return this.showMessage("Log in to like posts", "error");
 
     const token = this.getAuthToken();
@@ -995,12 +947,7 @@ class SearchManager {
 
       if (!res.ok) throw new Error(data.error || "Failed to update like");
 
-      const serverLikes =
-        typeof data.likes === "number"
-          ? data.likes
-          : typeof data.like_count === "number"
-          ? data.like_count
-          : null;
+      const serverLikes = typeof data.likes === "number" ? data.likes : typeof data.like_count === "number" ? data.like_count : null;
 
       if (serverLikes !== null) {
         countEl.textContent = String(serverLikes);
@@ -1012,8 +959,7 @@ class SearchManager {
   }
 
   async handleSave(postId, btn) {
-    const user =
-      typeof getCurrentUser === "function" ? getCurrentUser() : null;
+    const user = typeof getCurrentUser === "function" ? getCurrentUser() : null;
     if (!user) return this.showMessage("Log in to save posts", "error");
 
     const token = this.getAuthToken();
@@ -1043,61 +989,6 @@ class SearchManager {
       console.error(err);
       this.showMessage("Failed to update save", "error");
     }
-  }
-
-  /**
-   * Enrich posts with real engagement numbers from backend API
-   * Uses the same endpoint the feed / post page uses, so counts match everywhere.
-   */
-  async enrichPostsFromApi(posts) {
-    const token = this.getAuthToken();
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-    await Promise.all(
-      posts.map(async (post) => {
-        try {
-          const res = await fetch(`${FEED_API_BASE_URL}/posts/${post.id}`, {
-            method: "GET",
-            headers,
-          });
-
-          if (!res.ok) return;
-
-          const data = await res.json();
-          const row = data.post || data; // depending on how your API wraps it
-          if (!row) return;
-
-          const likes =
-            typeof row.likes === "number"
-              ? row.likes
-              : row.like_count ?? row.likes_count ?? 0;
-
-          const comments =
-            typeof row.comments === "number"
-              ? row.comments
-              : row.comment_count ?? row.comments_count ?? 0;
-
-          const saves =
-            typeof row.saves === "number"
-              ? row.saves
-              : row.save_count ??
-                row.saves_count ??
-                row.bookmarks_count ??
-                0;
-
-          post.likes = likes;
-          post.comments = comments;
-          post.saves = saves;
-
-          post.liked_by_me =
-            row.liked_by_me ?? row.is_liked ?? post.liked_by_me;
-          post.saved_by_me =
-            row.saved_by_me ?? row.is_saved ?? post.saved_by_me;
-        } catch (err) {
-          console.error("Failed to enrich post engagement", err);
-        }
-      })
-    );
   }
 
   /* ---------- STATE HELPERS ---------- */
@@ -1131,7 +1022,14 @@ class SearchManager {
     const state = document.getElementById("searchResultsState");
     if (state) {
       state.style.display = "block";
-      state.innerHTML = '<div class="no-results-message">No results found</div>';
+      // Don't clear the results sections, just show no results message
+      const existingMessage = state.querySelector(".no-results-message");
+      if (!existingMessage) {
+        const message = document.createElement("div");
+        message.className = "no-results-message";
+        message.textContent = "No results found";
+        state.appendChild(message);
+      }
     }
     if (noResults) noResults.style.display = "block";
   }
@@ -1145,23 +1043,12 @@ class SearchManager {
     ["searchDefault", "searchLoading", "searchResultsState", "noResults"].forEach(
       (id) => {
         const el = document.getElementById(id);
-        if (el) {
-          el.style.display = "none";
-          // Don't clear innerHTML for searchResultsState as we need to keep the structure
-          if (id !== "searchResultsState") {
-            el.innerHTML = "";
-          }
-        }
+        if (el) el.style.display = "none";
       }
     );
     ["usersResults", "postsResults", "hashtagsResults"].forEach((id) => {
       const el = document.getElementById(id);
-      if (el) {
-        el.style.display = "none";
-        if (id === "usersList" || id === "postsList" || id === "hashtagsList") {
-          el.innerHTML = "";
-        }
-      }
+      if (el) el.style.display = "none";
     });
     this.hideLoadingAnimation();
   }
@@ -1252,9 +1139,7 @@ class SearchManager {
         list.innerHTML = trending
           .map(
             (item, index) => `
-            <div class="trending-item" onclick="searchManager.searchHashtag('${
-              item.tag
-            }')">
+            <div class="trending-item" onclick="searchManager.searchHashtag('${item.tag}')">
               <span class="trending-rank">${index + 1}</span>
               <div class="trending-content">
                 <span class="trending-tag">#${item.tag}</span>
@@ -1289,9 +1174,7 @@ class SearchManager {
         list.innerHTML = hashtags
           .map(
             (item, index) => `
-            <div class="trending-item" onclick="searchManager.searchHashtag('${
-              item.tag
-            }')">
+            <div class="trending-item" onclick="searchManager.searchHashtag('${item.tag}')">
               <span class="trending-rank">${index + 1}</span>
               <div class="trending-content">
                 <span class="trending-tag">#${item.tag}</span>
