@@ -383,8 +383,8 @@
     line-height: 1.35;
 }
 
-/* Posts content: allow 2 lines instead of 1 giant row */
-.admin-post-content {
+/* ✅ IMPORTANT: Make the 2-line clamp reliably win over the earlier nowrap rule */
+#adminPostsTable td.admin-post-content {
     max-width: 320px;
     white-space: normal;
     overflow: hidden;
