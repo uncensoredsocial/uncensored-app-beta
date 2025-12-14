@@ -1286,7 +1286,10 @@ app.post('/api/users/:username/follow', authMiddleware, async (req, res) => {
 // Search users + posts + hashtags
 app.get('/api/search', async (req, res) => {
   try {
-    const q = (req.query.q || '').trim();
+    // ✅ Accept multiple parameter names for compatibility
+    const rawQuery = req.query.q || req.query.query || req.query.term || req.query.search || '';
+    const q = rawQuery.toString().trim();
+    
     if (!q) {
       return res.status(400).json({ error: 'Missing search query' });
     }
@@ -1315,7 +1318,10 @@ app.get('/api/search', async (req, res) => {
             username,
             display_name,
             avatar_url
-          )
+          ),
+          post_likes ( user_id ),
+          post_comments ( id, user_id ),
+          post_saves ( user_id )
         `
         )
         .ilike('content', pattern)
@@ -1329,17 +1335,19 @@ app.get('/api/search', async (req, res) => {
     ]);
 
     if (usersError || postsError || tagsError) {
-      console.error('Search errors:', {
-        usersError,
-        postsError,
-        tagsError
-      });
+      console.error('Search errors:', { usersError, postsError, tagsError });
       return res.status(500).json({ error: 'Search failed' });
     }
 
+    // Get current user for like/save status
+    const currentUserId = getUserIdFromAuthHeader(req);
+    
+    // Format posts with like/save status
+    const formattedPosts = (posts || []).map(p => shapePostRow(p, currentUserId));
+
     res.json({
       users: users || [],
-      posts: posts || [],
+      posts: formattedPosts || [],
       hashtags: hashtags || []
     });
   } catch (err) {
@@ -1351,15 +1359,18 @@ app.get('/api/search', async (req, res) => {
 // Save search query to history
 app.post('/api/search/history', authMiddleware, async (req, res) => {
   try {
-    const { query } = req.body;
-    if (!query || !query.trim()) {
+    // ✅ Accept multiple parameter names
+    const rawQuery = req.body?.query || req.body?.term || req.body?.q || req.body?.search || '';
+    const query = rawQuery.toString().trim();
+    
+    if (!query) {
       return res.status(400).json({ error: 'Missing query' });
     }
 
     const item = {
       id: uuidv4(),
       user_id: req.user.id,
-      query: query.trim(),
+      query: query,
       created_at: new Date().toISOString()
     };
 
@@ -1399,6 +1410,129 @@ app.get('/api/search/history', authMiddleware, async (req, res) => {
 });
 
 // ======================================================
+//                    NOTIFICATIONS / ALERTS
+// ======================================================
+
+app.get('/api/notifications', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const limit = Math.min(parseInt(req.query.limit || '30', 10) || 30, 100);
+
+    // Fetch recent follows where current user is followed
+    const { data: followers, error: followersErr } = await supabase
+      .from('follows')
+      .select(`
+        id,
+        created_at,
+        follower:users!follows_follower_id_fkey (
+          id, username, display_name, avatar_url
+        )
+      `)
+      .eq('followed_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    // Fetch likes on current user's posts
+    const { data: likes, error: likesErr } = await supabase
+      .from('post_likes')
+      .select(`
+        id,
+        created_at,
+        post_id,
+        user:users (
+          id, username, display_name, avatar_url
+        ),
+        post:posts!inner (
+          user_id, content
+        )
+      `)
+      .eq('post.user_id', userId)
+      .neq('user_id', userId) // Don't show self-likes
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    // Fetch comments on current user's posts
+    const { data: comments, error: commentsErr } = await supabase
+      .from('post_comments')
+      .select(`
+        id,
+        created_at,
+        post_id,
+        content,
+        user:users (
+          id, username, display_name, avatar_url
+        ),
+        post:posts!inner (
+          user_id, content
+        )
+      `)
+      .eq('post.user_id', userId)
+      .neq('user_id', userId) // Don't show self-comments
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (followersErr || likesErr || commentsErr) {
+      console.error('notifications errors:', { followersErr, likesErr, commentsErr });
+      return res.status(500).json({ error: 'Failed to load notifications' });
+    }
+
+    const feed = [];
+
+    // Format follower notifications
+    (followers || []).forEach(f => {
+      feed.push({
+        type: 'follow',
+        id: f.id,
+        created_at: f.created_at,
+        actor: f.follower || null
+      });
+    });
+
+    // Format like notifications
+    (likes || []).forEach(l => {
+      feed.push({
+        type: 'like',
+        id: l.id,
+        created_at: l.created_at,
+        actor: l.user || null,
+        post_id: l.post_id,
+        post_content: l.post?.content || ""
+      });
+    });
+
+    // Format comment notifications
+    (comments || []).forEach(c => {
+      feed.push({
+        type: 'comment',
+        id: c.id,
+        created_at: c.created_at,
+        actor: c.user || null,
+        post_id: c.post_id,
+        post_content: c.post?.content || "",
+        comment_text: c.content || ""
+      });
+    });
+
+    // Sort by newest first
+    feed.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    res.json({ notifications: feed.slice(0, limit) });
+  } catch (err) {
+    console.error('GET /api/notifications error:', err);
+    res.status(500).json({ error: 'Failed to load notifications' });
+  }
+});
+
+// Alias for alerts (some frontends use /api/alerts)
+app.get('/api/alerts', authMiddleware, (req, res) => {
+  // Forward to notifications
+  const originalUrl = req.originalUrl;
+  const queryPart = originalUrl.includes('?') ? originalUrl.slice(originalUrl.indexOf('?')) : '';
+  req.url = '/api/notifications' + queryPart;
+  return app._router.handle(req, res);
+});
+
+// ======================================================
 //                          ADMIN
 // ======================================================
 
@@ -1433,6 +1567,8 @@ app.get('/api/admin/stats', authMiddleware, requireAdmin, async (req, res) => {
 
     res.json({
       timestamp: now,
+      
+      // ✅ Original keys (keep for compatibility)
       users: userCount || 0,
       posts: postCount || 0,
       likes: likeCount || 0,
@@ -1440,7 +1576,17 @@ app.get('/api/admin/stats', authMiddleware, requireAdmin, async (req, res) => {
       hashtags: hashtagCount || 0,
       searches: searchCount || 0,
       comments: commentCount || 0,
-      saved_posts: savedCount || 0
+      saved_posts: savedCount || 0,
+      
+      // ✅ New keys (what admin.js expects)
+      total_users: userCount || 0,
+      total_posts: postCount || 0,
+      total_likes: likeCount || 0,
+      total_follows: followCount || 0,
+      total_hashtags: hashtagCount || 0,
+      total_searches: searchCount || 0,
+      total_comments: commentCount || 0,
+      total_saved: savedCount || 0
     });
   } catch (err) {
     console.error('GET /admin/stats error:', err);
@@ -1917,7 +2063,7 @@ app.get(
         return res
           .status(500)
           .json({ error: 'Failed to fetch subscription.' });
-      }
+    }
 
       res.json({ subscription: user });
     } catch (err) {
