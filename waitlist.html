@@ -3,252 +3,243 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Uncensored Social — Waitlist</title>
+  <title>Uncensored Social — Early Access</title>
+
+  <meta name="description" content="Uncensored Social: a privacy-first social platform with free speech, honest timelines, and no data brokering. Join the early access waitlist." />
 
   <link rel="stylesheet" href="css/waitlist.css" />
 </head>
-
 <body>
-  <div class="wrap">
+  <div class="page">
 
-    <header class="top">
+    <!-- Header -->
+    <header class="header">
       <div class="brand">
-        <div class="logo" aria-hidden="true"></div>
-        <div class="brandName">Uncensored Social</div>
+        <img src="Uncensored-Logo.PNG" alt="Uncensored Social logo" class="logo" />
+        <div class="brandText">
+          <div class="brandName">Uncensored Social</div>
+          <div class="brandTag">Free speech • Privacy • Honest timelines</div>
+        </div>
       </div>
 
-      <div class="topActions">
-        <a class="btn" href="#mission">Read the mission</a>
+      <nav class="nav">
+        <a class="navLink" href="#mission">Mission</a>
+        <a class="navLink" href="#countdown">Launch</a>
         <a class="btn btnPrimary" href="#waitlist">Join waitlist</a>
-      </div>
+      </nav>
     </header>
 
-    <main class="hero">
-      <!-- LEFT: message -->
-      <section class="card">
-        <div class="pad">
-          <div class="kicker">Free speech • Privacy • Honest timelines</div>
+    <!-- Hero -->
+    <main class="container">
+      <section class="hero">
+        <div class="heroLeft">
+          <div class="pill">Building in public • community-funded</div>
 
           <h1>Social media for people who refuse to be watched or silenced.</h1>
 
-          <p class="sub">
+          <p class="subtitle">
             Uncensored Social is an independent platform built around free expression and privacy —
-            with <b>New</b>, <b>Following</b>, and <b>Trending</b> feeds instead of one manipulated algorithm.
+            with <strong>New</strong>, <strong>Following</strong>, and <strong>Trending</strong> feeds instead of one manipulated algorithm.
           </p>
 
           <div class="bullets" id="mission">
             <div class="bullet">
-              <div class="dot" aria-hidden="true"></div>
-              <div>
+              <div class="bulletIcon"></div>
+              <div class="bulletText">
                 <strong>No data brokering.</strong>
                 <span>No selling, no renting, no “partners” buying your identity.</span>
               </div>
             </div>
 
             <div class="bullet">
-              <div class="dot" aria-hidden="true"></div>
-              <div>
-                <strong>Rules that make sense.</strong>
+              <div class="bulletIcon"></div>
+              <div class="bulletText">
+                <strong>Minimal rules, human enforcement.</strong>
                 <span>Focused on spam & real crimes — not opinions.</span>
               </div>
             </div>
 
             <div class="bullet">
-              <div class="dot" aria-hidden="true"></div>
-              <div>
+              <div class="bulletIcon"></div>
+              <div class="bulletText">
                 <strong>Encrypted messaging on the roadmap.</strong>
-                <span>Designed from day one with E2E encryption as the destination.</span>
+                <span>Designed from day one with end-to-end encryption as the destination.</span>
               </div>
             </div>
           </div>
 
-          <div class="donateCta">
-            <div class="donateCtaText">
-              <b>Support the build</b>
-              <span>Donations help cover servers and development.</span>
-            </div>
-            <div class="donateCtaActions">
-              <a class="btn" href="#donate">Donate</a>
-              <a class="btn btnPrimary" href="#waitlist">Reserve your handle</a>
-            </div>
+          <div class="ctaRow">
+            <a class="btn btnPrimary btnBig" href="#waitlist">Join waitlist</a>
+            <a class="btn btnGhost btnBig" href="#donate">Support the build</a>
+          </div>
+
+          <div class="trustLine">
+            <span class="trustDot"></span>
+            <span>No spam • No tracking pixels • No selling your info</span>
           </div>
         </div>
+
+        <!-- Right: Countdown + Status -->
+        <aside class="heroRight" id="countdown">
+          <div class="card cardTight">
+            <div class="cardHeader">
+              <div>
+                <div class="cardLabel">Target launch</div>
+                <div class="cardTitle">February 28, 2026</div>
+              </div>
+              <div class="statusPill" id="statusPill">ACTIVE</div>
+            </div>
+
+            <div class="countGrid">
+              <div class="countBox">
+                <div class="countNum" id="cdDays">—</div>
+                <div class="countCap">Days</div>
+              </div>
+              <div class="countBox">
+                <div class="countNum" id="cdHours">—</div>
+                <div class="countCap">Hours</div>
+              </div>
+              <div class="countBox">
+                <div class="countNum" id="cdMins">—</div>
+                <div class="countCap">Minutes</div>
+              </div>
+              <div class="countBox">
+                <div class="countNum" id="cdSecs">—</div>
+                <div class="countCap">Seconds</div>
+              </div>
+            </div>
+
+            <div class="cardNote">
+              Date might shift slightly — goal is a stable beta, not a marketing stunt.
+            </div>
+          </div>
+
+          <div class="card cardTight">
+            <div class="founding">
+              <div class="foundingTop">
+                <div class="foundingBadge">FOUNDING</div>
+                <div class="foundingText">
+                  <strong>Early supporters get priority invites.</strong>
+                  <span>You’ll also receive a visible “Founding” badge at launch.</span>
+                </div>
+              </div>
+              <div class="divider"></div>
+              <div class="foundingSmall">
+                We’re building the timeline people thought they were getting in 2012 —
+                before everything became surveillance and rage-bait.
+              </div>
+            </div>
+          </div>
+        </aside>
       </section>
 
-      <!-- RIGHT: countdown -->
-      <section class="card">
-        <div class="pad countWrap">
-          <div>
-            <div class="targetRow">
-              <div>
-                <div class="label">Target launch</div>
-                <div class="date mono">February 28, 2026</div>
-              </div>
-              <div class="label">Launch status</div>
-            </div>
-
-            <div class="status">
-              <div class="left">
-                <b>Building in public</b>
-                <small>Goal is a stable beta — not a marketing stunt.</small>
-              </div>
-              <div class="pill mono" id="statusPill">ACTIVE</div>
-            </div>
-
-            <div class="countdown">
-              <div class="unit">
-                <div class="num mono" id="cdDays">—</div>
-                <div class="cap">Days</div>
-              </div>
-              <div class="unit">
-                <div class="num mono" id="cdHours">—</div>
-                <div class="cap">Hours</div>
-              </div>
-              <div class="unit">
-                <div class="num mono" id="cdMins">—</div>
-                <div class="cap">Minutes</div>
-              </div>
-              <div class="unit">
-                <div class="num mono" id="cdSecs">—</div>
-                <div class="cap">Seconds</div>
-              </div>
-            </div>
-
-            <div class="fineprint">Date might shift slightly as stability improves.</div>
-          </div>
-
-          <div class="highlight">
-            <div class="bullet bulletTight">
-              <div class="dot" aria-hidden="true"></div>
-              <div>
-                <strong>Early supporters get priority invites.</strong>
-                <span>Plus a visible <b>Founding</b> badge at launch.</span>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </section>
-    </main>
-
-    <!-- WAITLIST -->
-    <section class="card section" id="waitlist">
-      <div class="pad">
-        <div class="sectionTitle">
-          <h2>RESERVE YOUR HANDLE</h2>
-          <p>No spam. No selling lists. Just launch + critical updates.</p>
+      <!-- Waitlist Form -->
+      <section class="card waitlistCard" id="waitlist">
+        <div class="waitlistHeader">
+          <h2>Join the early-access list</h2>
+          <p>
+            Launch info, critical updates, early access invites. That’s it.
+          </p>
         </div>
 
-        <form id="waitlistForm" autocomplete="on" novalidate>
-          <div class="formGrid">
+        <form id="waitlistForm" class="form" novalidate>
+          <div class="formRow">
             <div class="field">
-              <label for="username">Preferred @username</label>
+              <label for="email">Email (required)</label>
               <div class="inputWrap">
-                <span class="prefix">@</span>
-                <input id="username" name="username" type="text" inputmode="text"
-                       maxlength="24" placeholder="yourhandle" />
-              </div>
-            </div>
-
-            <div class="field">
-              <label for="email">Email (or phone required)</label>
-              <div class="inputWrap">
-                <input id="email" name="email" type="email" inputmode="email"
-                       placeholder="you@domain.com" />
+                <input id="email" type="email" placeholder="you@domain.com" autocomplete="email" />
               </div>
             </div>
 
             <div class="field">
               <label for="phone">Phone (optional SMS launch alert)</label>
               <div class="inputWrap">
-                <input id="phone" name="phone" type="tel" inputmode="tel"
-                       placeholder="+1 (555) 555-5555" />
-              </div>
-            </div>
-
-            <div class="field">
-              <label for="source">Source (optional)</label>
-              <div class="inputWrap">
-                <input id="source" name="source" type="text"
-                       value="waitlist_page" placeholder="waitlist_page" />
+                <input id="phone" type="tel" placeholder="+1 (555) 555-5555" autocomplete="tel" />
               </div>
             </div>
           </div>
 
           <div class="checks">
-            <label class="checkRow" for="consentEmail">
-              <input id="consentEmail" type="checkbox" />
-              <div>
-                <span>Email updates (launch info + critical updates)</span>
-                <small>Required if you provide an email.</small>
-              </div>
+            <label class="check">
+              <input type="checkbox" id="consentEmail" />
+              <span>I agree to receive email updates about launch & critical platform changes.</span>
             </label>
 
-            <label class="checkRow" for="consentSms">
-              <input id="consentSms" type="checkbox" />
-              <div>
-                <span>SMS launch alert (optional)</span>
-                <small>Required if you submit a phone number.</small>
-              </div>
+            <label class="check">
+              <input type="checkbox" id="consentSms" />
+              <span>Send me a one-time SMS when early access opens (only if I provide a phone number).</span>
             </label>
           </div>
 
-          <div class="formActions">
-            <div class="note">You can unsubscribe anytime. Contact info is never sold or rented.</div>
-            <button class="btn btnPrimary" type="submit" id="submitBtn">Join waitlist</button>
+          <div class="formBottom">
+            <button type="submit" class="btn btnPrimary btnBig" id="submitBtn">Join waitlist</button>
+            <div class="formTrust">
+              You can unsubscribe anytime. Contact info is never sold or rented.
+            </div>
           </div>
 
-          <div class="alert" id="formAlert"></div>
+          <div id="formAlert" class="alert" aria-live="polite"></div>
         </form>
-      </div>
-    </section>
+      </section>
 
-    <!-- DONATE (small) -->
-    <section class="card section" id="donate">
-      <div class="pad">
-        <div class="sectionTitle">
+      <!-- Donate -->
+      <section class="card donateCard" id="donate">
+        <div class="donateHeader">
           <h2>Support the platform</h2>
-          <p>Help fund servers + privacy-first development.</p>
+          <p>
+            Donations fund servers, privacy engineering, and encrypted messaging infrastructure.
+          </p>
         </div>
 
-        <div class="donateRow">
-          <div>
-            <b>$5 — Supporter</b>
-            <span>Your name on the thank-you wall at launch.</span>
-          </div>
-          <div class="donateActions">
-            <button class="btn" type="button" data-donate="5">Donate $5</button>
-          </div>
+        <div class="donateGrid">
+          <button class="tier" type="button" data-donate="5">
+            <div class="tierTop">
+              <strong>$5 — Supporter</strong>
+              <span>Your name on the thank-you wall at launch.</span>
+            </div>
+            <div class="tierBtn">Donate $5</div>
+          </button>
+
+          <button class="tier" type="button" data-donate="20">
+            <div class="tierTop">
+              <strong>$20 — Early Backer</strong>
+              <span>Early access + a visible supporter badge.</span>
+            </div>
+            <div class="tierBtn">Donate $20</div>
+          </button>
+
+          <button class="tier tierPrimary" type="button" data-donate="50">
+            <div class="tierTop">
+              <strong>$50+ — Founder</strong>
+              <span>Priority invite + “Founding” profile badge.</span>
+            </div>
+            <div class="tierBtn">Donate</div>
+          </button>
         </div>
 
-        <div class="donateRow">
-          <div>
-            <b>$20 — Early Backer</b>
-            <span>Early access + a visible supporter badge.</span>
+        <div class="cryptoRow">
+          <div class="cryptoTitle">Crypto accepted</div>
+          <div class="cryptoIcons">
+            <img src="Bitcoin.PNG" alt="Bitcoin" />
+            <img src="Ethereum.PNG" alt="Ethereum" />
+            <img src="Monero.PNG" alt="Monero" />
+            <img src="Solana.PNG" alt="Solana" />
+            <img src="USDC.PNG" alt="USDC" />
+            <img src="USDT.PNG" alt="USDT" />
           </div>
-          <div class="donateActions">
-            <button class="btn" type="button" data-donate="20">Donate $20</button>
-          </div>
+          <button class="btn btnGhost" type="button" id="cryptoCheckoutBtn">Open crypto checkout</button>
         </div>
 
-        <div class="donateRow">
-          <div>
-            <b>$50+ — Founder</b>
-            <span>Reserved username priority + “Founding” badge.</span>
-          </div>
-          <div class="donateActions">
-            <button class="btn btnPrimary" type="button" data-donate="50">Donate</button>
-          </div>
+        <div class="smallNote">
+          Keep it simple: donations fund stability, privacy engineering, and infrastructure.
         </div>
+      </section>
 
-        <div class="fineprint">Keep it simple: donations fund stability, privacy engineering, and infrastructure.</div>
-      </div>
-    </section>
-
-    <footer class="footer">
-      <div>Uncensored Social — Free speech. Privacy by default.</div>
-      <div>© <span id="year"></span> Uncensored Social</div>
-    </footer>
+      <footer class="footer">
+        <div>Uncensored Social</div>
+        <div>© <span id="year"></span> Uncensored Social — independent & community-funded.</div>
+      </footer>
+    </main>
 
   </div>
 
