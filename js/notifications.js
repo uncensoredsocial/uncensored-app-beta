@@ -6,7 +6,7 @@ const NOTIF_SUPABASE = supabase.createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmJzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyOTc5ODYsImV4cCI6MjA3OTg3Mzk4Nn0.LvqmdOqetnMrH8bnkJY6_S-dsGD8gnvpFczSCJPy-Q4"
 );
 
-// ✅ NEW: API base (same pattern as your other pages)
+// API base (same pattern as your other pages)
 const NOTIF_API_BASE_URL =
   typeof API_BASE_URL !== "undefined"
     ? API_BASE_URL
@@ -140,10 +140,9 @@ class NotificationsManager {
     if (!this.currentUser) return;
 
     try {
-      // ✅ FIX: Use your backend endpoint that already exists
+      // Use your backend endpoint
       const rawFeed = await this.fetchNotificationsFeed();
 
-      // Split into your existing arrays so filters still work
       const likes = [];
       const comments = [];
       const followers = [];
@@ -160,7 +159,8 @@ class NotificationsManager {
             user: {
               id: n.actor?.id,
               username: n.actor?.username,
-              displayName: n.actor?.display_name || n.actor?.displayName || n.actor?.username,
+              displayName:
+                n.actor?.display_name || n.actor?.displayName || n.actor?.username,
               avatar: n.actor?.avatar_url || n.actor?.avatar || "default-profile.PNG",
             },
           });
@@ -174,7 +174,8 @@ class NotificationsManager {
             user: {
               id: n.actor?.id,
               username: n.actor?.username,
-              displayName: n.actor?.display_name || n.actor?.displayName || n.actor?.username,
+              displayName:
+                n.actor?.display_name || n.actor?.displayName || n.actor?.username,
               avatar: n.actor?.avatar_url || n.actor?.avatar || "default-profile.PNG",
             },
           });
@@ -185,16 +186,28 @@ class NotificationsManager {
             user: {
               id: n.actor?.id,
               username: n.actor?.username,
-              displayName: n.actor?.display_name || n.actor?.displayName || n.actor?.username,
+              displayName:
+                n.actor?.display_name || n.actor?.displayName || n.actor?.username,
               avatar: n.actor?.avatar_url || n.actor?.avatar || "default-profile.PNG",
             },
+            // ✅ NEW: placeholder until we enrich
+            isFollowing: false,
           });
         }
       });
 
       this.likes = likes.filter((x) => x.user && x.user.id);
       this.comments = comments.filter((x) => x.user && x.user.id && x.postId);
-      this.followers = followers.filter((x) => x.user && x.user.id);
+      this.followers = followers.filter((x) => x.user && x.user.id && x.user.username);
+
+      // ✅ NEW: enrich follower follow-status so button shows Following correctly
+      if (this.followers.length) {
+        try {
+          await this.enrichFollowerFollowStatus(this.followers);
+        } catch (e) {
+          console.warn("Failed to enrich follower follow status (non-fatal):", e);
+        }
+      }
 
       // Build unified stream, newest first
       this.unified = [
@@ -224,7 +237,7 @@ class NotificationsManager {
     }
   }
 
-  // ✅ NEW: backend fetch that matches YOUR server.js
+  // backend fetch that matches YOUR server.js
   async fetchNotificationsFeed() {
     const token = this.getAuthToken();
     if (!token) throw new Error("Missing auth token");
@@ -244,8 +257,48 @@ class NotificationsManager {
     return data.notifications || [];
   }
 
-  // ========== FETCH HELPERS (limits bumped so you see a lot of alerts) ==========
-  // (kept for compatibility; not used now that backend feed exists)
+  // ✅ NEW: ask backend for each follower's is_following (backend already supports it)
+  async enrichFollowerFollowStatus(followersArr) {
+    const token = this.getAuthToken();
+    if (!token) return;
+
+    const uniqueUsernames = [
+      ...new Set(
+        followersArr
+          .map((f) => (f && f.user && f.user.username ? String(f.user.username) : ""))
+          .filter(Boolean)
+      ),
+    ];
+
+    if (!uniqueUsernames.length) return;
+
+    // Pull is_following for each username
+    const results = await Promise.all(
+      uniqueUsernames.map(async (uname) => {
+        try {
+          const res = await fetch(
+            `${NOTIF_API_BASE_URL}/users/${encodeURIComponent(uname)}`,
+            { method: "GET", headers: { Authorization: `Bearer ${token}` } }
+          );
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) return { username: uname, is_following: false };
+          return { username: uname, is_following: !!data.is_following };
+        } catch {
+          return { username: uname, is_following: false };
+        }
+      })
+    );
+
+    const map = new Map(results.map((r) => [r.username, r.is_following]));
+
+    followersArr.forEach((f) => {
+      const uname = f?.user?.username;
+      if (!uname) return;
+      f.isFollowing = !!map.get(uname);
+    });
+  }
+
+  // ========== FETCH HELPERS (kept for compatibility; not used now) ==========
 
   async fetchFollowers(userId) {
     const { data, error } = await NOTIF_SUPABASE
@@ -500,8 +553,8 @@ class NotificationsManager {
               </div>
               <div class="notification-meta">
                 "${this.escape(commentPreview)}" · ${this.formatTime(
-            n.created_at
-          )}
+                  n.created_at
+                )}
               </div>
             </div>
           </div>
@@ -509,11 +562,15 @@ class NotificationsManager {
         }
 
         // followers
+        const isFollowing = !!n.isFollowing;
+        const btnClass = isFollowing ? "btn-secondary" : "btn-primary";
+        const btnText = isFollowing ? "Following" : "Follow";
+
         return `
         <div class="notification-item follower-item"
              data-type="followers"
              data-user-id="${n.user.id}"
-             data-username="${this.escape(n.user.username)}">
+             data-username="${n.user.username}">
           <div class="notification-type-icon follow">
             <i class="fa-solid fa-user-plus"></i>
           </div>
@@ -529,12 +586,12 @@ class NotificationsManager {
             </div>
             <div class="notification-meta">
               @${this.escape(n.user.username)} · ${this.formatTime(
-          n.created_at
-        )}
+                n.created_at
+              )}
             </div>
           </div>
-          <button class="btn btn-sm btn-primary notification-follow-btn">
-            Follow
+          <button class="btn btn-sm ${btnClass} notification-follow-btn">
+            ${btnText}
           </button>
         </div>
       `;
@@ -543,7 +600,7 @@ class NotificationsManager {
   }
 
   // ========== FOLLOW HANDLER ==========
-  // ✅ Your backend follow route is /api/users/:username/follow (NOT userId)
+  // backend follow route is /api/users/:username/follow (toggle)
   async handleFollow(targetUserId, buttonEl) {
     if (!this.currentUser || !targetUserId || !buttonEl) return;
 
@@ -551,12 +608,24 @@ class NotificationsManager {
       const token = this.getAuthToken();
       if (!token) return;
 
-      // Find username from the rendered item (since backend uses username)
       const parent = buttonEl.closest(".notification-item");
       const username = parent ? parent.dataset.username : null;
       if (!username) return;
 
-      // This endpoint toggles follow/unfollow
+      // Optimistic toggle
+      const wasFollowing =
+        buttonEl.textContent.trim().toLowerCase() === "following";
+
+      if (wasFollowing) {
+        buttonEl.textContent = "Follow";
+        buttonEl.classList.remove("btn-secondary");
+        buttonEl.classList.add("btn-primary");
+      } else {
+        buttonEl.textContent = "Following";
+        buttonEl.classList.remove("btn-primary");
+        buttonEl.classList.add("btn-secondary");
+      }
+
       const res = await fetch(
         `${NOTIF_API_BASE_URL}/users/${encodeURIComponent(username)}/follow`,
         {
@@ -568,6 +637,7 @@ class NotificationsManager {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to follow");
 
+      // Sync with server result
       if (data.following) {
         buttonEl.textContent = "Following";
         buttonEl.classList.remove("btn-primary");
@@ -577,6 +647,22 @@ class NotificationsManager {
         buttonEl.classList.remove("btn-secondary");
         buttonEl.classList.add("btn-primary");
       }
+
+      // Update cached unified state so next re-render keeps it
+      this.unified = (this.unified || []).map((n) => {
+        if (n.type !== "followers") return n;
+        if (n.user && n.user.username === username) {
+          return { ...n, isFollowing: !!data.following };
+        }
+        return n;
+      });
+
+      this.followers = (this.followers || []).map((n) => {
+        if (n.user && n.user.username === username) {
+          return { ...n, isFollowing: !!data.following };
+        }
+        return n;
+      });
     } catch (err) {
       console.error("handleFollow error", err);
     }
