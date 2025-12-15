@@ -779,8 +779,11 @@ class SearchManager {
       </div>
     `;
 
-    const style = document.createElement("style");
-    style.textContent = `
+    // ✅ FIX: only inject the style once (prevents duplicates)
+    if (!document.getElementById("searchLoadingStyles")) {
+      const style = document.createElement("style");
+      style.id = "searchLoadingStyles";
+      style.textContent = `
       .loading-animation {
         display: flex;
         flex-direction: column;
@@ -830,9 +833,10 @@ class SearchManager {
         40% { transform: scale(1); opacity: 1; }
       }
     `;
+      document.head.appendChild(style);
+    }
 
-    document.head.appendChild(style);
-
+    // ✅ FIX: DO NOT wipe out the results DOM (this was the bug)
     const resultsContainer =
       document.getElementById("searchResultsState") ||
       document.getElementById("searchDefault") ||
@@ -841,8 +845,10 @@ class SearchManager {
 
     if (resultsContainer) {
       resultsContainer.style.display = "block";
-      resultsContainer.innerHTML = "";
-      resultsContainer.appendChild(loader);
+
+      // ✅ Don't do: resultsContainer.innerHTML = "";
+      // Just show loader inside container
+      resultsContainer.prepend(loader);
     } else {
       document.body.insertBefore(loader, document.body.firstChild);
     }
