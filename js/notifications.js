@@ -7,7 +7,7 @@ let NOTIF_SUPABASE = null;
 try {
   const sb = window.supabase || (typeof supabase !== "undefined" ? supabase : null);
   if (!sb || typeof sb.createClient !== "function") {
-    console.warn("Supabase client not found on window. Notifications disabled.");
+    console.warn("Supabase client not found on window. Notifications fallback disabled.");
     NOTIF_SUPABASE = null;
   } else {
     NOTIF_SUPABASE = sb.createClient(
@@ -19,6 +19,12 @@ try {
   console.error("Failed to initialize Supabase for notifications:", e);
   NOTIF_SUPABASE = null;
 }
+
+// ✅ Backend base (same pattern as other pages)
+const NOTIF_API_BASE_URL =
+  typeof API_BASE_URL !== "undefined"
+    ? API_BASE_URL
+    : "https://uncensored-app-beta-production.up.railway.app/api";
 
 class NotificationsManager {
   constructor() {
@@ -55,12 +61,6 @@ class NotificationsManager {
       return;
     }
 
-    // ✅ FIX: If Supabase client is missing, show a clear state instead of failing silently
-    if (!NOTIF_SUPABASE) {
-      this.showSupabaseMissingState();
-      return;
-    }
-
     this.setupFilterBar();
     this.setupEventDelegation();
     await this.loadAllNotifications();
@@ -84,15 +84,15 @@ class NotificationsManager {
     }
   }
 
-  // ✅ NEW: Supabase missing state (prevents “nothing loads” with no explanation)
-  showSupabaseMissingState() {
+  // ✅ NEW: Backend/Supabase both unavailable
+  showUnavailableState() {
     if (this.listEl) this.listEl.innerHTML = "";
 
     if (this.emptyState) {
       this.emptyState.style.display = "block";
       this.emptyState.innerHTML = `
         <h3>Notifications unavailable</h3>
-        <p>Supabase client didn’t load on this page. Make sure the Supabase script loads before notifications.js.</p>
+        <p>Your backend notifications endpoint is missing or blocked, and Supabase is not accessible from the client.</p>
       `;
     }
   }
@@ -166,12 +166,6 @@ class NotificationsManager {
   async loadAllNotifications() {
     if (!this.currentUser) return;
 
-    // ✅ FIX: Guard if client is missing (prevents runtime errors)
-    if (!NOTIF_SUPABASE) {
-      this.showSupabaseMissingState();
-      return;
-    }
-
     const userId = this.currentUser.id;
 
     try {
@@ -210,12 +204,101 @@ class NotificationsManager {
       }
     } catch (err) {
       console.error("Failed to load notifications", err);
+      // If everything failed hard, show an availability message
+      this.showUnavailableState();
     }
   }
 
-  // ========== FETCH HELPERS (limits bumped so you see a lot of alerts) ==========
+  // ========== AUTH / API HELPERS ==========
+
+  getAuthToken() {
+    try {
+      if (typeof getAuthToken === "function") return getAuthToken();
+      return (
+        localStorage.getItem("us_auth_token") ||
+        localStorage.getItem("authToken") ||
+        localStorage.getItem("token") ||
+        null
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  async apiTryPaths(paths) {
+    const token = this.getAuthToken();
+    if (!token) throw new Error("Missing auth token");
+
+    let lastErr = null;
+
+    for (const url of paths) {
+      try {
+        const res = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        // if route doesn't exist, try next
+        if (res.status === 404) {
+          lastErr = new Error(`404 ${url}`);
+          continue;
+        }
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          lastErr = new Error(data.error || `HTTP ${res.status}`);
+          continue;
+        }
+
+        return data;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+
+    throw lastErr || new Error("All API paths failed");
+  }
+
+  // ========== FETCH HELPERS (backend first, supabase fallback) ==========
 
   async fetchFollowers(userId) {
+    // ✅ Backend first
+    try {
+      const data = await this.apiTryPaths([
+        `${NOTIF_API_BASE_URL}/notifications?type=followers`,
+        `${NOTIF_API_BASE_URL}/notifications/followers`,
+      ]);
+
+      const rows = Array.isArray(data.followers) ? data.followers : Array.isArray(data.data) ? data.data : [];
+
+      return rows
+        .map((row) => {
+          const u = row.user || row.follower || row.actor || row.profile || null;
+          if (!u) return null;
+
+          return {
+            id: row.id || row.follow_id || row.notification_id || "",
+            created_at: row.created_at || row.createdAt || row.timestamp || row.time || "",
+            user: {
+              id: u.id,
+              username: u.username,
+              displayName: u.display_name || u.displayName || u.username,
+              avatar: u.avatar_url || u.avatar || "default-profile.PNG",
+            },
+          };
+        })
+        .filter(Boolean);
+    } catch (e) {
+      // fallback to Supabase
+      if (!NOTIF_SUPABASE) {
+        console.error("fetchFollowers failed (no backend, no supabase):", e);
+        return [];
+      }
+    }
+
     const { data, error } = await NOTIF_SUPABASE
       .from("follows")
       .select("id, follower_id, created_at")
@@ -261,6 +344,43 @@ class NotificationsManager {
   }
 
   async fetchLikes(userId) {
+    // ✅ Backend first
+    try {
+      const data = await this.apiTryPaths([
+        `${NOTIF_API_BASE_URL}/notifications?type=likes`,
+        `${NOTIF_API_BASE_URL}/notifications/likes`,
+      ]);
+
+      const rows = Array.isArray(data.likes) ? data.likes : Array.isArray(data.data) ? data.data : [];
+
+      return rows
+        .map((row) => {
+          const u = row.user || row.liker || row.actor || row.profile || null;
+          const post = row.post || row.post_data || null;
+          if (!u || !post) return null;
+
+          return {
+            id: row.id || row.like_id || row.notification_id || "",
+            created_at: row.created_at || row.createdAt || row.timestamp || row.time || "",
+            postId: post.id || row.post_id,
+            postContent: post.content || row.postContent || "",
+            user: {
+              id: u.id,
+              username: u.username,
+              displayName: u.display_name || u.displayName || u.username,
+              avatar: u.avatar_url || u.avatar || "default-profile.PNG",
+            },
+          };
+        })
+        .filter(Boolean);
+    } catch (e) {
+      // fallback to Supabase
+      if (!NOTIF_SUPABASE) {
+        console.error("fetchLikes failed (no backend, no supabase):", e);
+        return [];
+      }
+    }
+
     const { data: myPosts, error: postsErr } = await NOTIF_SUPABASE
       .from("posts")
       .select("id, content")
@@ -321,6 +441,44 @@ class NotificationsManager {
   }
 
   async fetchComments(userId) {
+    // ✅ Backend first
+    try {
+      const data = await this.apiTryPaths([
+        `${NOTIF_API_BASE_URL}/notifications?type=comments`,
+        `${NOTIF_API_BASE_URL}/notifications/comments`,
+      ]);
+
+      const rows = Array.isArray(data.comments) ? data.comments : Array.isArray(data.data) ? data.data : [];
+
+      return rows
+        .map((row) => {
+          const u = row.user || row.commenter || row.actor || row.profile || null;
+          const post = row.post || row.post_data || null;
+          if (!u || !post) return null;
+
+          return {
+            id: row.id || row.comment_id || row.notification_id || "",
+            created_at: row.created_at || row.createdAt || row.timestamp || row.time || "",
+            postId: post.id || row.post_id,
+            postContent: post.content || row.postContent || "",
+            commentText: row.content || row.commentText || "",
+            user: {
+              id: u.id,
+              username: u.username,
+              displayName: u.display_name || u.displayName || u.username,
+              avatar: u.avatar_url || u.avatar || "default-profile.PNG",
+            },
+          };
+        })
+        .filter(Boolean);
+    } catch (e) {
+      // fallback to Supabase
+      if (!NOTIF_SUPABASE) {
+        console.error("fetchComments failed (no backend, no supabase):", e);
+        return [];
+      }
+    }
+
     const { data: myPosts, error: postsErr } = await NOTIF_SUPABASE
       .from("posts")
       .select("id, content")
@@ -519,6 +677,37 @@ class NotificationsManager {
     try {
       const isFollowing =
         buttonEl.textContent.trim().toLowerCase() === "following";
+
+      // ✅ Prefer backend for follow toggles too (matches your app auth)
+      const token = this.getAuthToken();
+      if (token) {
+        if (isFollowing) {
+          const res = await fetch(`${NOTIF_API_BASE_URL}/follow/${encodeURIComponent(targetUserId)}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            buttonEl.textContent = "Follow";
+            buttonEl.classList.remove("btn-secondary");
+            buttonEl.classList.add("btn-primary");
+            return;
+          }
+        } else {
+          const res = await fetch(`${NOTIF_API_BASE_URL}/follow/${encodeURIComponent(targetUserId)}`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            buttonEl.textContent = "Following";
+            buttonEl.classList.remove("btn-primary");
+            buttonEl.classList.add("btn-secondary");
+            return;
+          }
+        }
+      }
+
+      // Fallback to supabase if backend follow routes aren't available
+      if (!NOTIF_SUPABASE) return;
 
       if (isFollowing) {
         const { error } = await NOTIF_SUPABASE
