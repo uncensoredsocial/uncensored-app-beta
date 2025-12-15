@@ -1,10 +1,24 @@
 // notifications.js
 
 // Same Supabase project as the rest of the app
-const NOTIF_SUPABASE = supabase.createClient(
-  "https://hbbbsreonwhvqfvbszne.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyOTc5ODYsImV4cCI6MjA3OTg3Mzk4Nn0.LvqmdOqetnMrH8bnkJY6_S-dsGD8gnvpFczSCJPy-Q4"
-);
+// ✅ FIX: Don't crash if supabase-js isn't loaded (or loads after this script)
+let NOTIF_SUPABASE = null;
+
+try {
+  const sb = window.supabase || (typeof supabase !== "undefined" ? supabase : null);
+  if (!sb || typeof sb.createClient !== "function") {
+    console.warn("Supabase client not found on window. Notifications disabled.");
+    NOTIF_SUPABASE = null;
+  } else {
+    NOTIF_SUPABASE = sb.createClient(
+      "https://hbbbsreonwhvqfvbszne.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyOTc5ODYsImV4cCI6MjA3OTg3Mzk4Nn0.LvqmdOqetnMrH8bnkJY6_S-dsGD8gnvpFczSCJPy-Q4"
+    );
+  }
+} catch (e) {
+  console.error("Failed to initialize Supabase for notifications:", e);
+  NOTIF_SUPABASE = null;
+}
 
 class NotificationsManager {
   constructor() {
@@ -41,6 +55,12 @@ class NotificationsManager {
       return;
     }
 
+    // ✅ FIX: If Supabase client is missing, show a clear state instead of failing silently
+    if (!NOTIF_SUPABASE) {
+      this.showSupabaseMissingState();
+      return;
+    }
+
     this.setupFilterBar();
     this.setupEventDelegation();
     await this.loadAllNotifications();
@@ -60,6 +80,19 @@ class NotificationsManager {
       this.emptyState.innerHTML = `
         <h3>Log in to see alerts</h3>
         <p>Create an account or log in to receive notifications.</p>
+      `;
+    }
+  }
+
+  // ✅ NEW: Supabase missing state (prevents “nothing loads” with no explanation)
+  showSupabaseMissingState() {
+    if (this.listEl) this.listEl.innerHTML = "";
+
+    if (this.emptyState) {
+      this.emptyState.style.display = "block";
+      this.emptyState.innerHTML = `
+        <h3>Notifications unavailable</h3>
+        <p>Supabase client didn’t load on this page. Make sure the Supabase script loads before notifications.js.</p>
       `;
     }
   }
@@ -132,6 +165,12 @@ class NotificationsManager {
 
   async loadAllNotifications() {
     if (!this.currentUser) return;
+
+    // ✅ FIX: Guard if client is missing (prevents runtime errors)
+    if (!NOTIF_SUPABASE) {
+      this.showSupabaseMissingState();
+      return;
+    }
 
     const userId = this.currentUser.id;
 
