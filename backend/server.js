@@ -2109,6 +2109,13 @@ app.get('/api/subscription/me', authMiddleware, async (req, res) => {
 });
 
 // ======================================================
+//                    WAITLIST / LEADS
+// ======================================================
+
+const leadsRoute = require('./routes/leads');
+app.use('/api/leads', leadsRoute);
+
+// ======================================================
 //                      START SERVER
 // ======================================================
 
