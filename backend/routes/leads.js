@@ -10,16 +10,14 @@ const supabase = createClient(
 );
 
 // ===============================
-// In-memory rate limiter (NO DB, NO extra deps)
+// In-memory rate limit (no DB storage)
 // ===============================
 const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-const RATE_MAX = 10; // 10 submissions/hour/IP
+const RATE_MAX = 10;
 const ipHits = new Map();
 
 function rateLimit(req, res, next) {
-  // req.ip works properly if trust proxy is set in server.js (see below)
   const ip = req.ip || "unknown";
-
   const now = Date.now();
   const entry = ipHits.get(ip);
 
@@ -28,29 +26,24 @@ function rateLimit(req, res, next) {
     return next();
   }
 
-  // reset window
   if (now > entry.resetAt) {
     ipHits.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
     return next();
   }
 
-  // block if over limit
   if (entry.count >= RATE_MAX) {
     return res.status(429).json({ error: "Too many requests. Try again later." });
   }
 
   entry.count += 1;
   ipHits.set(ip, entry);
-  return next();
+  next();
 }
 
-// cleanup map occasionally so it doesn't grow forever
 setInterval(() => {
   const now = Date.now();
   for (const [ip, entry] of ipHits.entries()) {
-    if (now > entry.resetAt + 5 * 60 * 1000) {
-      ipHits.delete(ip);
-    }
+    if (now > entry.resetAt + 5 * 60 * 1000) ipHits.delete(ip);
   }
 }, 10 * 60 * 1000);
 
@@ -76,20 +69,20 @@ router.post("/", rateLimit, async (req, res) => {
   try {
     const {
       email,
-      phone_e164,
+      phone_e164,        // frontend should send E.164 like +14155552671 (or null)
       phone_country,
       phone_dial,
-      consent_updates,
-      website, // honeypot (must be empty)
-      ts       // timing (ms since epoch)
+      consent_updates,   // your single checkbox
+      website,           // honeypot
+      ts                 // timing
     } = req.body || {};
 
-    // Honeypot (bots fill hidden fields)
+    // honeypot
     if (typeof website === "string" && website.trim() !== "") {
       return res.status(200).json({ ok: true });
     }
 
-    // Timing check (blocks instant-submit bots)
+    // timing check
     if (typeof ts === "number") {
       const delta = Date.now() - ts;
       if (delta < 1200) return res.status(429).json({ error: "Too fast. Try again." });
@@ -101,6 +94,9 @@ router.post("/", rateLimit, async (req, res) => {
       return res.status(400).json({ error: "Invalid email" });
     }
 
+    // You have ONE checkbox now:
+    // - it must be checked
+    // - it covers email updates AND SMS (if they provide a phone)
     if (!consent_updates) {
       return res.status(400).json({ error: "Consent required" });
     }
@@ -114,16 +110,33 @@ router.post("/", rateLimit, async (req, res) => {
       p = cleaned;
     }
 
-    const { error } = await supabase.from("leads").insert({
+    // ✅ IMPORTANT:
+    // Your table has BOTH phone and phone_e164.
+    // Store the phone number in both (so it shows in the `phone` column too).
+    const insertRow = {
       email: e,
+
+      // show up in your DB phone column:
+      phone: p,          // store E.164 in phone too (passes your phone CHECK)
       phone_e164: p,
+
       phone_country: p ? (phone_country || null) : null,
       phone_dial: p ? (phone_dial || null) : null,
-      consent_updates: true
-    });
+
+      // map your single checkbox into your existing schema:
+      consent_updates: true,
+      consent_email: true,
+      consent_sms: !!p,              // only true if phone provided
+
+      // keep these empty to respect "no IP tracking"
+      consent_ip: null,
+      consent_user_agent: null
+    };
+
+    const { error } = await supabase.from("leads").insert(insertRow);
 
     if (error) {
-      // Unique violation => treat as success (prevents retries spamming)
+      // If you add unique indexes later, duplicates return 23505
       if (error.code === "23505") {
         return res.status(200).json({ ok: true, duplicate: true });
       }
