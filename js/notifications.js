@@ -17,6 +17,17 @@ class NotificationsManager {
     // poll every second for live-ish updates
     this.pollIntervalMs = 1000;
     this.pollTimer = null;
+
+    // pause polling after follow/unfollow to prevent UI flip-flop
+    this.pauseUntil = 0; // timestamp ms
+    this.pauseAfterActionMs = 2000;
+
+    // prevent overlapping loads
+    this.isLoading = false;
+
+    // prevent duplicate clicks / in-flight toggles per username
+    this.followInFlight = new Set();
+
     this.currentUser = null;
 
     // unified list + filter bar
@@ -31,8 +42,8 @@ class NotificationsManager {
     this.unified = [];
     this.currentFilter = "all";
 
-    // prevent overlapping polls
-    this.isLoading = false;
+    // avoid pointless DOM churn
+    this.lastRenderKey = "";
 
     this.init();
   }
@@ -55,20 +66,17 @@ class NotificationsManager {
     this.setupFilterBar();
     this.setupEventDelegation();
 
-    await this.loadAllNotifications();
+    await this.loadAllNotifications({ force: true });
 
     // start polling
     this.pollTimer = setInterval(() => {
-      // Don’t spam requests in background tabs
       if (document.hidden) return;
       this.loadAllNotifications();
     }, this.pollIntervalMs);
 
-    // clean up if page is being unloaded
     window.addEventListener("beforeunload", () => this.stopPolling());
     document.addEventListener("visibilitychange", () => {
-      // When user comes back, refresh immediately
-      if (!document.hidden) this.loadAllNotifications();
+      if (!document.hidden) this.loadAllNotifications({ force: true });
     });
   }
 
@@ -105,7 +113,8 @@ class NotificationsManager {
           b.classList.toggle("active", b === btn)
         );
 
-        this.renderUnified(); // re-render with new filter
+        // no need to refetch, just re-render
+        this.renderUnified({ preserveScroll: true, force: true });
       });
     });
   }
@@ -122,8 +131,9 @@ class NotificationsManager {
 
       // follow/unfollow button for follower notifications
       if (type === "followers" && e.target.closest(".notification-follow-btn")) {
+        const btn = e.target.closest("button");
         const username = item.dataset.username;
-        this.handleFollow(username, e.target.closest("button"));
+        this.handleFollow(username, btn);
         return;
       }
 
@@ -157,14 +167,19 @@ class NotificationsManager {
     });
   }
 
-  async loadAllNotifications() {
+  async loadAllNotifications({ force = false } = {}) {
     if (!this.currentUser) return;
     if (this.isLoading) return;
+
+    // pause polling briefly after follow/unfollow to prevent flip-flop
+    if (!force && Date.now() < this.pauseUntil) return;
+
+    // if a follow request is currently in-flight, skip refetch (prevents immediate revert)
+    if (!force && this.followInFlight.size > 0) return;
 
     this.isLoading = true;
 
     try {
-      // Use your backend endpoint
       const rawFeed = await this.fetchNotificationsFeed();
 
       const likes = [];
@@ -229,7 +244,6 @@ class NotificationsManager {
                 n.actor?.avatar ||
                 "default-profile.PNG",
             },
-            // placeholder until we enrich
             isFollowing: false,
           });
         }
@@ -241,16 +255,27 @@ class NotificationsManager {
         (x) => x.user && x.user.id && x.user.username
       );
 
-      // enrich follower follow-status so button shows Following correctly
-      if (this.followers.length) {
+      // Only enrich if we aren't in the "pause" window
+      // (prevents stale is_following from snapping button back)
+      if (this.followers.length && Date.now() >= this.pauseUntil) {
         try {
           await this.enrichFollowerFollowStatus(this.followers);
         } catch (e) {
           console.warn("Failed to enrich follower follow status (non-fatal):", e);
         }
+      } else {
+        // If we’re paused, keep existing follow-state from current unified list if possible
+        const existingMap = new Map(
+          (this.unified || [])
+            .filter((n) => n.type === "followers" && n?.user?.username)
+            .map((n) => [n.user.username, !!n.isFollowing])
+        );
+        this.followers.forEach((f) => {
+          const u = f?.user?.username;
+          if (u && existingMap.has(u)) f.isFollowing = existingMap.get(u);
+        });
       }
 
-      // Build unified stream, newest first
       this.unified = [
         ...this.likes.map((n) => ({ ...n, type: "likes" })),
         ...this.comments.map((n) => ({ ...n, type: "comments" })),
@@ -260,10 +285,9 @@ class NotificationsManager {
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
-      this.renderUnified();
+      this.renderUnified({ preserveScroll: true });
 
       const hasAny = this.unified.length > 0;
-
       if (this.emptyState) {
         this.emptyState.style.display = hasAny ? "none" : "block";
         if (!hasAny) {
@@ -275,8 +299,6 @@ class NotificationsManager {
       }
     } catch (err) {
       console.error("Failed to load notifications", err);
-
-      // If auth fails, show logged out (and stop polling)
       const msg = String(err?.message || "");
       if (msg.includes("401") || msg.toLowerCase().includes("auth token")) {
         this.stopPolling();
@@ -287,7 +309,6 @@ class NotificationsManager {
     }
   }
 
-  // backend fetch that matches YOUR server.js
   async fetchNotificationsFeed() {
     const token = this.getAuthToken();
     if (!token) throw new Error("Missing auth token");
@@ -307,7 +328,6 @@ class NotificationsManager {
     return data.notifications || [];
   }
 
-  // ask backend for each follower's is_following
   async enrichFollowerFollowStatus(followersArr) {
     const token = this.getAuthToken();
     if (!token) return;
@@ -315,16 +335,12 @@ class NotificationsManager {
     const uniqueUsernames = [
       ...new Set(
         followersArr
-          .map((f) =>
-            f && f.user && f.user.username ? String(f.user.username) : ""
-          )
+          .map((f) => (f?.user?.username ? String(f.user.username) : ""))
           .filter(Boolean)
       ),
     ];
-
     if (!uniqueUsernames.length) return;
 
-    // Pull is_following for each username
     const results = await Promise.all(
       uniqueUsernames.map(async (uname) => {
         try {
@@ -342,7 +358,6 @@ class NotificationsManager {
     );
 
     const map = new Map(results.map((r) => [r.username, r.is_following]));
-
     followersArr.forEach((f) => {
       const uname = f?.user?.username;
       if (!uname) return;
@@ -350,178 +365,27 @@ class NotificationsManager {
     });
   }
 
-  // ========== FETCH HELPERS (kept for compatibility; not used now) ==========
-
-  async fetchFollowers(userId) {
-    const { data, error } = await NOTIF_SUPABASE
-      .from("follows")
-      .select("id, follower_id, created_at")
-      .eq("followed_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(100);
-
-    if (error || !data) {
-      console.error("fetchFollowers error", error);
-      return [];
-    }
-
-    const followerIds = [...new Set(data.map((f) => f.follower_id))];
-    if (!followerIds.length) return [];
-
-    const { data: users, error: usersErr } = await NOTIF_SUPABASE
-      .from("users")
-      .select("id, username, display_name, avatar_url")
-      .in("id", followerIds);
-
-    if (usersErr || !users) {
-      console.error("fetchFollowers users error", usersErr);
-      return [];
-    }
-
-    const map = new Map(users.map((u) => [u.id, u]));
-    return data
-      .map((row) => {
-        const u = map.get(row.follower_id);
-        if (!u) return null;
-        return {
-          id: row.id,
-          created_at: row.created_at,
-          user: {
-            id: u.id,
-            username: u.username,
-            displayName: u.display_name || u.username,
-            avatar: u.avatar_url || "default-profile.PNG",
-          },
-        };
-      })
-      .filter(Boolean);
-  }
-
-  async fetchLikes(userId) {
-    const { data: myPosts, error: postsErr } = await NOTIF_SUPABASE
-      .from("posts")
-      .select("id, content")
-      .eq("user_id", userId);
-
-    if (postsErr || !myPosts || !myPosts.length) return [];
-
-    const postIds = myPosts.map((p) => p.id);
-    const postMap = new Map(myPosts.map((p) => [p.id, p]));
-
-    const { data: likes, error } = await NOTIF_SUPABASE
-      .from("post_likes")
-      .select("id, post_id, user_id, created_at")
-      .in("post_id", postIds)
-      .order("created_at", { ascending: false })
-      .limit(100);
-
-    if (error || !likes) {
-      console.error("fetchLikes error", error);
-      return [];
-    }
-
-    const likerIds = [...new Set(likes.map((l) => l.user_id))];
-    if (!likerIds.length) return [];
-
-    const { data: users, error: usersErr } = await NOTIF_SUPABASE
-      .from("users")
-      .select("id, username, display_name, avatar_url")
-      .in("id", likerIds);
-
-    if (usersErr || !users) {
-      console.error("fetchLikes users error", usersErr);
-      return [];
-    }
-
-    const userMap = new Map(users.map((u) => [u.id, u]));
-
-    return likes
-      .map((row) => {
-        const actor = userMap.get(row.user_id);
-        const post = postMap.get(row.post_id);
-        if (!actor || !post) return null;
-
-        return {
-          id: row.id,
-          created_at: row.created_at,
-          postId: post.id,
-          postContent: post.content || "",
-          user: {
-            id: actor.id,
-            username: actor.username,
-            displayName: actor.display_name || actor.username,
-            avatar: actor.avatar_url || "default-profile.PNG",
-          },
-        };
-      })
-      .filter(Boolean);
-  }
-
-  async fetchComments(userId) {
-    const { data: myPosts, error: postsErr } = await NOTIF_SUPABASE
-      .from("posts")
-      .select("id, content")
-      .eq("user_id", userId);
-
-    if (postsErr || !myPosts || !myPosts.length) return [];
-
-    const postIds = myPosts.map((p) => p.id);
-    const postMap = new Map(myPosts.map((p) => [p.id, p]));
-
-    const { data: comments, error } = await NOTIF_SUPABASE
-      .from("post_comments")
-      .select("id, post_id, user_id, content, created_at")
-      .in("post_id", postIds)
-      .order("created_at", { ascending: false })
-      .limit(100);
-
-    if (error || !comments) {
-      console.error("fetchComments error", error);
-      return [];
-    }
-
-    const commenterIds = [...new Set(comments.map((c) => c.user_id))];
-    if (!commenterIds.length) return [];
-
-    const { data: users, error: usersErr } = await NOTIF_SUPABASE
-      .from("users")
-      .select("id, username, display_name, avatar_url")
-      .in("id", commenterIds);
-
-    if (usersErr || !users) {
-      console.error("fetchComments users error", usersErr);
-      return [];
-    }
-
-    const userMap = new Map(users.map((u) => [u.id, u]));
-
-    return comments
-      .map((row) => {
-        const actor = userMap.get(row.user_id);
-        const post = postMap.get(row.post_id);
-        if (!actor || !post) return null;
-
-        return {
-          id: row.id,
-          created_at: row.created_at,
-          postId: post.id,
-          postContent: post.content || "",
-          commentText: row.content || "",
-          user: {
-            id: actor.id,
-            username: actor.username,
-            displayName: actor.display_name || actor.username,
-            avatar: actor.avatar_url || "default-profile.PNG",
-          },
-        };
-      })
-      .filter(Boolean);
-  }
-
   // ========== RENDER UNIFIED LIST ==========
 
-  renderUnified() {
+  renderUnified({ preserveScroll = false, force = false } = {}) {
     if (!this.listEl) return;
+
+    // Create a key to avoid re-rendering if nothing changed
+    // include filter + follow state + ids (enough to stop DOM churn)
+    const keyParts = (this.unified || []).map((n) => {
+      const extra =
+        n.type === "followers" && n?.user?.username
+          ? `${n.user.username}:${n.isFollowing ? 1 : 0}`
+          : "";
+      return `${n.type}:${n.id}:${extra}`;
+    });
+    const nextKey = `${this.currentFilter}|${keyParts.join("|")}`;
+
+    if (!force && nextKey === this.lastRenderKey) return;
+    this.lastRenderKey = nextKey;
+
+    // preserve scroll position to prevent page “jump”
+    const prevScrollY = preserveScroll ? window.scrollY : 0;
 
     let items = this.unified;
     if (this.currentFilter !== "all") {
@@ -536,6 +400,7 @@ class NotificationsManager {
         followers: "followers",
       };
       const label = labelMap[this.currentFilter] || "notifications";
+
       this.listEl.innerHTML = `
         <div class="notification-item">
           <div class="notification-body">
@@ -543,6 +408,10 @@ class NotificationsManager {
           </div>
         </div>
       `;
+
+      if (preserveScroll) {
+        requestAnimationFrame(() => window.scrollTo(0, prevScrollY));
+      }
       return;
     }
 
@@ -613,6 +482,7 @@ class NotificationsManager {
         const isFollowing = !!n.isFollowing;
         const btnClass = isFollowing ? "btn-secondary" : "btn-primary";
         const btnText = isFollowing ? "Following" : "Follow";
+        const disabled = this.followInFlight.has(n.user.username) ? "disabled" : "";
 
         return `
         <div class="notification-item follower-item"
@@ -634,46 +504,66 @@ class NotificationsManager {
               @${this.escape(n.user.username)} · ${this.formatTime(n.created_at)}
             </div>
           </div>
-          <button class="btn btn-sm ${btnClass} notification-follow-btn" type="button">
+          <button class="btn btn-sm ${btnClass} notification-follow-btn"
+                  type="button"
+                  ${disabled}
+                  aria-busy="${disabled ? "true" : "false"}">
             ${btnText}
           </button>
         </div>
       `;
       })
       .join("");
+
+    if (preserveScroll) {
+      requestAnimationFrame(() => window.scrollTo(0, prevScrollY));
+    }
   }
 
   // ========== FOLLOW HANDLER ==========
-  // backend follow route is /api/users/:username/follow (toggle)
   async handleFollow(targetUsername, buttonEl) {
     if (!this.currentUser || !targetUsername || !buttonEl) return;
 
-    // prevent double clicks spamming
-    if (buttonEl.dataset.loading === "1") return;
-    buttonEl.dataset.loading = "1";
+    // block spam clicks
+    if (this.followInFlight.has(targetUsername)) return;
+    this.followInFlight.add(targetUsername);
+
+    // pause polling so it can’t overwrite UI mid-action
+    this.pauseUntil = Date.now() + this.pauseAfterActionMs;
 
     try {
       const token = this.getAuthToken();
       if (!token) return;
 
-      // Optimistic toggle
-      const wasFollowing =
-        buttonEl.textContent.trim().toLowerCase() === "following";
+      // Determine current state from our cached model (NOT from button text)
+      const currentItem = (this.unified || []).find(
+        (n) => n.type === "followers" && n?.user?.username === targetUsername
+      );
+      const wasFollowing = currentItem ? !!currentItem.isFollowing : false;
 
-      if (wasFollowing) {
-        buttonEl.textContent = "Follow";
-        buttonEl.classList.remove("btn-secondary");
-        buttonEl.classList.add("btn-primary");
-      } else {
-        buttonEl.textContent = "Following";
-        buttonEl.classList.remove("btn-primary");
-        buttonEl.classList.add("btn-secondary");
-      }
+      // optimistic update: update model FIRST so rerenders don’t revert
+      this.unified = (this.unified || []).map((n) => {
+        if (n.type === "followers" && n?.user?.username === targetUsername) {
+          return { ...n, isFollowing: !wasFollowing };
+        }
+        return n;
+      });
+      this.followers = (this.followers || []).map((n) => {
+        if (n?.user?.username === targetUsername) {
+          return { ...n, isFollowing: !wasFollowing };
+        }
+        return n;
+      });
+
+      // re-render once (preserve scroll)
+      this.renderUnified({ preserveScroll: true, force: true });
+
+      // Disable the clicked button immediately
+      buttonEl.disabled = true;
+      buttonEl.setAttribute("aria-busy", "true");
 
       const res = await fetch(
-        `${NOTIF_API_BASE_URL}/users/${encodeURIComponent(
-          targetUsername
-        )}/follow`,
+        `${NOTIF_API_BASE_URL}/users/${encodeURIComponent(targetUsername)}/follow`,
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
@@ -683,36 +573,45 @@ class NotificationsManager {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to follow");
 
-      // Sync with server result
-      if (data.following) {
-        buttonEl.textContent = "Following";
-        buttonEl.classList.remove("btn-primary");
-        buttonEl.classList.add("btn-secondary");
-      } else {
-        buttonEl.textContent = "Follow";
-        buttonEl.classList.remove("btn-secondary");
-        buttonEl.classList.add("btn-primary");
-      }
+      const serverFollowing = !!data.following;
 
-      // Update cached unified state so next re-render keeps it
+      // sync model with server result
       this.unified = (this.unified || []).map((n) => {
-        if (n.type !== "followers") return n;
-        if (n.user && n.user.username === targetUsername) {
-          return { ...n, isFollowing: !!data.following };
+        if (n.type === "followers" && n?.user?.username === targetUsername) {
+          return { ...n, isFollowing: serverFollowing };
+        }
+        return n;
+      });
+      this.followers = (this.followers || []).map((n) => {
+        if (n?.user?.username === targetUsername) {
+          return { ...n, isFollowing: serverFollowing };
         }
         return n;
       });
 
-      this.followers = (this.followers || []).map((n) => {
-        if (n.user && n.user.username === targetUsername) {
-          return { ...n, isFollowing: !!data.following };
-        }
-        return n;
-      });
+      // render once more to reflect final truth
+      this.renderUnified({ preserveScroll: true, force: true });
+
+      // extend pause slightly so enrich doesn’t snap back
+      this.pauseUntil = Date.now() + this.pauseAfterActionMs;
     } catch (err) {
       console.error("handleFollow error", err);
+
+      // If request failed, force a refresh after a short pause
+      this.pauseUntil = Date.now() + 500;
+      setTimeout(() => this.loadAllNotifications({ force: true }), 600);
     } finally {
-      buttonEl.dataset.loading = "0";
+      this.followInFlight.delete(targetUsername);
+
+      // Re-enable button if it still exists in DOM
+      try {
+        if (buttonEl && buttonEl.isConnected) {
+          buttonEl.disabled = false;
+          buttonEl.setAttribute("aria-busy", "false");
+        }
+      } catch {}
+
+      // Ensure next normal poll can happen after pause window
     }
   }
 
