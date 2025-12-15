@@ -1,26 +1,12 @@
 // notifications.js
 
 // Same Supabase project as the rest of the app
-// ✅ FIX: Don't crash if supabase-js isn't loaded (or loads after this script)
-let NOTIF_SUPABASE = null;
+const NOTIF_SUPABASE = supabase.createClient(
+  "https://hbbbsreonwhvqfvbszne.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmJzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyOTc5ODYsImV4cCI6MjA3OTg3Mzk4Nn0.LvqmdOqetnMrH8bnkJY6_S-dsGD8gnvpFczSCJPy-Q4"
+);
 
-try {
-  const sb = window.supabase || (typeof supabase !== "undefined" ? supabase : null);
-  if (!sb || typeof sb.createClient !== "function") {
-    console.warn("Supabase client not found on window. Notifications fallback disabled.");
-    NOTIF_SUPABASE = null;
-  } else {
-    NOTIF_SUPABASE = sb.createClient(
-      "https://hbbbsreonwhvqfvbszne.supabase.co",
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyOTc5ODYsImV4cCI6MjA3OTg3Mzk4Nn0.LvqmdOqetnMrH8bnkJY6_S-dsGD8gnvpFczSCJPy-Q4"
-    );
-  }
-} catch (e) {
-  console.error("Failed to initialize Supabase for notifications:", e);
-  NOTIF_SUPABASE = null;
-}
-
-// ✅ Backend base (same pattern as other pages)
+// ✅ NEW: API base (same pattern as your other pages)
 const NOTIF_API_BASE_URL =
   typeof API_BASE_URL !== "undefined"
     ? API_BASE_URL
@@ -80,19 +66,6 @@ class NotificationsManager {
       this.emptyState.innerHTML = `
         <h3>Log in to see alerts</h3>
         <p>Create an account or log in to receive notifications.</p>
-      `;
-    }
-  }
-
-  // ✅ NEW: Backend/Supabase both unavailable
-  showUnavailableState() {
-    if (this.listEl) this.listEl.innerHTML = "";
-
-    if (this.emptyState) {
-      this.emptyState.style.display = "block";
-      this.emptyState.innerHTML = `
-        <h3>Notifications unavailable</h3>
-        <p>Your backend notifications endpoint is missing or blocked, and Supabase is not accessible from the client.</p>
       `;
     }
   }
@@ -166,24 +139,68 @@ class NotificationsManager {
   async loadAllNotifications() {
     if (!this.currentUser) return;
 
-    const userId = this.currentUser.id;
-
     try {
-      const [likes, comments, followers] = await Promise.all([
-        this.fetchLikes(userId),
-        this.fetchComments(userId),
-        this.fetchFollowers(userId),
-      ]);
+      // ✅ FIX: Use your backend endpoint that already exists
+      const rawFeed = await this.fetchNotificationsFeed();
 
-      this.likes = likes;
-      this.comments = comments;
-      this.followers = followers;
+      // Split into your existing arrays so filters still work
+      const likes = [];
+      const comments = [];
+      const followers = [];
+
+      (rawFeed || []).forEach((n) => {
+        const t = String(n.type || "").toLowerCase();
+
+        if (t === "like") {
+          likes.push({
+            id: n.id,
+            created_at: n.created_at,
+            postId: n.post_id,
+            postContent: n.post_content || "",
+            user: {
+              id: n.actor?.id,
+              username: n.actor?.username,
+              displayName: n.actor?.display_name || n.actor?.displayName || n.actor?.username,
+              avatar: n.actor?.avatar_url || n.actor?.avatar || "default-profile.PNG",
+            },
+          });
+        } else if (t === "comment") {
+          comments.push({
+            id: n.id,
+            created_at: n.created_at,
+            postId: n.post_id,
+            postContent: n.post_content || "",
+            commentText: n.comment_text || "",
+            user: {
+              id: n.actor?.id,
+              username: n.actor?.username,
+              displayName: n.actor?.display_name || n.actor?.displayName || n.actor?.username,
+              avatar: n.actor?.avatar_url || n.actor?.avatar || "default-profile.PNG",
+            },
+          });
+        } else if (t === "follow") {
+          followers.push({
+            id: n.id,
+            created_at: n.created_at,
+            user: {
+              id: n.actor?.id,
+              username: n.actor?.username,
+              displayName: n.actor?.display_name || n.actor?.displayName || n.actor?.username,
+              avatar: n.actor?.avatar_url || n.actor?.avatar || "default-profile.PNG",
+            },
+          });
+        }
+      });
+
+      this.likes = likes.filter((x) => x.user && x.user.id);
+      this.comments = comments.filter((x) => x.user && x.user.id && x.postId);
+      this.followers = followers.filter((x) => x.user && x.user.id);
 
       // Build unified stream, newest first
       this.unified = [
-        ...likes.map((n) => ({ ...n, type: "likes" })),
-        ...comments.map((n) => ({ ...n, type: "comments" })),
-        ...followers.map((n) => ({ ...n, type: "followers" })),
+        ...this.likes.map((n) => ({ ...n, type: "likes" })),
+        ...this.comments.map((n) => ({ ...n, type: "comments" })),
+        ...this.followers.map((n) => ({ ...n, type: "followers" })),
       ].sort(
         (a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -204,101 +221,33 @@ class NotificationsManager {
       }
     } catch (err) {
       console.error("Failed to load notifications", err);
-      // If everything failed hard, show an availability message
-      this.showUnavailableState();
     }
   }
 
-  // ========== AUTH / API HELPERS ==========
-
-  getAuthToken() {
-    try {
-      if (typeof getAuthToken === "function") return getAuthToken();
-      return (
-        localStorage.getItem("us_auth_token") ||
-        localStorage.getItem("authToken") ||
-        localStorage.getItem("token") ||
-        null
-      );
-    } catch {
-      return null;
-    }
-  }
-
-  async apiTryPaths(paths) {
+  // ✅ NEW: backend fetch that matches YOUR server.js
+  async fetchNotificationsFeed() {
     const token = this.getAuthToken();
     if (!token) throw new Error("Missing auth token");
 
-    let lastErr = null;
+    const res = await fetch(`${NOTIF_API_BASE_URL}/notifications?limit=100`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-    for (const url of paths) {
-      try {
-        const res = await fetch(url, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        // if route doesn't exist, try next
-        if (res.status === 404) {
-          lastErr = new Error(`404 ${url}`);
-          continue;
-        }
-
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          lastErr = new Error(data.error || `HTTP ${res.status}`);
-          continue;
-        }
-
-        return data;
-      } catch (e) {
-        lastErr = e;
-      }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || `HTTP ${res.status}`);
     }
 
-    throw lastErr || new Error("All API paths failed");
+    return data.notifications || [];
   }
 
-  // ========== FETCH HELPERS (backend first, supabase fallback) ==========
+  // ========== FETCH HELPERS (limits bumped so you see a lot of alerts) ==========
+  // (kept for compatibility; not used now that backend feed exists)
 
   async fetchFollowers(userId) {
-    // ✅ Backend first
-    try {
-      const data = await this.apiTryPaths([
-        `${NOTIF_API_BASE_URL}/notifications?type=followers`,
-        `${NOTIF_API_BASE_URL}/notifications/followers`,
-      ]);
-
-      const rows = Array.isArray(data.followers) ? data.followers : Array.isArray(data.data) ? data.data : [];
-
-      return rows
-        .map((row) => {
-          const u = row.user || row.follower || row.actor || row.profile || null;
-          if (!u) return null;
-
-          return {
-            id: row.id || row.follow_id || row.notification_id || "",
-            created_at: row.created_at || row.createdAt || row.timestamp || row.time || "",
-            user: {
-              id: u.id,
-              username: u.username,
-              displayName: u.display_name || u.displayName || u.username,
-              avatar: u.avatar_url || u.avatar || "default-profile.PNG",
-            },
-          };
-        })
-        .filter(Boolean);
-    } catch (e) {
-      // fallback to Supabase
-      if (!NOTIF_SUPABASE) {
-        console.error("fetchFollowers failed (no backend, no supabase):", e);
-        return [];
-      }
-    }
-
     const { data, error } = await NOTIF_SUPABASE
       .from("follows")
       .select("id, follower_id, created_at")
@@ -344,43 +293,6 @@ class NotificationsManager {
   }
 
   async fetchLikes(userId) {
-    // ✅ Backend first
-    try {
-      const data = await this.apiTryPaths([
-        `${NOTIF_API_BASE_URL}/notifications?type=likes`,
-        `${NOTIF_API_BASE_URL}/notifications/likes`,
-      ]);
-
-      const rows = Array.isArray(data.likes) ? data.likes : Array.isArray(data.data) ? data.data : [];
-
-      return rows
-        .map((row) => {
-          const u = row.user || row.liker || row.actor || row.profile || null;
-          const post = row.post || row.post_data || null;
-          if (!u || !post) return null;
-
-          return {
-            id: row.id || row.like_id || row.notification_id || "",
-            created_at: row.created_at || row.createdAt || row.timestamp || row.time || "",
-            postId: post.id || row.post_id,
-            postContent: post.content || row.postContent || "",
-            user: {
-              id: u.id,
-              username: u.username,
-              displayName: u.display_name || u.displayName || u.username,
-              avatar: u.avatar_url || u.avatar || "default-profile.PNG",
-            },
-          };
-        })
-        .filter(Boolean);
-    } catch (e) {
-      // fallback to Supabase
-      if (!NOTIF_SUPABASE) {
-        console.error("fetchLikes failed (no backend, no supabase):", e);
-        return [];
-      }
-    }
-
     const { data: myPosts, error: postsErr } = await NOTIF_SUPABASE
       .from("posts")
       .select("id, content")
@@ -441,44 +353,6 @@ class NotificationsManager {
   }
 
   async fetchComments(userId) {
-    // ✅ Backend first
-    try {
-      const data = await this.apiTryPaths([
-        `${NOTIF_API_BASE_URL}/notifications?type=comments`,
-        `${NOTIF_API_BASE_URL}/notifications/comments`,
-      ]);
-
-      const rows = Array.isArray(data.comments) ? data.comments : Array.isArray(data.data) ? data.data : [];
-
-      return rows
-        .map((row) => {
-          const u = row.user || row.commenter || row.actor || row.profile || null;
-          const post = row.post || row.post_data || null;
-          if (!u || !post) return null;
-
-          return {
-            id: row.id || row.comment_id || row.notification_id || "",
-            created_at: row.created_at || row.createdAt || row.timestamp || row.time || "",
-            postId: post.id || row.post_id,
-            postContent: post.content || row.postContent || "",
-            commentText: row.content || row.commentText || "",
-            user: {
-              id: u.id,
-              username: u.username,
-              displayName: u.display_name || u.displayName || u.username,
-              avatar: u.avatar_url || u.avatar || "default-profile.PNG",
-            },
-          };
-        })
-        .filter(Boolean);
-    } catch (e) {
-      // fallback to Supabase
-      if (!NOTIF_SUPABASE) {
-        console.error("fetchComments failed (no backend, no supabase):", e);
-        return [];
-      }
-    }
-
     const { data: myPosts, error: postsErr } = await NOTIF_SUPABASE
       .from("posts")
       .select("id, content")
@@ -669,69 +543,39 @@ class NotificationsManager {
   }
 
   // ========== FOLLOW HANDLER ==========
-
+  // ✅ Your backend follow route is /api/users/:username/follow (NOT userId)
   async handleFollow(targetUserId, buttonEl) {
     if (!this.currentUser || !targetUserId || !buttonEl) return;
-    const meId = this.currentUser.id;
 
     try {
-      const isFollowing =
-        buttonEl.textContent.trim().toLowerCase() === "following";
-
-      // ✅ Prefer backend for follow toggles too (matches your app auth)
       const token = this.getAuthToken();
-      if (token) {
-        if (isFollowing) {
-          const res = await fetch(`${NOTIF_API_BASE_URL}/follow/${encodeURIComponent(targetUserId)}`, {
-            method: "DELETE",
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (res.ok) {
-            buttonEl.textContent = "Follow";
-            buttonEl.classList.remove("btn-secondary");
-            buttonEl.classList.add("btn-primary");
-            return;
-          }
-        } else {
-          const res = await fetch(`${NOTIF_API_BASE_URL}/follow/${encodeURIComponent(targetUserId)}`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (res.ok) {
-            buttonEl.textContent = "Following";
-            buttonEl.classList.remove("btn-primary");
-            buttonEl.classList.add("btn-secondary");
-            return;
-          }
+      if (!token) return;
+
+      // Find username from the rendered item (since backend uses username)
+      const parent = buttonEl.closest(".notification-item");
+      const username = parent ? parent.dataset.username : null;
+      if (!username) return;
+
+      // This endpoint toggles follow/unfollow
+      const res = await fetch(
+        `${NOTIF_API_BASE_URL}/users/${encodeURIComponent(username)}/follow`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
         }
-      }
+      );
 
-      // Fallback to supabase if backend follow routes aren't available
-      if (!NOTIF_SUPABASE) return;
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to follow");
 
-      if (isFollowing) {
-        const { error } = await NOTIF_SUPABASE
-          .from("follows")
-          .delete()
-          .eq("follower_id", meId)
-          .eq("followed_id", targetUserId);
-
-        if (error) throw error;
-
-        buttonEl.textContent = "Follow";
-        buttonEl.classList.remove("btn-secondary");
-        buttonEl.classList.add("btn-primary");
-      } else {
-        const { error } = await NOTIF_SUPABASE.from("follows").insert({
-          follower_id: meId,
-          followed_id: targetUserId,
-        });
-
-        if (error) throw error;
-
+      if (data.following) {
         buttonEl.textContent = "Following";
         buttonEl.classList.remove("btn-primary");
         buttonEl.classList.add("btn-secondary");
+      } else {
+        buttonEl.textContent = "Follow";
+        buttonEl.classList.remove("btn-secondary");
+        buttonEl.classList.add("btn-primary");
       }
     } catch (err) {
       console.error("handleFollow error", err);
@@ -739,6 +583,20 @@ class NotificationsManager {
   }
 
   // ========== UTILITIES ==========
+
+  getAuthToken() {
+    try {
+      if (typeof getAuthToken === "function") return getAuthToken();
+      return (
+        localStorage.getItem("us_auth_token") ||
+        localStorage.getItem("authToken") ||
+        localStorage.getItem("token") ||
+        null
+      );
+    } catch {
+      return null;
+    }
+  }
 
   escape(str) {
     return String(str || "")
