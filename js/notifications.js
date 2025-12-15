@@ -31,6 +31,9 @@ class NotificationsManager {
     this.unified = [];
     this.currentFilter = "all";
 
+    // prevent overlapping polls
+    this.isLoading = false;
+
     this.init();
   }
 
@@ -42,20 +45,38 @@ class NotificationsManager {
       this.currentUser = null;
     }
 
-    if (!this.currentUser) {
+    // If user object exists but token is missing, treat as logged out
+    const token = this.getAuthToken();
+    if (!this.currentUser || !token) {
       this.showLoggedOutState();
       return;
     }
 
     this.setupFilterBar();
     this.setupEventDelegation();
+
     await this.loadAllNotifications();
 
     // start polling
-    this.pollTimer = setInterval(
-      () => this.loadAllNotifications(),
-      this.pollIntervalMs
-    );
+    this.pollTimer = setInterval(() => {
+      // Don’t spam requests in background tabs
+      if (document.hidden) return;
+      this.loadAllNotifications();
+    }, this.pollIntervalMs);
+
+    // clean up if page is being unloaded
+    window.addEventListener("beforeunload", () => this.stopPolling());
+    document.addEventListener("visibilitychange", () => {
+      // When user comes back, refresh immediately
+      if (!document.hidden) this.loadAllNotifications();
+    });
+  }
+
+  stopPolling() {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
   }
 
   showLoggedOutState() {
@@ -101,8 +122,8 @@ class NotificationsManager {
 
       // follow/unfollow button for follower notifications
       if (type === "followers" && e.target.closest(".notification-follow-btn")) {
-        const userId = item.dataset.userId;
-        this.handleFollow(userId, e.target.closest("button"));
+        const username = item.dataset.username;
+        this.handleFollow(username, e.target.closest("button"));
         return;
       }
 
@@ -138,6 +159,9 @@ class NotificationsManager {
 
   async loadAllNotifications() {
     if (!this.currentUser) return;
+    if (this.isLoading) return;
+
+    this.isLoading = true;
 
     try {
       // Use your backend endpoint
@@ -160,8 +184,13 @@ class NotificationsManager {
               id: n.actor?.id,
               username: n.actor?.username,
               displayName:
-                n.actor?.display_name || n.actor?.displayName || n.actor?.username,
-              avatar: n.actor?.avatar_url || n.actor?.avatar || "default-profile.PNG",
+                n.actor?.display_name ||
+                n.actor?.displayName ||
+                n.actor?.username,
+              avatar:
+                n.actor?.avatar_url ||
+                n.actor?.avatar ||
+                "default-profile.PNG",
             },
           });
         } else if (t === "comment") {
@@ -175,8 +204,13 @@ class NotificationsManager {
               id: n.actor?.id,
               username: n.actor?.username,
               displayName:
-                n.actor?.display_name || n.actor?.displayName || n.actor?.username,
-              avatar: n.actor?.avatar_url || n.actor?.avatar || "default-profile.PNG",
+                n.actor?.display_name ||
+                n.actor?.displayName ||
+                n.actor?.username,
+              avatar:
+                n.actor?.avatar_url ||
+                n.actor?.avatar ||
+                "default-profile.PNG",
             },
           });
         } else if (t === "follow") {
@@ -187,10 +221,15 @@ class NotificationsManager {
               id: n.actor?.id,
               username: n.actor?.username,
               displayName:
-                n.actor?.display_name || n.actor?.displayName || n.actor?.username,
-              avatar: n.actor?.avatar_url || n.actor?.avatar || "default-profile.PNG",
+                n.actor?.display_name ||
+                n.actor?.displayName ||
+                n.actor?.username,
+              avatar:
+                n.actor?.avatar_url ||
+                n.actor?.avatar ||
+                "default-profile.PNG",
             },
-            // ✅ NEW: placeholder until we enrich
+            // placeholder until we enrich
             isFollowing: false,
           });
         }
@@ -198,9 +237,11 @@ class NotificationsManager {
 
       this.likes = likes.filter((x) => x.user && x.user.id);
       this.comments = comments.filter((x) => x.user && x.user.id && x.postId);
-      this.followers = followers.filter((x) => x.user && x.user.id && x.user.username);
+      this.followers = followers.filter(
+        (x) => x.user && x.user.id && x.user.username
+      );
 
-      // ✅ NEW: enrich follower follow-status so button shows Following correctly
+      // enrich follower follow-status so button shows Following correctly
       if (this.followers.length) {
         try {
           await this.enrichFollowerFollowStatus(this.followers);
@@ -234,6 +275,15 @@ class NotificationsManager {
       }
     } catch (err) {
       console.error("Failed to load notifications", err);
+
+      // If auth fails, show logged out (and stop polling)
+      const msg = String(err?.message || "");
+      if (msg.includes("401") || msg.toLowerCase().includes("auth token")) {
+        this.stopPolling();
+        this.showLoggedOutState();
+      }
+    } finally {
+      this.isLoading = false;
     }
   }
 
@@ -257,7 +307,7 @@ class NotificationsManager {
     return data.notifications || [];
   }
 
-  // ✅ NEW: ask backend for each follower's is_following (backend already supports it)
+  // ask backend for each follower's is_following
   async enrichFollowerFollowStatus(followersArr) {
     const token = this.getAuthToken();
     if (!token) return;
@@ -265,7 +315,9 @@ class NotificationsManager {
     const uniqueUsernames = [
       ...new Set(
         followersArr
-          .map((f) => (f && f.user && f.user.username ? String(f.user.username) : ""))
+          .map((f) =>
+            f && f.user && f.user.username ? String(f.user.username) : ""
+          )
           .filter(Boolean)
       ),
     ];
@@ -487,9 +539,7 @@ class NotificationsManager {
       this.listEl.innerHTML = `
         <div class="notification-item">
           <div class="notification-body">
-            <div class="notification-text">No ${this.escape(
-              label
-            )} yet.</div>
+            <div class="notification-text">No ${this.escape(label)} yet.</div>
           </div>
         </div>
       `;
@@ -552,9 +602,7 @@ class NotificationsManager {
                 commented on your post
               </div>
               <div class="notification-meta">
-                "${this.escape(commentPreview)}" · ${this.formatTime(
-                  n.created_at
-                )}
+                "${this.escape(commentPreview)}" · ${this.formatTime(n.created_at)}
               </div>
             </div>
           </div>
@@ -580,17 +628,13 @@ class NotificationsManager {
           </div>
           <div class="notification-body">
             <div class="notification-text">
-              <strong>${this.escape(
-                n.user.displayName
-              )}</strong> started following you
+              <strong>${this.escape(n.user.displayName)}</strong> started following you
             </div>
             <div class="notification-meta">
-              @${this.escape(n.user.username)} · ${this.formatTime(
-                n.created_at
-              )}
+              @${this.escape(n.user.username)} · ${this.formatTime(n.created_at)}
             </div>
           </div>
-          <button class="btn btn-sm ${btnClass} notification-follow-btn">
+          <button class="btn btn-sm ${btnClass} notification-follow-btn" type="button">
             ${btnText}
           </button>
         </div>
@@ -601,16 +645,16 @@ class NotificationsManager {
 
   // ========== FOLLOW HANDLER ==========
   // backend follow route is /api/users/:username/follow (toggle)
-  async handleFollow(targetUserId, buttonEl) {
-    if (!this.currentUser || !targetUserId || !buttonEl) return;
+  async handleFollow(targetUsername, buttonEl) {
+    if (!this.currentUser || !targetUsername || !buttonEl) return;
+
+    // prevent double clicks spamming
+    if (buttonEl.dataset.loading === "1") return;
+    buttonEl.dataset.loading = "1";
 
     try {
       const token = this.getAuthToken();
       if (!token) return;
-
-      const parent = buttonEl.closest(".notification-item");
-      const username = parent ? parent.dataset.username : null;
-      if (!username) return;
 
       // Optimistic toggle
       const wasFollowing =
@@ -627,7 +671,9 @@ class NotificationsManager {
       }
 
       const res = await fetch(
-        `${NOTIF_API_BASE_URL}/users/${encodeURIComponent(username)}/follow`,
+        `${NOTIF_API_BASE_URL}/users/${encodeURIComponent(
+          targetUsername
+        )}/follow`,
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
@@ -651,20 +697,22 @@ class NotificationsManager {
       // Update cached unified state so next re-render keeps it
       this.unified = (this.unified || []).map((n) => {
         if (n.type !== "followers") return n;
-        if (n.user && n.user.username === username) {
+        if (n.user && n.user.username === targetUsername) {
           return { ...n, isFollowing: !!data.following };
         }
         return n;
       });
 
       this.followers = (this.followers || []).map((n) => {
-        if (n.user && n.user.username === username) {
+        if (n.user && n.user.username === targetUsername) {
           return { ...n, isFollowing: !!data.following };
         }
         return n;
       });
     } catch (err) {
       console.error("handleFollow error", err);
+    } finally {
+      buttonEl.dataset.loading = "0";
     }
   }
 
