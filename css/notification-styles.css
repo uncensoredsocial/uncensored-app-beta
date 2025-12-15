@@ -231,3 +231,36 @@
     border-radius: var(--radius-md);
   }
 }
+
+/* === FIX FOLLOW BUTTON FLICKER & COLOR === */
+
+.notification-follow-btn {
+  background: var(--primary-color);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.notification-follow-btn:hover {
+  opacity: 0.9;
+}
+
+.notification-follow-btn[data-following="1"] {
+  background: var(--primary-color);
+  color: #fff;
+}
+
+/* absolutely kill disabled / grey / iOS states */
+.notification-follow-btn:disabled,
+.notification-follow-btn[aria-busy="true"],
+.notification-follow-btn[data-busy="1"] {
+  background: var(--primary-color);
+  color: #fff;
+  opacity: 1;
+}
