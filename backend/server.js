@@ -1030,253 +1030,179 @@ app.delete('/api/posts/:id', authMiddleware, async (req, res) => {
 });
 
 // ======================================================
-//                   PROFILE / FOLLOWS
+//            FOLLOWERS / FOLLOWING LIST ENDPOINTS
 // ======================================================
 
-// Get posts for a given username – same shape as feed
-app.get('/api/users/:username/posts', async (req, res) => {
+// Get followers list for a username
+app.get('/api/users/:username/followers', async (req, res) => {
   try {
     const { username } = req.params;
-    const currentUserId = getUserIdFromAuthHeader(req);
 
-    const { data: user, error: userError } = await supabase
+    // viewer (optional) so we can return is_following flags for buttons
+    const viewerId = getUserIdFromAuthHeader(req);
+
+    // target user
+    const { data: target, error: targetErr } = await supabase
       .from('users')
-      .select('id,username,display_name,avatar_url')
+      .select('id,username')
       .eq('username', username)
       .single();
 
-    if (userError || !user) {
+    if (targetErr || !target) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const { data: posts, error } = await supabase
-      .from('posts')
-      .select(
-        `
+    // followers = rows where followed_id = target.id
+    const { data: rows, error } = await supabase
+      .from('follows')
+      .select(`
         id,
-        user_id,
-        content,
-        media_url,
-        media_type,
         created_at,
-        post_likes ( user_id ),
-        post_comments ( id, user_id ),
-        post_saves ( user_id )
-      `
-      )
-      .eq('user_id', user.id)
+        follower:users!follows_follower_id_fkey (
+          id, username, display_name, avatar_url
+        )
+      `)
+      .eq('followed_id', target.id)
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Get profile posts error:', error);
-      return res.status(500).json({ error: 'Failed to load posts' });
+      console.error('followers list error:', error);
+      return res.status(500).json({ error: 'Failed to load followers' });
     }
 
-    const shaped = (posts || []).map((p) =>
-      shapePostRow(
-        {
-          ...p,
-          user: {
-            id: user.id,
-            username: username,
-            display_name: user.display_name,
-            avatar_url: user.avatar_url
-          }
-        },
-        currentUserId
-      )
-    );
+    const followers = (rows || []).map(r => r.follower).filter(Boolean);
+    const followerIds = followers.map(u => u.id);
 
-    res.json(shaped);
-  } catch (err) {
-    console.error('GET /users/:username/posts error:', err);
-    res.status(500).json({ error: 'Failed to load posts' });
-  }
-});
-
-// Get posts that a given user has liked – same shape as feed
-app.get('/api/users/:username/likes', async (req, res) => {
-  try {
-    const { username } = req.params;
-    const currentUserId = getUserIdFromAuthHeader(req);
-
-    // 1) Find the user whose likes we are showing
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('id,username,display_name,avatar_url')
-      .eq('username', username)
-      .single();
-
-    if (userError || !user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    // 2) Get all post_ids that this user has liked
-    const { data: likedRows, error: likesError } = await supabase
-      .from('post_likes')
-      .select('post_id')
-      .eq('user_id', user.id);
-
-    if (likesError) {
-      console.error('Get liked posts error (likes table):', likesError);
-      return res.status(500).json({ error: 'Failed to load liked posts' });
-    }
-
-    if (!likedRows || likedRows.length === 0) {
-      return res.json([]);
-    }
-
-    const postIds = likedRows.map((row) => row.post_id);
-
-    // 3) Fetch those posts with the same shape as the main feed
-    const { data: posts, error: postsError } = await supabase
-      .from('posts')
-      .select(
-        `
-        id,
-        user_id,
-        content,
-        media_url,
-        media_type,
-        created_at,
-        user:users (
-          id,
-          username,
-          display_name,
-          avatar_url
-        ),
-        post_likes ( user_id ),
-        post_comments ( id, user_id ),
-        post_saves ( user_id )
-      `
-      )
-      .in('id', postIds)
-      .order('created_at', { ascending: false });
-
-    if (postsError) {
-      console.error('Get liked posts error (posts table):', postsError);
-      return res.status(500).json({ error: 'Failed to load liked posts' });
-    }
-
-    const shaped = (posts || []).map((p) => shapePostRow(p, currentUserId));
-    res.json(shaped);
-  } catch (err) {
-    console.error('GET /users/:username/likes error:', err);
-    res.status(500).json({ error: 'Failed to load liked posts' });
-  }
-});
-
-// Get user by username
-app.get('/api/users/:username', async (req, res) => {
-  try {
-    const { username } = req.params;
-
-    const currentUserId = getUserIdFromAuthHeader(req);
-
-    const { data: user, error } = await supabase
-      .from('users')
-      .select(
-        'id,username,display_name,avatar_url,banner_url,bio,created_at'
-      )
-      .eq('username', username)
-      .single();
-
-    if (error || !user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const stats = await getUserStats(user.id);
-
-    let isFollowing = false;
-    if (currentUserId && currentUserId !== user.id) {
-      const { data: followRow, error: followError } = await supabase
+    // viewer -> does viewer follow each follower?
+    let viewerFollowingSet = new Set();
+    if (viewerId && followerIds.length) {
+      const { data: viewerFollows, error: vfErr } = await supabase
         .from('follows')
-        .select('id')
-        .eq('follower_id', currentUserId)
-        .eq('followed_id', user.id)
-        .maybeSingle();
+        .select('followed_id')
+        .eq('follower_id', viewerId)
+        .in('followed_id', followerIds);
 
-      if (followError) {
-        console.error('is_following check error:', followError);
+      if (vfErr) {
+        console.error('viewer following lookup error:', vfErr);
+      } else {
+        viewerFollowingSet = new Set((viewerFollows || []).map(x => x.followed_id));
       }
-      isFollowing = !!followRow;
     }
 
-    res.json({ ...user, ...stats, is_following: isFollowing });
-  } catch (err) {
-    console.error('GET /users/:username error:', err);
-    res.status(500).json({ error: 'Failed to load profile' });
-  }
-});
-
-// Follow / unfollow user
-app.post('/api/users/:username/follow', authMiddleware, async (req, res) => {
-  try {
-    const { username } = req.params;
-    const currentUserId = req.user.id;
-
-    const { data: target, error: targetError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('username', username)
-      .single();
-
-    if (targetError || !target) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    if (target.id === currentUserId) {
-      return res.status(400).json({ error: 'You cannot follow yourself' });
-    }
-
-    const { data: existing, error: checkError } = await supabase
-      .from('follows')
-      .select('id')
-      .eq('follower_id', currentUserId)
-      .eq('followed_id', target.id)
-      .maybeSingle();
-
-    if (checkError) {
-      console.error('Follow check error:', checkError);
-      return res.status(500).json({ error: 'Failed to update follow status' });
-    }
-
-    let following;
-
-    if (existing) {
-      const { error: delError } = await supabase
-        .from('follows')
-        .delete()
-        .eq('id', existing.id);
-
-      if (delError) {
-        console.error('Unfollow error:', delError);
-        return res.status(500).json({ error: 'Failed to unfollow' });
-      }
-      following = false;
-    } else {
-      const { error: insError } = await supabase.from('follows').insert({
-        id: uuidv4(),
-        follower_id: currentUserId,
-        followed_id: target.id
-      });
-
-      if (insError) {
-        console.error('Follow error:', insError);
-        return res.status(500).json({ error: 'Failed to follow' });
-      }
-      following = true;
-    }
+    // For followers tab: follows_me is true (they follow the target user)
+    const shaped = followers.map(u => ({
+      id: u.id,
+      username: u.username,
+      display_name: u.display_name,
+      avatar_url: u.avatar_url,
+      follows_me: true,
+      is_following: viewerId ? viewerFollowingSet.has(u.id) : false
+    }));
 
     const stats = await getUserStats(target.id);
 
-    res.json({
-      following,
-      ...stats
+    return res.json({
+      users: shaped,
+      followers_count: stats.followers_count || 0,
+      following_count: stats.following_count || 0
     });
   } catch (err) {
-    console.error('POST /users/:username/follow error:', err);
-    res.status(500).json({ error: 'Failed to update follow status' });
+    console.error('GET /users/:username/followers error:', err);
+    return res.status(500).json({ error: 'Failed to load followers' });
+  }
+});
+
+// Get following list for a username
+app.get('/api/users/:username/following', async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    const viewerId = getUserIdFromAuthHeader(req);
+
+    // target user
+    const { data: target, error: targetErr } = await supabase
+      .from('users')
+      .select('id,username')
+      .eq('username', username)
+      .single();
+
+    if (targetErr || !target) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // following = rows where follower_id = target.id
+    const { data: rows, error } = await supabase
+      .from('follows')
+      .select(`
+        id,
+        created_at,
+        followed:users!follows_followed_id_fkey (
+          id, username, display_name, avatar_url
+        )
+      `)
+      .eq('follower_id', target.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('following list error:', error);
+      return res.status(500).json({ error: 'Failed to load following' });
+    }
+
+    const following = (rows || []).map(r => r.followed).filter(Boolean);
+    const followedIds = following.map(u => u.id);
+
+    // viewer -> does viewer follow each followed user?
+    let viewerFollowingSet = new Set();
+    if (viewerId && followedIds.length) {
+      const { data: viewerFollows, error: vfErr } = await supabase
+        .from('follows')
+        .select('followed_id')
+        .eq('follower_id', viewerId)
+        .in('followed_id', followedIds);
+
+      if (vfErr) {
+        console.error('viewer following lookup error:', vfErr);
+      } else {
+        viewerFollowingSet = new Set((viewerFollows || []).map(x => x.followed_id));
+      }
+    }
+
+    // do these followed users follow the target back? (optional, good for UI)
+    let followsBackSet = new Set();
+    if (followedIds.length) {
+      const { data: backRows, error: backErr } = await supabase
+        .from('follows')
+        .select('follower_id,followed_id')
+        .in('follower_id', followedIds)
+        .eq('followed_id', target.id);
+
+      if (backErr) {
+        console.error('follow-back lookup error:', backErr);
+      } else {
+        followsBackSet = new Set((backRows || []).map(x => x.follower_id));
+      }
+    }
+
+    const shaped = following.map(u => ({
+      id: u.id,
+      username: u.username,
+      display_name: u.display_name,
+      avatar_url: u.avatar_url,
+      // in "Following" tab, is_following means "viewer follows them" (for button state)
+      is_following: viewerId ? viewerFollowingSet.has(u.id) : false,
+      follows_me: followsBackSet.has(u.id) // they follow the target back
+    }));
+
+    const stats = await getUserStats(target.id);
+
+    return res.json({
+      users: shaped,
+      followers_count: stats.followers_count || 0,
+      following_count: stats.following_count || 0
+    });
+  } catch (err) {
+    console.error('GET /users/:username/following error:', err);
+    return res.status(500).json({ error: 'Failed to load following' });
   }
 });
 
