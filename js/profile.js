@@ -5,6 +5,8 @@ const PROFILE_API_BASE_URL =
     ? API_BASE_URL
     : "https://uncensored-app-beta-production.up.railway.app/api";
 
+const DEFAULT_AVATAR = "default-profile.PNG";
+
 class ProfilePage {
   constructor() {
     this.user = null;
@@ -12,6 +14,11 @@ class ProfilePage {
     this.likedPosts = [];
     this.likesLoaded = false;
     this.likesContainer = null;
+
+    // followers/following modal state
+    this.followModalOpen = false;
+    this.followListMode = "followers"; // or "following"
+    this.followListCache = { followers: null, following: null };
   }
 
   async init() {
@@ -33,7 +40,6 @@ class ProfilePage {
     // Refresh from backend
     await this.fetchCurrentUser();
     await this.fetchUserPosts();
-    // Likes are lazy-loaded when Likes tab is opened
   }
 
   cacheDom() {
@@ -53,7 +59,7 @@ class ProfilePage {
     this.settingsButton = document.getElementById("settingsButton");
     this.editProfileBtn = document.getElementById("editProfileBtn");
 
-    // Modal
+    // Modal: edit profile
     this.editModal = document.getElementById("editProfileModal");
     this.editForm = document.getElementById("editProfileForm");
     this.editDisplayNameInput = document.getElementById("editDisplayName");
@@ -71,6 +77,19 @@ class ProfilePage {
     this.tabButtons = document.querySelectorAll(".tab-btn");
     this.postsTabPane = document.getElementById("postsTab");
     this.likesTabPane = document.getElementById("likesTab");
+
+    // Followers/Following click targets
+    this.followersStatBtn = document.getElementById("followersStatBtn");
+    this.followingStatBtn = document.getElementById("followingStatBtn");
+
+    // Follow list modal
+    this.followListModal = document.getElementById("followListModal");
+    this.followListTitle = document.getElementById("followListTitle");
+    this.followListBackBtn = document.getElementById("followListBackBtn");
+    this.followListItems = document.getElementById("followListItems");
+    this.followListLoading = document.getElementById("followListLoading");
+    this.followListEmpty = document.getElementById("followListEmpty");
+    this.followListError = document.getElementById("followListError");
   }
 
   bindEvents() {
@@ -99,10 +118,7 @@ class ProfilePage {
       this.editBioInput.addEventListener("input", () => {
         const len = this.editBioInput.value.length;
         this.bioCharCounter.textContent = `${len}/160`;
-        this.bioCharCounter.classList.toggle(
-          "warning",
-          len > 140 && len <= 160
-        );
+        this.bioCharCounter.classList.toggle("warning", len > 140 && len <= 160);
         this.bioCharCounter.classList.toggle("error", len > 160);
       });
     }
@@ -112,12 +128,28 @@ class ProfilePage {
       btn.addEventListener("click", () => this.switchTab(btn.dataset.tab));
     });
 
-    // Close modal on backdrop click
+    // Close edit modal on backdrop click
     if (this.editModal) {
       this.editModal.addEventListener("click", (e) => {
-        if (e.target === this.editModal) {
-          this.closeEditModal();
-        }
+        if (e.target === this.editModal) this.closeEditModal();
+      });
+    }
+
+    // Followers/Following
+    if (this.followersStatBtn) {
+      this.followersStatBtn.addEventListener("click", () => this.openFollowList("followers"));
+    }
+    if (this.followingStatBtn) {
+      this.followingStatBtn.addEventListener("click", () => this.openFollowList("following"));
+    }
+
+    // Follow list modal close
+    if (this.followListBackBtn) {
+      this.followListBackBtn.addEventListener("click", () => this.closeFollowList());
+    }
+    if (this.followListModal) {
+      this.followListModal.addEventListener("click", (e) => {
+        if (e.target === this.followListModal) this.closeFollowList();
       });
     }
   }
@@ -130,9 +162,7 @@ class ProfilePage {
       if (!token) return;
 
       const res = await fetch(`${PROFILE_API_BASE_URL}/auth/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: { Authorization: `Bearer ${token}` }
       });
 
       if (!res.ok) {
@@ -144,65 +174,48 @@ class ProfilePage {
       const user = await res.json();
       this.setUser(user);
 
-      if (window.setCurrentUser) {
-        setCurrentUser(user);
-      }
+      if (window.setCurrentUser) setCurrentUser(user);
     } catch (err) {
       console.warn("fetchCurrentUser error:", err);
     }
   }
 
-  /* ---------------- Fetch user posts (own posts tab) ---------------- */
+  /* ---------------- Fetch user posts ---------------- */
 
   async fetchUserPosts() {
     if (!this.user || !this.user.username || !this.postsContainer) return;
 
-    this.postsContainer.innerHTML = `
-      <div class="loading-indicator">Loading posts...</div>
-    `;
+    this.postsContainer.innerHTML = `<div class="loading-indicator">Loading posts...</div>`;
 
     try {
       const res = await fetch(
-        `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(
-          this.user.username
-        )}/posts`
+        `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(this.user.username)}/posts`
       );
       if (!res.ok) throw new Error("Failed to load posts");
 
       const posts = await res.json();
 
-      // Sort newest -> oldest
       this.posts = (posts || []).slice().sort((a, b) => {
         const aDate = a.created_at ? new Date(a.created_at) : 0;
         const bDate = b.created_at ? new Date(b.created_at) : 0;
         return bDate - aDate;
       });
 
-      if (this.postsCountEl) {
-        this.postsCountEl.textContent = this.posts.length.toString();
-      }
+      if (this.postsCountEl) this.postsCountEl.textContent = this.posts.length.toString();
 
       if (!this.posts.length) {
-        this.postsContainer.innerHTML = `
-          <div class="empty-state">
-            <h3>No posts yet</h3>
-          </div>
-        `;
+        this.postsContainer.innerHTML = `<div class="empty-state"><h3>No posts yet</h3></div>`;
         return;
       }
 
       this.renderPosts();
     } catch (err) {
       console.error("fetchUserPosts error:", err);
-      this.postsContainer.innerHTML = `
-        <div class="empty-state">
-          <h3>Error loading posts</h3>
-        </div>
-      `;
+      this.postsContainer.innerHTML = `<div class="empty-state"><h3>Error loading posts</h3></div>`;
     }
   }
 
-  /* ---------------- Fetch user liked posts (Likes tab) ---------------- */
+  /* ---------------- Likes ---------------- */
 
   ensureLikesContainer() {
     if (!this.likesTabPane) return;
@@ -216,7 +229,6 @@ class ProfilePage {
       this.likesTabPane.innerHTML = "";
       this.likesTabPane.appendChild(container);
     }
-
     this.likesContainer = container;
   }
 
@@ -226,21 +238,16 @@ class ProfilePage {
     this.ensureLikesContainer();
     if (!this.likesContainer) return;
 
-    this.likesContainer.innerHTML = `
-      <div class="loading-indicator">Loading likes...</div>
-    `;
+    this.likesContainer.innerHTML = `<div class="loading-indicator">Loading likes...</div>`;
 
     try {
       const res = await fetch(
-        `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(
-          this.user.username
-        )}/likes`
+        `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(this.user.username)}/likes`
       );
       if (!res.ok) throw new Error("Failed to load liked posts");
 
       const liked = await res.json();
 
-      // Sort newest -> oldest
       this.likedPosts = (liked || []).slice().sort((a, b) => {
         const aDate = a.created_at ? new Date(a.created_at) : 0;
         const bDate = b.created_at ? new Date(b.created_at) : 0;
@@ -250,31 +257,22 @@ class ProfilePage {
       this.likesLoaded = true;
 
       if (!this.likedPosts.length) {
-        this.likesContainer.innerHTML = `
-          <div class="empty-state">
-            <h3>No liked posts yet</h3>
-          </div>
-        `;
+        this.likesContainer.innerHTML = `<div class="empty-state"><h3>No liked posts yet</h3></div>`;
         return;
       }
 
       this.renderLikedPosts();
     } catch (err) {
       console.error("fetchUserLikedPosts error:", err);
-      this.likesContainer.innerHTML = `
-        <div class="empty-state">
-          <h3>Error loading liked posts</h3>
-        </div>
-      `;
+      this.likesContainer.innerHTML = `<div class="empty-state"><h3>Error loading liked posts</h3></div>`;
     }
   }
 
-  /* ---------------- RENDER POSTS (feed-style) ---------------- */
+  /* ---------------- RENDER POSTS ---------------- */
 
   renderPosts() {
     if (!this.postsContainer) return;
     this.postsContainer.innerHTML = "";
-
     this.posts.forEach((post) => {
       const el = this.createPostElement(post, { fromLikesTab: false });
       this.postsContainer.appendChild(el);
@@ -284,21 +282,12 @@ class ProfilePage {
   renderLikedPosts() {
     if (!this.likesContainer) return;
     this.likesContainer.innerHTML = "";
-
     this.likedPosts.forEach((post) => {
       const el = this.createPostElement(post, { fromLikesTab: true });
       this.likesContainer.appendChild(el);
     });
   }
 
-  /**
-   * Shared renderer for:
-   *  - own Posts tab
-   *  - Likes tab
-   *
-   * Layout + icons intentionally match feed.js
-   * Only difference: red trash icon on your own posts in Posts tab.
-   */
   createPostElement(post, options = {}) {
     const { fromLikesTab = false } = options;
 
@@ -307,52 +296,33 @@ class ProfilePage {
     article.dataset.postId = post.id;
     article.tabIndex = 0;
 
-    // Prefer real author data from API if present
     const author = post.user || post.author || this.user || {};
-    const avatar = author.avatar_url || "default-profile.png";
+    const avatar = author.avatar_url || DEFAULT_AVATAR;
     const username = author.username || "unknown";
     const displayName = author.display_name || username;
 
     const createdAt = post.created_at;
     const time = createdAt ? this.formatTime(createdAt) : "";
 
-    // is this my own post?
     const isOwnPost =
       this.user && (post.user_id === this.user.id || author.id === this.user.id);
 
-    // like / save flags same as feed.js
     const liked =
-      post.liked_by_me === true ||
-      post.is_liked === true ||
-      post.isLiked === true;
+      post.liked_by_me === true || post.is_liked === true || post.isLiked === true;
     const saved =
-      post.saved_by_me === true ||
-      post.is_saved === true ||
-      post.isSaved === true;
+      post.saved_by_me === true || post.is_saved === true || post.isSaved === true;
 
-    // like count
     let likeCount = 0;
-    if (typeof post.likes === "number") {
-      likeCount = post.likes;
-    } else if (typeof post.like_count === "number") {
-      likeCount = post.like_count;
-    } else if (Array.isArray(post.likes)) {
-      likeCount = post.likes.length;
-    }
+    if (typeof post.likes === "number") likeCount = post.likes;
+    else if (typeof post.like_count === "number") likeCount = post.like_count;
+    else if (Array.isArray(post.likes)) likeCount = post.likes.length;
 
-    // comment count
     let commentCount = 0;
-    if (typeof post.comments_count === "number") {
-      commentCount = post.comments_count;
-    } else if (typeof post.comment_count === "number") {
-      commentCount = post.comment_count;
-    } else if (Array.isArray(post.comments)) {
-      commentCount = post.comments.length;
-    } else if (typeof post.comments === "number") {
-      commentCount = post.comments;
-    }
+    if (typeof post.comments_count === "number") commentCount = post.comments_count;
+    else if (typeof post.comment_count === "number") commentCount = post.comment_count;
+    else if (Array.isArray(post.comments)) commentCount = post.comments.length;
+    else if (typeof post.comments === "number") commentCount = post.comments;
 
-    // media (image / video)
     const mediaUrl =
       post.media_url || post.media || post.image_url || post.video_url || null;
     const mediaType = post.media_type || "";
@@ -361,7 +331,7 @@ class ProfilePage {
     article.innerHTML = `
       <header class="post-header">
         <div class="post-user" data-username="${this.escapeHtml(username)}">
-          <img class="post-avatar" src="${avatar}" onerror="this.src='default-profile.png'">
+          <img class="post-avatar" src="${avatar}" onerror="this.src='${DEFAULT_AVATAR}'">
           <div class="post-user-meta">
             <span class="post-display-name">${this.escapeHtml(displayName)}</span>
             <span class="post-username">@${this.escapeHtml(username)}</span>
@@ -413,8 +383,6 @@ class ProfilePage {
         </div>
       </footer>
     `;
-
-    // --- Event hooks (same behaviour as feed.js) ---
 
     const likeBtn = article.querySelector(".like-btn");
     const commentBtn = article.querySelector(".comment-btn");
@@ -470,7 +438,6 @@ class ProfilePage {
       });
     }
 
-    // Whole card -> post.html (but ignore buttons/links)
     article.addEventListener("click", (e) => {
       const target = e.target;
       if (
@@ -509,7 +476,7 @@ class ProfilePage {
     return `
       <div class="post-media">
         <a href="${url}" target="_blank" rel="noopener noreferrer">
-          <img src="${url}" loading="lazy">
+          <img src="${url}" loading="lazy" onerror="this.style.display='none'">
         </a>
       </div>
     `;
@@ -537,14 +504,11 @@ class ProfilePage {
         `${PROFILE_API_BASE_URL}/posts/${encodeURIComponent(post.id)}`,
         {
           method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+          headers: { Authorization: `Bearer ${token}` }
         }
       );
 
       if (!res.ok) {
-        // Try JSON, then text
         let msg = "Failed to delete post";
         try {
           const data = await res.json();
@@ -556,7 +520,6 @@ class ProfilePage {
         throw new Error(msg);
       }
 
-      // remove from local arrays and UI
       this.posts = this.posts.filter((p) => p.id !== post.id);
       this.likedPosts = this.likedPosts.filter((p) => p.id !== post.id);
 
@@ -569,11 +532,7 @@ class ProfilePage {
       }
 
       if (!this.posts.length && this.postsContainer) {
-        this.postsContainer.innerHTML = `
-          <div class="empty-state">
-            <h3>No posts yet</h3>
-          </div>
-        `;
+        this.postsContainer.innerHTML = `<div class="empty-state"><h3>No posts yet</h3></div>`;
       }
     } catch (err) {
       console.error("confirmDeletePost error:", err);
@@ -603,7 +562,6 @@ class ProfilePage {
       post.liked_by_me === true ||
       post.is_liked === true;
 
-    // optimistic UI
     let newCount = currentCount + (wasLiked ? -1 : 1);
     if (newCount < 0) newCount = 0;
 
@@ -619,16 +577,13 @@ class ProfilePage {
         `${PROFILE_API_BASE_URL}/posts/${encodeURIComponent(post.id)}/like`,
         {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+          headers: { Authorization: `Bearer ${token}` }
         }
       );
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to update like");
 
-      // trust server count if provided
       const serverLikes =
         typeof data.likes === "number"
           ? data.likes
@@ -638,26 +593,17 @@ class ProfilePage {
 
       const nowLiked = data.liked === true ? true : !wasLiked;
 
-      if (serverLikes !== null && countEl) {
-        countEl.textContent = String(serverLikes);
-      }
+      if (serverLikes !== null && countEl) countEl.textContent = String(serverLikes);
 
       this.updateLocalPostState(post.id, {
         liked_by_me: nowLiked,
         is_liked: nowLiked,
-        likes:
-          serverLikes !== null
-            ? serverLikes
-            : newCount,
-        like_count:
-          serverLikes !== null
-            ? serverLikes
-            : newCount
+        likes: serverLikes !== null ? serverLikes : newCount,
+        like_count: serverLikes !== null ? serverLikes : newCount
       });
     } catch (err) {
       console.error("handleLike error:", err);
 
-      // revert UI
       btn.classList.toggle("liked", wasLiked);
       if (icon) {
         icon.classList.remove(wasLiked ? "fa-regular" : "fa-solid");
@@ -680,11 +626,8 @@ class ProfilePage {
 
     const icon = btn.querySelector("i");
     const wasSaved =
-      btn.classList.contains("saved") ||
-      post.saved_by_me === true ||
-      post.is_saved === true;
+      btn.classList.contains("saved") || post.saved_by_me === true || post.is_saved === true;
 
-    // optimistic UI
     btn.classList.toggle("saved", !wasSaved);
     if (icon) {
       icon.classList.remove(wasSaved ? "fa-solid" : "fa-regular");
@@ -696,9 +639,7 @@ class ProfilePage {
         `${PROFILE_API_BASE_URL}/posts/${encodeURIComponent(post.id)}/save`,
         {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+          headers: { Authorization: `Bearer ${token}` }
         }
       );
 
@@ -714,7 +655,6 @@ class ProfilePage {
     } catch (err) {
       console.error("handleSave error:", err);
 
-      // revert
       btn.classList.toggle("saved", wasSaved);
       if (icon) {
         icon.classList.remove(wasSaved ? "fa-regular" : "fa-solid");
@@ -728,17 +668,10 @@ class ProfilePage {
   handleSharePostClick(post) {
     if (!post || !post.id) return;
 
-    const url = `${window.location.origin}/post.html?id=${encodeURIComponent(
-      post.id
-    )}`;
+    const url = `${window.location.origin}/post.html?id=${encodeURIComponent(post.id)}`;
 
     if (navigator.share) {
-      navigator
-        .share({
-          title: "Check out this post",
-          url
-        })
-        .catch(() => {});
+      navigator.share({ title: "Check out this post", url }).catch(() => {});
     } else if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard
         .writeText(url)
@@ -749,14 +682,227 @@ class ProfilePage {
     }
   }
 
+  /* ---------------- Followers / Following Modal ---------------- */
+
+  openFollowList(mode) {
+    if (!this.user || !this.user.username || !this.followListModal) return;
+
+    this.followListMode = mode === "following" ? "following" : "followers";
+    if (this.followListTitle) {
+      this.followListTitle.textContent = this.followListMode === "followers" ? "Followers" : "Following";
+    }
+
+    this.followListModal.classList.add("open");
+    this.followListModal.classList.add("open"); // matches your modal style
+    this.followListModal.classList.add("open"); // harmless
+    this.followListModal.classList.add("open");
+
+    // your backdrop uses .open to display
+    this.followListModal.classList.add("open");
+
+    // but CSS uses .profile-modal-backdrop.open
+    this.followListModal.classList.add("open");
+
+    this.followListModal.classList.add("open");
+
+    // actually show it:
+    this.followListModal.classList.add("open");
+
+    // ensure display state resets
+    this.renderFollowListLoading();
+    this.fetchFollowList(mode);
+  }
+
+  closeFollowList() {
+    if (!this.followListModal) return;
+    this.followListModal.classList.remove("open");
+  }
+
+  renderFollowListLoading() {
+    if (this.followListItems) this.followListItems.innerHTML = "";
+    if (this.followListLoading) this.followListLoading.style.display = "block";
+    if (this.followListEmpty) this.followListEmpty.style.display = "none";
+    if (this.followListError) this.followListError.style.display = "none";
+  }
+
+  renderFollowListError() {
+    if (this.followListItems) this.followListItems.innerHTML = "";
+    if (this.followListLoading) this.followListLoading.style.display = "none";
+    if (this.followListEmpty) this.followListEmpty.style.display = "none";
+    if (this.followListError) this.followListError.style.display = "block";
+  }
+
+  renderFollowListEmpty() {
+    if (this.followListItems) this.followListItems.innerHTML = "";
+    if (this.followListLoading) this.followListLoading.style.display = "none";
+    if (this.followListError) this.followListError.style.display = "none";
+    if (this.followListEmpty) this.followListEmpty.style.display = "block";
+  }
+
+  async fetchFollowList(mode) {
+    const listMode = mode === "following" ? "following" : "followers";
+
+    // quick cache
+    if (this.followListCache[listMode]) {
+      this.renderFollowList(this.followListCache[listMode], listMode);
+      return;
+    }
+
+    try {
+      const username = this.user.username;
+      const token = typeof getAuthToken === "function" ? getAuthToken() : null;
+
+      // Try common endpoints:
+      // 1) /users/:username/followers
+      // 2) /users/:username/following
+      const url = `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(username)}/${listMode}`;
+
+      const res = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+
+      if (!res.ok) throw new Error("Failed");
+
+      const data = await res.json().catch(() => []);
+      const arr = Array.isArray(data) ? data : (data.users || data.items || []);
+
+      this.followListCache[listMode] = arr;
+
+      if (!arr || !arr.length) {
+        this.renderFollowListEmpty();
+        return;
+      }
+
+      this.renderFollowList(arr, listMode);
+    } catch (e) {
+      console.warn("fetchFollowList failed:", e);
+      this.renderFollowListError();
+    }
+  }
+
+  renderFollowList(users, listMode) {
+    if (!this.followListItems) return;
+
+    if (this.followListLoading) this.followListLoading.style.display = "none";
+    if (this.followListEmpty) this.followListEmpty.style.display = "none";
+    if (this.followListError) this.followListError.style.display = "none";
+
+    this.followListItems.innerHTML = "";
+
+    users.forEach((u) => {
+      const user = u.user || u || {};
+      const username = user.username || "";
+      const displayName = user.display_name || username || "User";
+      const avatar = user.avatar_url || DEFAULT_AVATAR;
+
+      // If API provides a flag like is_following / following
+      const isFollowing = user.is_following === true || user.following === true;
+
+      const row = document.createElement("div");
+      row.className = "followlist-row";
+
+      row.innerHTML = `
+        <img class="followlist-avatar" src="${avatar}" onerror="this.src='${DEFAULT_AVATAR}'" />
+        <div class="followlist-meta">
+          <div class="followlist-name">${this.escapeHtml(displayName)}</div>
+          <div class="followlist-username">@${this.escapeHtml(username)}</div>
+        </div>
+        <div class="followlist-action">
+          ${
+            username && this.user && username !== this.user.username
+              ? `<button class="follow-btn ${isFollowing ? "" : "primary"}" type="button">
+                   ${isFollowing ? "Unfollow" : "Follow"}
+                 </button>`
+              : ""
+          }
+        </div>
+      `;
+
+      const meta = row.querySelector(".followlist-meta");
+      if (meta && username) {
+        meta.addEventListener("click", () => {
+          this.closeFollowList();
+          if (this.user && username === this.user.username) {
+            window.location.href = "profile.html";
+          } else {
+            window.location.href = `user.html?user=${encodeURIComponent(username)}`;
+          }
+        });
+      }
+
+      const btn = row.querySelector(".follow-btn");
+      if (btn && username) {
+        btn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          await this.toggleFollow(username, btn);
+
+          // update cache locally so UI stays consistent
+          const nowFollowing = btn.textContent.trim().toLowerCase() === "unfollow";
+          user.is_following = nowFollowing;
+          user.following = nowFollowing;
+        });
+      }
+
+      this.followListItems.appendChild(row);
+    });
+  }
+
+  async toggleFollow(targetUsername, btn) {
+    const token = typeof getAuthToken === "function" ? getAuthToken() : null;
+    if (!token) {
+      alert("Please log in to follow users.");
+      return;
+    }
+
+    const wasFollowing = btn.textContent.trim().toLowerCase() === "unfollow";
+
+    // optimistic
+    btn.disabled = true;
+    btn.textContent = wasFollowing ? "Follow" : "Unfollow";
+    btn.classList.toggle("primary", wasFollowing);
+
+    try {
+      // Try common follow endpoints:
+      // 1) POST /users/:username/follow  (toggle)
+      // 2) POST /users/:username/followers (less likely)
+      // If your backend differs, tell me the exact route and I’ll lock it in.
+      const url = `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(targetUsername)}/follow`;
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Follow failed");
+
+      // If backend returns following state
+      const following =
+        data.following === true || data.is_following === true || data.followed === true
+          ? true
+          : data.following === false || data.is_following === false
+          ? false
+          : !wasFollowing;
+
+      btn.textContent = following ? "Unfollow" : "Follow";
+      btn.classList.toggle("primary", !following);
+    } catch (err) {
+      console.warn("toggleFollow error:", err);
+      // revert
+      btn.textContent = wasFollowing ? "Unfollow" : "Follow";
+      btn.classList.toggle("primary", !wasFollowing);
+      alert(err.message || "Could not follow/unfollow.");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   /* ---------------- Helpers ---------------- */
 
   updateLocalPostState(postId, changes) {
     const apply = (arr) => {
       const idx = arr.findIndex((p) => p.id === postId);
-      if (idx !== -1) {
-        arr[idx] = { ...arr[idx], ...changes };
-      }
+      if (idx !== -1) arr[idx] = { ...arr[idx], ...changes };
     };
     apply(this.posts);
     apply(this.likedPosts);
@@ -764,12 +910,8 @@ class ProfilePage {
 
   formatContent(text) {
     const safe = this.escapeHtml(text || "");
-
     return safe
-      .replace(
-        /(https?:\/\/[^\s]+)/g,
-        '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
-      )
+      .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>')
       .replace(/#(\w+)/g, '<span class="hashtag">#$1</span>')
       .replace(/@(\w+)/g, '<span class="mention">@$1</span>');
   }
@@ -788,9 +930,9 @@ class ProfilePage {
     if (this.joinEl) this.joinEl.textContent = this.formatJoinDate(createdAt);
 
     if (this.avatarEl) {
-      this.avatarEl.src = this.user.avatar_url || "default-profile.png";
+      this.avatarEl.src = this.user.avatar_url || DEFAULT_AVATAR;
       this.avatarEl.onerror = () => {
-        this.avatarEl.src = "default-profile.png";
+        this.avatarEl.src = DEFAULT_AVATAR;
       };
     }
 
@@ -808,14 +950,10 @@ class ProfilePage {
       this.postsCountEl.textContent = (this.user.posts_count || 0).toString();
     }
     if (this.followersCountEl) {
-      this.followersCountEl.textContent = (
-        this.user.followers_count || 0
-      ).toString();
+      this.followersCountEl.textContent = (this.user.followers_count || 0).toString();
     }
     if (this.followingCountEl) {
-      this.followingCountEl.textContent = (
-        this.user.following_count || 0
-      ).toString();
+      this.followingCountEl.textContent = (this.user.following_count || 0).toString();
     }
   }
 
@@ -864,17 +1002,11 @@ class ProfilePage {
       let banner_url = this.user.banner_url || null;
 
       if (this.avatarFileInput && this.avatarFileInput.files[0]) {
-        avatar_url = await this.uploadImageFile(
-          this.avatarFileInput.files[0],
-          "avatar"
-        );
+        avatar_url = await this.uploadImageFile(this.avatarFileInput.files[0], "avatar");
       }
 
       if (this.bannerFileInput && this.bannerFileInput.files[0]) {
-        banner_url = await this.uploadImageFile(
-          this.bannerFileInput.files[0],
-          "banner"
-        );
+        banner_url = await this.uploadImageFile(this.bannerFileInput.files[0], "banner");
       }
 
       const token = typeof getAuthToken === "function" ? getAuthToken() : null;
@@ -886,19 +1018,11 @@ class ProfilePage {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({
-          display_name,
-          bio,
-          avatar_url,
-          banner_url
-        })
+        body: JSON.stringify({ display_name, bio, avatar_url, banner_url })
       });
 
       const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to update profile");
-      }
+      if (!res.ok) throw new Error(data.error || "Failed to update profile");
 
       this.setUser(data);
       if (window.setCurrentUser) setCurrentUser(data);
@@ -906,13 +1030,10 @@ class ProfilePage {
       this.editSuccessEl.textContent = "Profile updated!";
       this.editSuccessEl.classList.remove("hidden");
 
-      setTimeout(() => {
-        this.closeEditModal();
-      }, 700);
+      setTimeout(() => this.closeEditModal(), 700);
     } catch (err) {
       console.error("handleEditSubmit error:", err);
-      this.editErrorEl.textContent =
-        err.message || "Failed to update profile";
+      this.editErrorEl.textContent = err.message || "Failed to update profile";
       this.editErrorEl.classList.remove("hidden");
     } finally {
       if (this.saveProfileBtn) {
@@ -934,18 +1055,11 @@ class ProfilePage {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({
-        imageData: base64,
-        kind
-      })
+      body: JSON.stringify({ imageData: base64, kind })
     });
 
     const data = await res.json().catch(() => ({}));
-
-    if (!res.ok || !data.url) {
-      throw new Error(data.error || `Failed to upload ${kind} image`);
-    }
-
+    if (!res.ok || !data.url) throw new Error(data.error || `Failed to upload ${kind} image`);
     return data.url;
   }
 
@@ -958,8 +1072,7 @@ class ProfilePage {
         if (commaIndex === -1) return resolve(result);
         resolve(result.slice(commaIndex + 1));
       };
-      reader.onerror = () =>
-        reject(reader.error || new Error("File read error"));
+      reader.onerror = () => reject(reader.error || new Error("File read error"));
       reader.readAsDataURL(file);
     });
   }
@@ -972,21 +1085,17 @@ class ProfilePage {
     this.postsTabPane.classList.toggle("active", tabName === "posts");
     this.likesTabPane.classList.toggle("active", tabName === "likes");
 
-    if (tabName === "likes" && !this.likesLoaded) {
-      this.fetchUserLikedPosts();
-    }
+    if (tabName === "likes" && !this.likesLoaded) this.fetchUserLikedPosts();
   }
 
   formatJoinDate(dateString) {
     if (!dateString) return "Joined —";
     const date = new Date(dateString);
     if (Number.isNaN(date.getTime())) return "Joined —";
-
     const opts = { month: "long", year: "numeric" };
     return `Joined ${date.toLocaleDateString(undefined, opts)}`;
   }
 
-  // same relative time logic as feed.js
   formatTime(ts) {
     const d = new Date(ts);
     if (isNaN(d)) return "";
