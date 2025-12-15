@@ -760,7 +760,21 @@ class SearchManager {
   /* ---------- LOADING ANIMATION ---------- */
 
   showLoadingAnimation() {
-    this.hideAllStates();
+    // ✅ ONLY show loader while loading. Hide results header/state during loading.
+    // Keep everything else the same.
+
+    // Hide other states but DO NOT inject loader into results container anymore.
+    ["searchDefault", "searchResultsState", "noResults"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = "none";
+    });
+
+    // Clear any previous no-results message inside results state
+    const resultsState = document.getElementById("searchResultsState");
+    if (resultsState) {
+      const existingMsg = resultsState.querySelector(".no-results-message");
+      if (existingMsg) existingMsg.remove();
+    }
 
     const existingLoader = document.getElementById("searchLoadingAnimation");
     if (existingLoader) existingLoader.remove();
@@ -779,82 +793,89 @@ class SearchManager {
       </div>
     `;
 
-    // ✅ FIX: only inject the style once (prevents duplicates)
+    // Prevent duplicate style tags
     if (!document.getElementById("searchLoadingStyles")) {
       const style = document.createElement("style");
       style.id = "searchLoadingStyles";
       style.textContent = `
-      .loading-animation {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        padding: 40px 20px;
-        text-align: center;
-      }
+        .loading-animation {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 40px 20px;
+          text-align: center;
+        }
 
-      .loading-spinner {
-        width: 50px;
-        height: 50px;
-        border: 4px solid rgba(0, 0, 0, 0.1);
-        border-radius: 50%;
-        border-top-color: var(--primary-color, #3498db);
-        animation: spin 1s ease-in-out infinite;
-        margin-bottom: 20px;
-      }
+        .loading-spinner {
+          width: 50px;
+          height: 50px;
+          border: 4px solid rgba(0, 0, 0, 0.1);
+          border-radius: 50%;
+          border-top-color: var(--primary-color, #3498db);
+          animation: spin 1s ease-in-out infinite;
+          margin-bottom: 20px;
+        }
 
-      .loading-text {
-        font-size: 18px;
-        font-weight: 500;
-        color: var(--text-color, #333);
-        margin-bottom: 15px;
-      }
+        .loading-text {
+          font-size: 18px;
+          font-weight: 500;
+          color: var(--text-color, #333);
+          margin-bottom: 15px;
+        }
 
-      .loading-dots {
-        display: flex;
-        gap: 8px;
-      }
+        .loading-dots {
+          display: flex;
+          gap: 8px;
+        }
 
-      .loading-dots .dot {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background-color: var(--primary-color, #3498db);
-        animation: bounce 1.4s infinite ease-in-out both;
-      }
+        .loading-dots .dot {
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          background-color: var(--primary-color, #3498db);
+          animation: bounce 1.4s infinite ease-in-out both;
+        }
 
-      .loading-dots .dot:nth-child(1) { animation-delay: -0.32s; }
-      .loading-dots .dot:nth-child(2) { animation-delay: -0.16s; }
+        .loading-dots .dot:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dots .dot:nth-child(2) { animation-delay: -0.16s; }
 
-      @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-      @keyframes bounce {
-        0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
-        40% { transform: scale(1); opacity: 1; }
-      }
-    `;
+        @keyframes bounce {
+          0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
+          40% { transform: scale(1); opacity: 1; }
+        }
+      `;
       document.head.appendChild(style);
     }
 
-    // ✅ FIX: DO NOT wipe out the results DOM (this was the bug)
-    const resultsContainer =
-      document.getElementById("searchResultsState") ||
-      document.getElementById("searchDefault") ||
-      document.querySelector(".search-results") ||
-      document.querySelector(".search-container");
-
-    if (resultsContainer) {
-      resultsContainer.style.display = "block";
-
-      // ✅ Don't do: resultsContainer.innerHTML = "";
-      // Just show loader inside container
-      resultsContainer.prepend(loader);
-    } else {
-      document.body.insertBefore(loader, document.body.firstChild);
+    // ✅ Put loader in #searchLoading (dedicated loading state)
+    const loadingState = document.getElementById("searchLoading");
+    if (loadingState) {
+      loadingState.style.display = "block";
+      loadingState.innerHTML = "";
+      loadingState.appendChild(loader);
+      return;
     }
+
+    // Fallback if #searchLoading doesn't exist
+    const fallbackContainer =
+      document.querySelector(".search-results") ||
+      document.querySelector(".search-container") ||
+      document.body;
+
+    fallbackContainer.appendChild(loader);
   }
 
   hideLoadingAnimation() {
+    // ✅ hide the dedicated loading state
+    const loadingState = document.getElementById("searchLoading");
+    if (loadingState) {
+      loadingState.style.display = "none";
+      loadingState.innerHTML = "";
+    }
+
     const loader = document.getElementById("searchLoadingAnimation");
     if (loader) loader.remove();
   }
