@@ -5,17 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Uncensored Social — Early Access</title>
 
-  <meta name="description" content="Uncensored Social: a privacy-first social platform with free speech, honest timelines, and no data brokering. Join the early access waitlist." />
+  <meta name="description" content="Uncensored Social: free speech, privacy, honest timelines. Join the early access waitlist." />
 
   <link rel="stylesheet" href="css/waitlist.css" />
 </head>
 <body>
   <div class="page">
 
-    <!-- Header -->
-    <header class="header">
+    <!-- Sticky Header -->
+    <header class="header" id="top">
       <div class="brand">
-        <img src="uncensored-logo.PNG" alt="Uncensored Social logo" class="logo" />
+        <img src="uncensored-logo.PNG" alt="Uncensored Social" class="logo" />
         <div class="brandText">
           <div class="brandName">Uncensored Social</div>
           <div class="brandTag">Free speech • Privacy • Honest timelines</div>
@@ -23,38 +23,39 @@
       </div>
 
       <nav class="nav">
-        <a class="navLink" href="#mission">Mission</a>
-        <a class="navLink" href="#countdown">Launch</a>
-        <a class="btn btnPrimary" href="#waitlist">Join waitlist</a>
+        <a class="navLink" href="#mission" data-scroll>Mission</a>
+        <a class="navLink" href="#countdown" data-scroll>Launch</a>
+        <a class="btn btnGhost" href="#donate" data-scroll>Support the build</a>
+        <a class="btn btnPrimary" href="#waitlist" data-scroll>Join waitlist</a>
       </nav>
     </header>
 
-    <!-- Hero -->
     <main class="container">
-      <section class="hero">
+      <!-- HERO -->
+      <section class="hero" id="mission">
         <div class="heroLeft">
-          <div class="pill">Building in public • community-funded</div>
+          <div class="pill">Early access • Priority invites</div>
 
           <h1>Social media for people who refuse to be watched or silenced.</h1>
 
           <p class="subtitle">
-            Uncensored Social is an independent platform built around free expression and privacy —
+            An independent platform built around free expression and privacy —
             with <strong>New</strong>, <strong>Following</strong>, and <strong>Trending</strong> feeds instead of one manipulated algorithm.
           </p>
 
-          <div class="bullets" id="mission">
+          <div class="bullets">
             <div class="bullet">
               <div class="bulletIcon"></div>
               <div class="bulletText">
-                <strong>No data brokering.</strong>
-                <span>No selling, no renting, no “partners” buying your identity.</span>
+                <strong>No selling your identity.</strong>
+                <span>No renting, no “partners,” no ad network profiles.</span>
               </div>
             </div>
 
             <div class="bullet">
               <div class="bulletIcon"></div>
               <div class="bulletText">
-                <strong>Minimal rules, human enforcement.</strong>
+                <strong>Rules that make sense.</strong>
                 <span>Focused on spam & real crimes — not opinions.</span>
               </div>
             </div>
@@ -62,24 +63,24 @@
             <div class="bullet">
               <div class="bulletIcon"></div>
               <div class="bulletText">
-                <strong>Encrypted messaging on the roadmap.</strong>
-                <span>Designed from day one with end-to-end encryption as the destination.</span>
+                <strong>Built for speed.</strong>
+                <span>Fast timelines. Low friction. No junk UI.</span>
               </div>
             </div>
           </div>
 
           <div class="ctaRow">
-            <a class="btn btnPrimary btnBig" href="#waitlist">Join waitlist</a>
-            <a class="btn btnGhost btnBig" href="#donate">Support the build</a>
+            <a class="btn btnPrimary btnBig" href="#waitlist" data-scroll>Join waitlist</a>
+            <a class="btn btnGhost btnBig" href="#donate" data-scroll>Support the build</a>
           </div>
 
           <div class="trustLine">
             <span class="trustDot"></span>
-            <span>No spam • No tracking pixels • No selling your info</span>
+            <span>No spam • No tracking pixels • Info never sold</span>
           </div>
         </div>
 
-        <!-- Right: Countdown + Status -->
+        <!-- RIGHT: COUNTDOWN -->
         <aside class="heroRight" id="countdown">
           <div class="card cardTight">
             <div class="cardHeader">
@@ -115,31 +116,22 @@
           </div>
 
           <div class="card cardTight">
-            <div class="founding">
-              <div class="foundingTop">
-                <div class="foundingBadge">FOUNDING</div>
-                <div class="foundingText">
-                  <strong>Early supporters get priority invites.</strong>
-                  <span>You’ll also receive a visible “Founding” badge at launch.</span>
-                </div>
-              </div>
-              <div class="divider"></div>
-              <div class="foundingSmall">
-                We’re building the timeline people thought they were getting in 2012 —
-                before everything became surveillance and rage-bait.
-              </div>
+            <div class="cardLabel">Why this exists</div>
+            <div class="cardTitle" style="margin-top:6px;font-size:16px;">
+              A timeline that respects you.
+            </div>
+            <div class="cardNote" style="margin-top:8px;">
+              No hidden tracking, no identity brokering, no algorithmic shaping.
             </div>
           </div>
         </aside>
       </section>
 
-      <!-- Waitlist Form -->
+      <!-- WAITLIST -->
       <section class="card waitlistCard" id="waitlist">
         <div class="waitlistHeader">
           <h2>Join the early-access list</h2>
-          <p>
-            Launch info, critical updates, early access invites. That’s it.
-          </p>
+          <p>Launch updates, early access invites, and critical platform changes. That’s it.</p>
         </div>
 
         <form id="waitlistForm" class="form" novalidate>
@@ -147,27 +139,34 @@
             <div class="field">
               <label for="email">Email (required)</label>
               <div class="inputWrap">
-                <input id="email" type="email" placeholder="you@domain.com" autocomplete="email" />
+                <input id="email" type="email" placeholder="you@domain.com" autocomplete="email" required />
               </div>
+              <div class="hint">We email your invite. That’s why it’s required.</div>
             </div>
 
             <div class="field">
               <label for="phone">Phone (optional SMS launch alert)</label>
-              <div class="inputWrap">
-                <input id="phone" type="tel" placeholder="+1 (555) 555-5555" autocomplete="tel" />
+
+              <div class="inputWrap phoneWrap">
+                <button type="button" class="countryBtn" id="countryBtn" aria-label="Choose country">
+                  <span class="flag" id="countryFlag">🇺🇸</span>
+                  <span class="dial" id="countryDial">+1</span>
+                  <span class="chev">▾</span>
+                </button>
+
+                <input id="phone" type="tel" placeholder="(555) 555-5555" autocomplete="tel" />
               </div>
+
+              <div class="countryMenu" id="countryMenu" role="menu" aria-hidden="true"></div>
+              <div class="hint">Optional. If you add a phone, we can send SMS updates too.</div>
             </div>
           </div>
 
+          <!-- ONE CHECKBOX: email updates + optional SMS if phone provided -->
           <div class="checks">
             <label class="check">
               <input type="checkbox" id="consentEmail" />
-              <span>I agree to receive email updates about launch & critical platform changes.</span>
-            </label>
-
-            <label class="check">
-              <input type="checkbox" id="consentSms" />
-              <span>Send me a one-time SMS when early access opens (only if I provide a phone number).</span>
+              <span>I agree to receive email updates (and optional SMS updates if I provide a phone number).</span>
             </label>
           </div>
 
@@ -182,44 +181,43 @@
         </form>
       </section>
 
-      <!-- Donate -->
+      <!-- DONATE (buttons link to donate.html) -->
       <section class="card donateCard" id="donate">
         <div class="donateHeader">
           <h2>Support the platform</h2>
-          <p>
-            Donations fund servers, privacy engineering, and encrypted messaging infrastructure.
-          </p>
+          <p>Donations fund servers, privacy engineering, and encrypted messaging infrastructure.</p>
         </div>
 
         <div class="donateGrid">
-          <button class="tier" type="button" data-donate="5">
+          <a class="tier" href="donate.html">
             <div class="tierTop">
               <strong>$5 — Supporter</strong>
               <span>Your name on the thank-you wall at launch.</span>
             </div>
             <div class="tierBtn">Donate $5</div>
-          </button>
+          </a>
 
-          <button class="tier" type="button" data-donate="20">
+          <a class="tier" href="donate.html">
             <div class="tierTop">
               <strong>$20 — Early Backer</strong>
               <span>Early access + a visible supporter badge.</span>
             </div>
             <div class="tierBtn">Donate $20</div>
-          </button>
+          </a>
 
-          <button class="tier tierPrimary" type="button" data-donate="50">
+          <a class="tier tierPrimary" href="donate.html">
             <div class="tierTop">
               <strong>$50+ — Founder</strong>
-              <span>Priority invite + “Founding” profile badge.</span>
+              <span>Help fund servers + privacy-first development.</span>
             </div>
             <div class="tierBtn">Donate</div>
-          </button>
+          </a>
         </div>
 
         <div class="cryptoRow">
           <div class="cryptoTitle">Crypto accepted</div>
           <div class="cryptoIcons">
+            <!-- NOT capitalized, only PNG is uppercase -->
             <img src="bitcoin.PNG" alt="Bitcoin" />
             <img src="ethereum.PNG" alt="Ethereum" />
             <img src="monero.PNG" alt="Monero" />
@@ -227,7 +225,7 @@
             <img src="usdc.PNG" alt="USDC" />
             <img src="usdt.PNG" alt="USDT" />
           </div>
-          <button class="btn btnGhost" type="button" id="cryptoCheckoutBtn">Open crypto checkout</button>
+          <a class="btn btnGhost" href="donate.html">Open crypto checkout</a>
         </div>
 
         <div class="smallNote">
@@ -240,7 +238,6 @@
         <div>© <span id="year"></span> Uncensored Social — independent & community-funded.</div>
       </footer>
     </main>
-
   </div>
 
   <script src="js/waitlist.js"></script>
