@@ -1,9 +1,20 @@
 // js/profile.js
 
-const PROFILE_API_BASE_URL =
-  typeof API_BASE_URL !== "undefined"
-    ? API_BASE_URL
-    : "https://uncensored-app-beta-production.up.railway.app/api";
+// ✅ Robust API base builder (prevents /api/api and missing /api)
+function normalizeApiBase(raw) {
+  let b = String(raw || "").trim();
+  b = b.replace(/\/+$/, ""); // remove trailing slashes
+
+  if (!b) return "https://uncensored-app-beta-production.up.railway.app/api";
+
+  // If someone set API_BASE_URL to the domain (no /api), add it.
+  // If they set it to ".../api", keep it.
+  return b.endsWith("/api") ? b : b + "/api";
+}
+
+const PROFILE_API_BASE_URL = normalizeApiBase(
+  typeof API_BASE_URL !== "undefined" ? API_BASE_URL : ""
+);
 
 class ProfilePage {
   constructor() {
@@ -160,6 +171,26 @@ class ProfilePage {
     }
   }
 
+  /* ---------------- Small helpers ---------------- */
+
+  buildOptionalAuthHeaders() {
+    const token = typeof getAuthToken === "function" ? getAuthToken() : null;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  // ✅ Accept either:
+  //  - an array: [...]
+  //  - { posts: [...] } or { data: [...] } or { results: [...] }
+  normalizeListPayload(payload) {
+    if (Array.isArray(payload)) return payload;
+    if (!payload || typeof payload !== "object") return [];
+    if (Array.isArray(payload.posts)) return payload.posts;
+    if (Array.isArray(payload.data)) return payload.data;
+    if (Array.isArray(payload.results)) return payload.results;
+    if (Array.isArray(payload.items)) return payload.items;
+    return [];
+  }
+
   /* ---------------- Fetch current user ---------------- */
 
   async fetchCurrentUser() {
@@ -188,16 +219,21 @@ class ProfilePage {
 
     this.postsContainer.innerHTML = `<div class="loading-indicator">Loading posts...</div>`;
 
+    const url = `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(this.user.username)}/posts`;
+
     try {
-      const res = await fetch(
-        `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(this.user.username)}/posts`,
-        { headers: this.buildOptionalAuthHeaders() }
-      );
-      if (!res.ok) throw new Error("Failed to load posts");
+      const res = await fetch(url, { headers: this.buildOptionalAuthHeaders() });
 
-      const posts = await res.json();
+      // ✅ Better error visibility (keeps UI the same)
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Failed to load posts (${res.status}) ${text}`.trim());
+      }
 
-      this.posts = (posts || []).slice().sort((a, b) => {
+      const payload = await res.json().catch(() => null);
+      const postsArr = this.normalizeListPayload(payload);
+
+      this.posts = (postsArr || []).slice().sort((a, b) => {
         const aDate = a.created_at ? new Date(a.created_at) : 0;
         const bDate = b.created_at ? new Date(b.created_at) : 0;
         return bDate - aDate;
@@ -220,7 +256,7 @@ class ProfilePage {
   /* ---------------- Likes tab ---------------- */
 
   ensureLikesContainer() {
-    if (!this.likesTabPane) return;
+    if (!this.likesTabPane) return null;
     let container = this.likesTabPane.querySelector(".profile-posts");
     if (!container) {
       container = document.createElement("div");
@@ -236,17 +272,24 @@ class ProfilePage {
     if (!this.user || !this.user.username || !this.likesTabPane) return;
 
     const likesContainer = this.ensureLikesContainer();
+    if (!likesContainer) return;
+
     likesContainer.innerHTML = `<div class="loading-indicator">Loading likes...</div>`;
 
-    try {
-      const res = await fetch(
-        `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(this.user.username)}/likes`,
-        { headers: this.buildOptionalAuthHeaders() }
-      );
-      if (!res.ok) throw new Error("Failed to load liked posts");
+    const url = `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(this.user.username)}/likes`;
 
-      const liked = await res.json();
-      this.likedPosts = (liked || []).slice().sort((a, b) => {
+    try {
+      const res = await fetch(url, { headers: this.buildOptionalAuthHeaders() });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Failed to load liked posts (${res.status}) ${text}`.trim());
+      }
+
+      const payload = await res.json().catch(() => null);
+      const likedArr = this.normalizeListPayload(payload);
+
+      this.likedPosts = (likedArr || []).slice().sort((a, b) => {
         const aDate = a.created_at ? new Date(a.created_at) : 0;
         const bDate = b.created_at ? new Date(b.created_at) : 0;
         return bDate - aDate;
@@ -456,9 +499,8 @@ class ProfilePage {
   openFollowList(tab) {
     if (!this.followListModal || !this.user?.username) return;
     this.followListError?.classList.add("hidden");
-    this.followListError.textContent = "";
+    if (this.followListError) this.followListError.textContent = "";
 
-    // set counts in header
     const fCount = Number(this.user.followers_count || this.followersCountEl?.textContent || 0);
     const fgCount = Number(this.user.following_count || this.followingCountEl?.textContent || 0);
     if (this.followersTabCount) this.followersTabCount.textContent = String(fCount);
@@ -504,9 +546,7 @@ class ProfilePage {
       this.followers = Array.isArray(data.users) ? data.users : [];
       this.followersLoaded = true;
 
-      // update counts from server truth
       this.applyFollowCountsFromServer(data);
-
       this.renderFollowRows("followers");
     } catch (err) {
       console.error("fetchFollowers error:", err);
@@ -535,7 +575,6 @@ class ProfilePage {
       this.followingLoaded = true;
 
       this.applyFollowCountsFromServer(data);
-
       this.renderFollowRows("following");
     } catch (err) {
       console.error("fetchFollowing error:", err);
@@ -587,13 +626,6 @@ class ProfilePage {
       const avatar = u.avatar_url || "default-profile.PNG";
       const display = u.display_name || u.username;
 
-      // Button label rules:
-      // - Followers tab:
-      //    if viewer already follows them -> "Following"
-      //    else -> "Follow back" (because they follow you)
-      // - Following tab:
-      //    if viewer follows them -> "Following"
-      //    else -> "Follow"
       const isFollowing = u.is_following === true;
 
       let label = "Follow";
@@ -607,7 +639,6 @@ class ProfilePage {
         btnClass = isFollowing ? "followlist-action ghost" : "followlist-action primary";
       }
 
-      // Don’t show follow button for yourself
       const isMe = this.user && u.username === this.user.username;
 
       row.innerHTML = `
@@ -625,7 +656,6 @@ class ProfilePage {
         }
       `;
 
-      // click anywhere on left side -> open profile
       row.addEventListener("click", (e) => {
         const btn = e.target.closest("button");
         if (btn) return;
@@ -657,8 +687,6 @@ class ProfilePage {
     const username = userObj?.username;
     if (!username) return;
 
-    // optimistic toggle
-    const wasFollowing = btn.dataset.following === "1";
     btn.disabled = true;
 
     try {
@@ -666,9 +694,7 @@ class ProfilePage {
         `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(username)}/follow`,
         {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+          headers: { Authorization: `Bearer ${token}` }
         }
       );
 
@@ -677,16 +703,11 @@ class ProfilePage {
 
       const nowFollowing = data.following === true;
 
-      // update counts from server response (these are for TARGET USER in backend,
-      // but we can still use them to refresh our /auth/me later.
-      // For accurate "me" counts, we’ll just refetch /auth/me quickly.)
       await this.fetchCurrentUser();
 
-      // update local list state for this row
       userObj.is_following = nowFollowing;
       btn.dataset.following = nowFollowing ? "1" : "0";
 
-      // update label styles based on tab
       if (mode === "followers") {
         btn.textContent = nowFollowing ? "Following" : "Follow back";
         btn.classList.toggle("primary", !nowFollowing);
@@ -697,7 +718,6 @@ class ProfilePage {
         btn.classList.toggle("ghost", nowFollowing);
       }
 
-      // If we unfollow someone inside Following tab, remove them from the list (TikTok behavior)
       if (mode === "following" && !nowFollowing) {
         this.following = this.following.filter((x) => x.username !== username);
         this.renderFollowRows("following");
@@ -708,11 +728,6 @@ class ProfilePage {
     } finally {
       btn.disabled = false;
     }
-  }
-
-  buildOptionalAuthHeaders() {
-    const token = typeof getAuthToken === "function" ? getAuthToken() : null;
-    return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
   /* ---------------- Edit profile ---------------- */
@@ -751,7 +766,6 @@ class ProfilePage {
     if (this.followersCountEl) this.followersCountEl.textContent = String(this.user.followers_count || 0);
     if (this.followingCountEl) this.followingCountEl.textContent = String(this.user.following_count || 0);
 
-    // update modal header counts if it’s open
     if (this.followListModal && this.followListModal.classList.contains("open")) {
       if (this.followersTabCount) this.followersTabCount.textContent = String(this.user.followers_count || 0);
       if (this.followingTabCount) this.followingTabCount.textContent = String(this.user.following_count || 0);
