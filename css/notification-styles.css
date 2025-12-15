@@ -264,3 +264,33 @@
   color: #fff;
   opacity: 1;
 }
+
+/* ================================
+   Fix: Don't highlight the row when tapping Follow/Following button
+   ================================ */
+
+/* iOS/Safari tap highlight off for the button */
+.notification-follow-btn {
+  -webkit-tap-highlight-color: transparent;
+  tap-highlight-color: transparent;
+}
+
+/* When the tap is on the button, don't allow the row to "active" flash */
+.notification-item:has(.notification-follow-btn:active),
+.notification-item:has(.notification-follow-btn:focus),
+.notification-item:has(.notification-follow-btn:focus-visible) {
+  background-color: inherit !important;
+}
+
+/* If :has isn't supported, this still helps on iOS */
+.notification-follow-btn:active {
+  transform: none !important;
+  filter: none !important;
+}
+
+/* Optional: keep hover behavior for the row, but not when button is the target */
+.notification-follow-btn:active,
+.notification-follow-btn:focus,
+.notification-follow-btn:focus-visible {
+  outline: none;
+}
