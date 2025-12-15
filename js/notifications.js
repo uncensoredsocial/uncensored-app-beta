@@ -14,33 +14,31 @@ const NOTIF_API_BASE_URL =
 
 class NotificationsManager {
   constructor() {
-    // poll every second for live-ish updates
     this.pollIntervalMs = 1000;
     this.pollTimer = null;
 
-    // pause polling after follow/unfollow to prevent UI flip-flop
-    this.pauseUntil = 0; // timestamp ms
-    this.pauseAfterActionMs = 2000;
-
-    // prevent overlapping loads
-    this.isLoading = false;
-
-    // prevent duplicate clicks / in-flight toggles per username
-    this.followInFlight = new Set();
-
     this.currentUser = null;
 
-    // unified list + filter bar
     this.listEl = document.getElementById("notificationsList");
     this.emptyState = document.getElementById("notificationsEmpty");
     this.filterButtons = document.querySelectorAll(".notif-filter-btn");
 
-    // store raw arrays + unified
     this.likes = [];
     this.comments = [];
     this.followers = [];
     this.unified = [];
     this.currentFilter = "all";
+
+    // prevent overlapping loads
+    this.isLoading = false;
+
+    // prevent spam clicking / double requests
+    this.followInFlight = new Set();
+
+    // 🔒 Lock follow states briefly after click so polling/enrich can't override
+    // Map<username, { isFollowing: boolean, until: number }>
+    this.followStateLocks = new Map();
+    this.followLockMs = 5000;
 
     // avoid pointless DOM churn
     this.lastRenderKey = "";
@@ -56,7 +54,6 @@ class NotificationsManager {
       this.currentUser = null;
     }
 
-    // If user object exists but token is missing, treat as logged out
     const token = this.getAuthToken();
     if (!this.currentUser || !token) {
       this.showLoggedOutState();
@@ -68,7 +65,6 @@ class NotificationsManager {
 
     await this.loadAllNotifications({ force: true });
 
-    // start polling
     this.pollTimer = setInterval(() => {
       if (document.hidden) return;
       this.loadAllNotifications();
@@ -89,7 +85,6 @@ class NotificationsManager {
 
   showLoggedOutState() {
     if (this.listEl) this.listEl.innerHTML = "";
-
     if (this.emptyState) {
       this.emptyState.style.display = "block";
       this.emptyState.innerHTML = `
@@ -98,8 +93,6 @@ class NotificationsManager {
       `;
     }
   }
-
-  // --------- Filter bar (All / Likes / Comments / Followers) ---------
 
   setupFilterBar() {
     if (!this.filterButtons || !this.filterButtons.length) return;
@@ -113,13 +106,11 @@ class NotificationsManager {
           b.classList.toggle("active", b === btn)
         );
 
-        // no need to refetch, just re-render
         this.renderUnified({ preserveScroll: true, force: true });
       });
     });
   }
 
-  // Delegated click handling so re-rendering is safe
   setupEventDelegation() {
     if (!this.listEl) return;
 
@@ -129,7 +120,7 @@ class NotificationsManager {
 
       const type = item.dataset.type;
 
-      // follow/unfollow button for follower notifications
+      // follow/unfollow button
       if (type === "followers" && e.target.closest(".notification-follow-btn")) {
         const btn = e.target.closest("button");
         const username = item.dataset.username;
@@ -167,14 +158,45 @@ class NotificationsManager {
     });
   }
 
+  // ---------- LOCK HELPERS ----------
+
+  isLocked(username) {
+    if (!username) return false;
+    const entry = this.followStateLocks.get(username);
+    if (!entry) return false;
+    if (Date.now() > entry.until) {
+      this.followStateLocks.delete(username);
+      return false;
+    }
+    return true;
+  }
+
+  getLockedState(username) {
+    const entry = this.followStateLocks.get(username);
+    if (!entry) return null;
+    if (Date.now() > entry.until) {
+      this.followStateLocks.delete(username);
+      return null;
+    }
+    return !!entry.isFollowing;
+  }
+
+  setLock(username, isFollowing) {
+    if (!username) return;
+    this.followStateLocks.set(username, {
+      isFollowing: !!isFollowing,
+      until: Date.now() + this.followLockMs,
+    });
+  }
+
+  // ---------- LOAD ----------
+
   async loadAllNotifications({ force = false } = {}) {
     if (!this.currentUser) return;
     if (this.isLoading) return;
 
-    // pause polling briefly after follow/unfollow to prevent flip-flop
-    if (!force && Date.now() < this.pauseUntil) return;
-
-    // if a follow request is currently in-flight, skip refetch (prevents immediate revert)
+    // if a follow request is currently in-flight, skip polling refresh
+    // (prevents it from touching the row you’re clicking)
     if (!force && this.followInFlight.size > 0) return;
 
     this.isLoading = true;
@@ -255,26 +277,21 @@ class NotificationsManager {
         (x) => x.user && x.user.id && x.user.username
       );
 
-      // Only enrich if we aren't in the "pause" window
-      // (prevents stale is_following from snapping button back)
-      if (this.followers.length && Date.now() >= this.pauseUntil) {
+      // Enrich follow-status, BUT skip usernames currently locked
+      if (this.followers.length) {
         try {
           await this.enrichFollowerFollowStatus(this.followers);
         } catch (e) {
           console.warn("Failed to enrich follower follow status (non-fatal):", e);
         }
-      } else {
-        // If we’re paused, keep existing follow-state from current unified list if possible
-        const existingMap = new Map(
-          (this.unified || [])
-            .filter((n) => n.type === "followers" && n?.user?.username)
-            .map((n) => [n.user.username, !!n.isFollowing])
-        );
-        this.followers.forEach((f) => {
-          const u = f?.user?.username;
-          if (u && existingMap.has(u)) f.isFollowing = existingMap.get(u);
-        });
       }
+
+      // Apply lock override after enrich (lock always wins)
+      this.followers.forEach((f) => {
+        const uname = f?.user?.username;
+        const locked = this.getLockedState(uname);
+        if (locked !== null) f.isFollowing = locked;
+      });
 
       this.unified = [
         ...this.likes.map((n) => ({ ...n, type: "likes" })),
@@ -315,16 +332,11 @@ class NotificationsManager {
 
     const res = await fetch(`${NOTIF_API_BASE_URL}/notifications?limit=100`, {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     });
 
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data.error || `HTTP ${res.status}`);
-    }
-
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
     return data.notifications || [];
   }
 
@@ -338,7 +350,8 @@ class NotificationsManager {
           .map((f) => (f?.user?.username ? String(f.user.username) : ""))
           .filter(Boolean)
       ),
-    ];
+    ].filter((uname) => !this.isLocked(uname)); // ✅ skip locked
+
     if (!uniqueUsernames.length) return;
 
     const results = await Promise.all(
@@ -358,20 +371,20 @@ class NotificationsManager {
     );
 
     const map = new Map(results.map((r) => [r.username, r.is_following]));
+
     followersArr.forEach((f) => {
       const uname = f?.user?.username;
       if (!uname) return;
-      f.isFollowing = !!map.get(uname);
+      if (this.isLocked(uname)) return; // ✅ lock wins
+      if (map.has(uname)) f.isFollowing = !!map.get(uname);
     });
   }
 
-  // ========== RENDER UNIFIED LIST ==========
+  // ---------- RENDER ----------
 
   renderUnified({ preserveScroll = false, force = false } = {}) {
     if (!this.listEl) return;
 
-    // Create a key to avoid re-rendering if nothing changed
-    // include filter + follow state + ids (enough to stop DOM churn)
     const keyParts = (this.unified || []).map((n) => {
       const extra =
         n.type === "followers" && n?.user?.username
@@ -380,11 +393,9 @@ class NotificationsManager {
       return `${n.type}:${n.id}:${extra}`;
     });
     const nextKey = `${this.currentFilter}|${keyParts.join("|")}`;
-
     if (!force && nextKey === this.lastRenderKey) return;
     this.lastRenderKey = nextKey;
 
-    // preserve scroll position to prevent page “jump”
     const prevScrollY = preserveScroll ? window.scrollY : 0;
 
     let items = this.unified;
@@ -480,10 +491,8 @@ class NotificationsManager {
 
         // followers
         const isFollowing = !!n.isFollowing;
-        const btnClass = isFollowing ? "btn-secondary" : "btn-primary";
         const btnText = isFollowing ? "Following" : "Follow";
-        const disabled = this.followInFlight.has(n.user.username) ? "disabled" : "";
-
+        // ✅ keep the SAME classes always (no color switching)
         return `
         <div class="notification-item follower-item"
              data-type="followers"
@@ -504,10 +513,9 @@ class NotificationsManager {
               @${this.escape(n.user.username)} · ${this.formatTime(n.created_at)}
             </div>
           </div>
-          <button class="btn btn-sm ${btnClass} notification-follow-btn"
+          <button class="btn btn-sm notification-follow-btn"
                   type="button"
-                  ${disabled}
-                  aria-busy="${disabled ? "true" : "false"}">
+                  data-following="${isFollowing ? "1" : "0"}">
             ${btnText}
           </button>
         </div>
@@ -520,47 +528,62 @@ class NotificationsManager {
     }
   }
 
-  // ========== FOLLOW HANDLER ==========
+  // ---------- FOLLOW ----------
+
+  setButtonState(buttonEl, isFollowing, busy) {
+    if (!buttonEl) return;
+    buttonEl.textContent = isFollowing ? "Following" : "Follow";
+    buttonEl.dataset.following = isFollowing ? "1" : "0";
+    buttonEl.disabled = !!busy;
+    buttonEl.setAttribute("aria-busy", busy ? "true" : "false");
+    // ✅ no class changes => no color changes
+  }
+
+  getModelFollowing(username, fallbackButtonEl) {
+    const item = (this.unified || []).find(
+      (n) => n.type === "followers" && n?.user?.username === username
+    );
+    if (item) return !!item.isFollowing;
+
+    // fallback if model isn't ready
+    if (fallbackButtonEl) return fallbackButtonEl.dataset.following === "1";
+    return false;
+  }
+
+  patchModelFollowing(username, newVal) {
+    this.unified = (this.unified || []).map((n) => {
+      if (n.type === "followers" && n?.user?.username === username) {
+        return { ...n, isFollowing: !!newVal };
+      }
+      return n;
+    });
+    this.followers = (this.followers || []).map((n) => {
+      if (n?.user?.username === username) {
+        return { ...n, isFollowing: !!newVal };
+      }
+      return n;
+    });
+  }
+
   async handleFollow(targetUsername, buttonEl) {
     if (!this.currentUser || !targetUsername || !buttonEl) return;
 
-    // block spam clicks
     if (this.followInFlight.has(targetUsername)) return;
     this.followInFlight.add(targetUsername);
-
-    // pause polling so it can’t overwrite UI mid-action
-    this.pauseUntil = Date.now() + this.pauseAfterActionMs;
 
     try {
       const token = this.getAuthToken();
       if (!token) return;
 
-      // Determine current state from our cached model (NOT from button text)
-      const currentItem = (this.unified || []).find(
-        (n) => n.type === "followers" && n?.user?.username === targetUsername
-      );
-      const wasFollowing = currentItem ? !!currentItem.isFollowing : false;
+      const wasFollowing = this.getModelFollowing(targetUsername, buttonEl);
+      const optimistic = !wasFollowing;
 
-      // optimistic update: update model FIRST so rerenders don’t revert
-      this.unified = (this.unified || []).map((n) => {
-        if (n.type === "followers" && n?.user?.username === targetUsername) {
-          return { ...n, isFollowing: !wasFollowing };
-        }
-        return n;
-      });
-      this.followers = (this.followers || []).map((n) => {
-        if (n?.user?.username === targetUsername) {
-          return { ...n, isFollowing: !wasFollowing };
-        }
-        return n;
-      });
+      // ✅ lock + update model (so polling/enrich can't override)
+      this.setLock(targetUsername, optimistic);
+      this.patchModelFollowing(targetUsername, optimistic);
 
-      // re-render once (preserve scroll)
-      this.renderUnified({ preserveScroll: true, force: true });
-
-      // Disable the clicked button immediately
-      buttonEl.disabled = true;
-      buttonEl.setAttribute("aria-busy", "true");
+      // ✅ update ONLY the clicked button (no rerender => no jumping)
+      this.setButtonState(buttonEl, optimistic, true);
 
       const res = await fetch(
         `${NOTIF_API_BASE_URL}/users/${encodeURIComponent(targetUsername)}/follow`,
@@ -575,47 +598,38 @@ class NotificationsManager {
 
       const serverFollowing = !!data.following;
 
-      // sync model with server result
-      this.unified = (this.unified || []).map((n) => {
-        if (n.type === "followers" && n?.user?.username === targetUsername) {
-          return { ...n, isFollowing: serverFollowing };
-        }
-        return n;
-      });
-      this.followers = (this.followers || []).map((n) => {
-        if (n?.user?.username === targetUsername) {
-          return { ...n, isFollowing: serverFollowing };
-        }
-        return n;
-      });
+      // ✅ lock again to the server truth
+      this.setLock(targetUsername, serverFollowing);
+      this.patchModelFollowing(targetUsername, serverFollowing);
 
-      // render once more to reflect final truth
-      this.renderUnified({ preserveScroll: true, force: true });
+      // ✅ update button to final truth, and unlock the UI immediately
+      this.setButtonState(buttonEl, serverFollowing, false);
 
-      // extend pause slightly so enrich doesn’t snap back
-      this.pauseUntil = Date.now() + this.pauseAfterActionMs;
+      // Optional: refresh after a short delay (won’t flicker because lock wins)
+      setTimeout(() => this.loadAllNotifications({ force: true }), 600);
     } catch (err) {
       console.error("handleFollow error", err);
 
-      // If request failed, force a refresh after a short pause
-      this.pauseUntil = Date.now() + 500;
+      // revert button to whatever model currently says, and re-enable
+      const current = this.getModelFollowing(targetUsername, buttonEl);
+      this.setButtonState(buttonEl, current, false);
+
+      // refresh to be safe
       setTimeout(() => this.loadAllNotifications({ force: true }), 600);
     } finally {
       this.followInFlight.delete(targetUsername);
 
-      // Re-enable button if it still exists in DOM
+      // Ensure button is clickable even if something weird happened
       try {
         if (buttonEl && buttonEl.isConnected) {
           buttonEl.disabled = false;
           buttonEl.setAttribute("aria-busy", "false");
         }
       } catch {}
-
-      // Ensure next normal poll can happen after pause window
     }
   }
 
-  // ========== UTILITIES ==========
+  // ---------- UTIL ----------
 
   getAuthToken() {
     try {
