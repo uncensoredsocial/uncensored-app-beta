@@ -14,34 +14,25 @@ const NOTIF_API_BASE_URL =
 
 class NotificationsManager {
   constructor() {
+    // poll every second for live-ish updates
     this.pollIntervalMs = 1000;
     this.pollTimer = null;
-
     this.currentUser = null;
 
+    // unified list + filter bar
     this.listEl = document.getElementById("notificationsList");
     this.emptyState = document.getElementById("notificationsEmpty");
     this.filterButtons = document.querySelectorAll(".notif-filter-btn");
 
+    // store raw arrays + unified
     this.likes = [];
     this.comments = [];
     this.followers = [];
     this.unified = [];
     this.currentFilter = "all";
 
-    // prevent overlapping loads
-    this.isLoading = false;
-
-    // prevent spam clicking / double requests
+    // ✅ NEW: prevent polling from overwriting button state while a follow/unfollow request is in-flight
     this.followInFlight = new Set();
-
-    // 🔒 Lock follow states briefly after click so polling/enrich can't override
-    // Map<username, { isFollowing: boolean, until: number }>
-    this.followStateLocks = new Map();
-    this.followLockMs = 5000;
-
-    // avoid pointless DOM churn
-    this.lastRenderKey = "";
 
     this.init();
   }
@@ -54,37 +45,25 @@ class NotificationsManager {
       this.currentUser = null;
     }
 
-    const token = this.getAuthToken();
-    if (!this.currentUser || !token) {
+    if (!this.currentUser) {
       this.showLoggedOutState();
       return;
     }
 
     this.setupFilterBar();
     this.setupEventDelegation();
+    await this.loadAllNotifications();
 
-    await this.loadAllNotifications({ force: true });
-
-    this.pollTimer = setInterval(() => {
-      if (document.hidden) return;
-      this.loadAllNotifications();
-    }, this.pollIntervalMs);
-
-    window.addEventListener("beforeunload", () => this.stopPolling());
-    document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) this.loadAllNotifications({ force: true });
-    });
-  }
-
-  stopPolling() {
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
-      this.pollTimer = null;
-    }
+    // start polling
+    this.pollTimer = setInterval(
+      () => this.loadAllNotifications(),
+      this.pollIntervalMs
+    );
   }
 
   showLoggedOutState() {
     if (this.listEl) this.listEl.innerHTML = "";
+
     if (this.emptyState) {
       this.emptyState.style.display = "block";
       this.emptyState.innerHTML = `
@@ -93,6 +72,8 @@ class NotificationsManager {
       `;
     }
   }
+
+  // --------- Filter bar (All / Likes / Comments / Followers) ---------
 
   setupFilterBar() {
     if (!this.filterButtons || !this.filterButtons.length) return;
@@ -106,11 +87,12 @@ class NotificationsManager {
           b.classList.toggle("active", b === btn)
         );
 
-        this.renderUnified({ preserveScroll: true, force: true });
+        this.renderUnified(); // re-render with new filter
       });
     });
   }
 
+  // Delegated click handling so re-rendering is safe
   setupEventDelegation() {
     if (!this.listEl) return;
 
@@ -120,11 +102,14 @@ class NotificationsManager {
 
       const type = item.dataset.type;
 
-      // follow/unfollow button
+      // follow/unfollow button for follower notifications
       if (type === "followers" && e.target.closest(".notification-follow-btn")) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const userId = item.dataset.userId;
         const btn = e.target.closest("button");
-        const username = item.dataset.username;
-        this.handleFollow(username, btn);
+        this.handleFollow(userId, btn);
         return;
       }
 
@@ -158,50 +143,11 @@ class NotificationsManager {
     });
   }
 
-  // ---------- LOCK HELPERS ----------
-
-  isLocked(username) {
-    if (!username) return false;
-    const entry = this.followStateLocks.get(username);
-    if (!entry) return false;
-    if (Date.now() > entry.until) {
-      this.followStateLocks.delete(username);
-      return false;
-    }
-    return true;
-  }
-
-  getLockedState(username) {
-    const entry = this.followStateLocks.get(username);
-    if (!entry) return null;
-    if (Date.now() > entry.until) {
-      this.followStateLocks.delete(username);
-      return null;
-    }
-    return !!entry.isFollowing;
-  }
-
-  setLock(username, isFollowing) {
-    if (!username) return;
-    this.followStateLocks.set(username, {
-      isFollowing: !!isFollowing,
-      until: Date.now() + this.followLockMs,
-    });
-  }
-
-  // ---------- LOAD ----------
-
-  async loadAllNotifications({ force = false } = {}) {
+  async loadAllNotifications() {
     if (!this.currentUser) return;
-    if (this.isLoading) return;
-
-    // if a follow request is currently in-flight, skip polling refresh
-    // (prevents it from touching the row you’re clicking)
-    if (!force && this.followInFlight.size > 0) return;
-
-    this.isLoading = true;
 
     try {
+      // Use your backend endpoint
       const rawFeed = await this.fetchNotificationsFeed();
 
       const likes = [];
@@ -221,13 +167,8 @@ class NotificationsManager {
               id: n.actor?.id,
               username: n.actor?.username,
               displayName:
-                n.actor?.display_name ||
-                n.actor?.displayName ||
-                n.actor?.username,
-              avatar:
-                n.actor?.avatar_url ||
-                n.actor?.avatar ||
-                "default-profile.PNG",
+                n.actor?.display_name || n.actor?.displayName || n.actor?.username,
+              avatar: n.actor?.avatar_url || n.actor?.avatar || "default-profile.PNG",
             },
           });
         } else if (t === "comment") {
@@ -241,13 +182,8 @@ class NotificationsManager {
               id: n.actor?.id,
               username: n.actor?.username,
               displayName:
-                n.actor?.display_name ||
-                n.actor?.displayName ||
-                n.actor?.username,
-              avatar:
-                n.actor?.avatar_url ||
-                n.actor?.avatar ||
-                "default-profile.PNG",
+                n.actor?.display_name || n.actor?.displayName || n.actor?.username,
+              avatar: n.actor?.avatar_url || n.actor?.avatar || "default-profile.PNG",
             },
           });
         } else if (t === "follow") {
@@ -258,14 +194,10 @@ class NotificationsManager {
               id: n.actor?.id,
               username: n.actor?.username,
               displayName:
-                n.actor?.display_name ||
-                n.actor?.displayName ||
-                n.actor?.username,
-              avatar:
-                n.actor?.avatar_url ||
-                n.actor?.avatar ||
-                "default-profile.PNG",
+                n.actor?.display_name || n.actor?.displayName || n.actor?.username,
+              avatar: n.actor?.avatar_url || n.actor?.avatar || "default-profile.PNG",
             },
+            // placeholder until we enrich
             isFollowing: false,
           });
         }
@@ -273,11 +205,9 @@ class NotificationsManager {
 
       this.likes = likes.filter((x) => x.user && x.user.id);
       this.comments = comments.filter((x) => x.user && x.user.id && x.postId);
-      this.followers = followers.filter(
-        (x) => x.user && x.user.id && x.user.username
-      );
+      this.followers = followers.filter((x) => x.user && x.user.id && x.user.username);
 
-      // Enrich follow-status, BUT skip usernames currently locked
+      // enrich follower follow-status so button shows Following correctly
       if (this.followers.length) {
         try {
           await this.enrichFollowerFollowStatus(this.followers);
@@ -286,14 +216,8 @@ class NotificationsManager {
         }
       }
 
-      // Apply lock override after enrich (lock always wins)
-      this.followers.forEach((f) => {
-        const uname = f?.user?.username;
-        const locked = this.getLockedState(uname);
-        if (locked !== null) f.isFollowing = locked;
-      });
-
-      this.unified = [
+      // Build unified stream, newest first
+      const nextUnified = [
         ...this.likes.map((n) => ({ ...n, type: "likes" })),
         ...this.comments.map((n) => ({ ...n, type: "comments" })),
         ...this.followers.map((n) => ({ ...n, type: "followers" })),
@@ -302,9 +226,29 @@ class NotificationsManager {
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
-      this.renderUnified({ preserveScroll: true });
+      // ✅ NEW: preserve local optimistic follow state while request is in-flight
+      // (polling every second used to overwrite the button and cause "glitching")
+      const preserved = nextUnified.map((n) => {
+        if (n.type !== "followers") return n;
+        const uname = n?.user?.username;
+        if (!uname) return n;
+
+        // if this username is mid-toggle, keep existing state from current unified list
+        if (this.followInFlight.has(uname)) {
+          const prev = (this.unified || []).find(
+            (p) => p.type === "followers" && p?.user?.username === uname
+          );
+          if (prev) return { ...n, isFollowing: !!prev.isFollowing };
+        }
+        return n;
+      });
+
+      this.unified = preserved;
+
+      this.renderUnified();
 
       const hasAny = this.unified.length > 0;
+
       if (this.emptyState) {
         this.emptyState.style.display = hasAny ? "none" : "block";
         if (!hasAny) {
@@ -316,30 +260,30 @@ class NotificationsManager {
       }
     } catch (err) {
       console.error("Failed to load notifications", err);
-      const msg = String(err?.message || "");
-      if (msg.includes("401") || msg.toLowerCase().includes("auth token")) {
-        this.stopPolling();
-        this.showLoggedOutState();
-      }
-    } finally {
-      this.isLoading = false;
     }
   }
 
+  // backend fetch that matches YOUR server.js
   async fetchNotificationsFeed() {
     const token = this.getAuthToken();
     if (!token) throw new Error("Missing auth token");
 
     const res = await fetch(`${NOTIF_API_BASE_URL}/notifications?limit=100`, {
       method: "GET",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     });
 
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    if (!res.ok) {
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+
     return data.notifications || [];
   }
 
+  // ask backend for each follower's is_following (backend already supports it)
   async enrichFollowerFollowStatus(followersArr) {
     const token = this.getAuthToken();
     if (!token) return;
@@ -347,10 +291,10 @@ class NotificationsManager {
     const uniqueUsernames = [
       ...new Set(
         followersArr
-          .map((f) => (f?.user?.username ? String(f.user.username) : ""))
+          .map((f) => (f && f.user && f.user.username ? String(f.user.username) : ""))
           .filter(Boolean)
       ),
-    ].filter((uname) => !this.isLocked(uname)); // ✅ skip locked
+    ];
 
     if (!uniqueUsernames.length) return;
 
@@ -375,28 +319,182 @@ class NotificationsManager {
     followersArr.forEach((f) => {
       const uname = f?.user?.username;
       if (!uname) return;
-      if (this.isLocked(uname)) return; // ✅ lock wins
-      if (map.has(uname)) f.isFollowing = !!map.get(uname);
+      f.isFollowing = !!map.get(uname);
     });
   }
 
-  // ---------- RENDER ----------
+  // ========== FETCH HELPERS (kept for compatibility; not used now) ==========
 
-  renderUnified({ preserveScroll = false, force = false } = {}) {
+  async fetchFollowers(userId) {
+    const { data, error } = await NOTIF_SUPABASE
+      .from("follows")
+      .select("id, follower_id, created_at")
+      .eq("followed_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (error || !data) {
+      console.error("fetchFollowers error", error);
+      return [];
+    }
+
+    const followerIds = [...new Set(data.map((f) => f.follower_id))];
+    if (!followerIds.length) return [];
+
+    const { data: users, error: usersErr } = await NOTIF_SUPABASE
+      .from("users")
+      .select("id, username, display_name, avatar_url")
+      .in("id", followerIds);
+
+    if (usersErr || !users) {
+      console.error("fetchFollowers users error", usersErr);
+      return [];
+    }
+
+    const map = new Map(users.map((u) => [u.id, u]));
+    return data
+      .map((row) => {
+        const u = map.get(row.follower_id);
+        if (!u) return null;
+        return {
+          id: row.id,
+          created_at: row.created_at,
+          user: {
+            id: u.id,
+            username: u.username,
+            displayName: u.display_name || u.username,
+            avatar: u.avatar_url || "default-profile.PNG",
+          },
+        };
+      })
+      .filter(Boolean);
+  }
+
+  async fetchLikes(userId) {
+    const { data: myPosts, error: postsErr } = await NOTIF_SUPABASE
+      .from("posts")
+      .select("id, content")
+      .eq("user_id", userId);
+
+    if (postsErr || !myPosts || !myPosts.length) return [];
+
+    const postIds = myPosts.map((p) => p.id);
+    const postMap = new Map(myPosts.map((p) => [p.id, p]));
+
+    const { data: likes, error } = await NOTIF_SUPABASE
+      .from("post_likes")
+      .select("id, post_id, user_id, created_at")
+      .in("post_id", postIds)
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (error || !likes) {
+      console.error("fetchLikes error", error);
+      return [];
+    }
+
+    const likerIds = [...new Set(likes.map((l) => l.user_id))];
+    if (!likerIds.length) return [];
+
+    const { data: users, error: usersErr } = await NOTIF_SUPABASE
+      .from("users")
+      .select("id, username, display_name, avatar_url")
+      .in("id", likerIds);
+
+    if (usersErr || !users) {
+      console.error("fetchLikes users error", usersErr);
+      return [];
+    }
+
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
+    return likes
+      .map((row) => {
+        const actor = userMap.get(row.user_id);
+        const post = postMap.get(row.post_id);
+        if (!actor || !post) return null;
+
+        return {
+          id: row.id,
+          created_at: row.created_at,
+          postId: post.id,
+          postContent: post.content || "",
+          user: {
+            id: actor.id,
+            username: actor.username,
+            displayName: actor.display_name || actor.username,
+            avatar: actor.avatar_url || "default-profile.PNG",
+          },
+        };
+      })
+      .filter(Boolean);
+  }
+
+  async fetchComments(userId) {
+    const { data: myPosts, error: postsErr } = await NOTIF_SUPABASE
+      .from("posts")
+      .select("id, content")
+      .eq("user_id", userId);
+
+    if (postsErr || !myPosts || !myPosts.length) return [];
+
+    const postIds = myPosts.map((p) => p.id);
+    const postMap = new Map(myPosts.map((p) => [p.id, p]));
+
+    const { data: comments, error } = await NOTIF_SUPABASE
+      .from("post_comments")
+      .select("id, post_id, user_id, content, created_at")
+      .in("post_id", postIds)
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (error || !comments) {
+      console.error("fetchComments error", error);
+      return [];
+    }
+
+    const commenterIds = [...new Set(comments.map((c) => c.user_id))];
+    if (!commenterIds.length) return [];
+
+    const { data: users, error: usersErr } = await NOTIF_SUPABASE
+      .from("users")
+      .select("id, username, display_name, avatar_url")
+      .in("id", commenterIds);
+
+    if (usersErr || !users) {
+      console.error("fetchComments users error", usersErr);
+      return [];
+    }
+
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
+    return comments
+      .map((row) => {
+        const actor = userMap.get(row.user_id);
+        const post = postMap.get(row.post_id);
+        if (!actor || !post) return null;
+
+        return {
+          id: row.id,
+          created_at: row.created_at,
+          postId: post.id,
+          postContent: post.content || "",
+          commentText: row.content || "",
+          user: {
+            id: actor.id,
+            username: actor.username,
+            displayName: actor.display_name || actor.username,
+            avatar: actor.avatar_url || "default-profile.PNG",
+          },
+        };
+      })
+      .filter(Boolean);
+  }
+
+  // ========== RENDER UNIFIED LIST ==========
+
+  renderUnified() {
     if (!this.listEl) return;
-
-    const keyParts = (this.unified || []).map((n) => {
-      const extra =
-        n.type === "followers" && n?.user?.username
-          ? `${n.user.username}:${n.isFollowing ? 1 : 0}`
-          : "";
-      return `${n.type}:${n.id}:${extra}`;
-    });
-    const nextKey = `${this.currentFilter}|${keyParts.join("|")}`;
-    if (!force && nextKey === this.lastRenderKey) return;
-    this.lastRenderKey = nextKey;
-
-    const prevScrollY = preserveScroll ? window.scrollY : 0;
 
     let items = this.unified;
     if (this.currentFilter !== "all") {
@@ -411,18 +509,15 @@ class NotificationsManager {
         followers: "followers",
       };
       const label = labelMap[this.currentFilter] || "notifications";
-
       this.listEl.innerHTML = `
         <div class="notification-item">
           <div class="notification-body">
-            <div class="notification-text">No ${this.escape(label)} yet.</div>
+            <div class="notification-text">No ${this.escape(
+              label
+            )} yet.</div>
           </div>
         </div>
       `;
-
-      if (preserveScroll) {
-        requestAnimationFrame(() => window.scrollTo(0, prevScrollY));
-      }
       return;
     }
 
@@ -482,7 +577,9 @@ class NotificationsManager {
                 commented on your post
               </div>
               <div class="notification-meta">
-                "${this.escape(commentPreview)}" · ${this.formatTime(n.created_at)}
+                "${this.escape(commentPreview)}" · ${this.formatTime(
+                  n.created_at
+                )}
               </div>
             </div>
           </div>
@@ -492,7 +589,8 @@ class NotificationsManager {
         // followers
         const isFollowing = !!n.isFollowing;
         const btnText = isFollowing ? "Following" : "Follow";
-        // ✅ keep the SAME classes always (no color switching)
+        const busy = n?.user?.username ? this.followInFlight.has(n.user.username) : false;
+
         return `
         <div class="notification-item follower-item"
              data-type="followers"
@@ -507,86 +605,57 @@ class NotificationsManager {
           </div>
           <div class="notification-body">
             <div class="notification-text">
-              <strong>${this.escape(n.user.displayName)}</strong> started following you
+              <strong>${this.escape(
+                n.user.displayName
+              )}</strong> started following you
             </div>
             <div class="notification-meta">
-              @${this.escape(n.user.username)} · ${this.formatTime(n.created_at)}
+              @${this.escape(n.user.username)} · ${this.formatTime(
+                n.created_at
+              )}
             </div>
           </div>
           <button class="btn btn-sm notification-follow-btn"
-                  type="button"
-                  data-following="${isFollowing ? "1" : "0"}">
+                  data-following="${isFollowing ? "1" : "0"}"
+                  data-busy="${busy ? "1" : "0"}"
+                  aria-busy="${busy ? "true" : "false"}">
             ${btnText}
           </button>
         </div>
       `;
       })
       .join("");
-
-    if (preserveScroll) {
-      requestAnimationFrame(() => window.scrollTo(0, prevScrollY));
-    }
   }
 
-  // ---------- FOLLOW ----------
+  // ========== FOLLOW HANDLER ==========
+  // backend follow route is /api/users/:username/follow (toggle)
+  async handleFollow(targetUserId, buttonEl) {
+    if (!this.currentUser || !targetUserId || !buttonEl) return;
 
-  setButtonState(buttonEl, isFollowing, busy) {
-    if (!buttonEl) return;
-    buttonEl.textContent = isFollowing ? "Following" : "Follow";
-    buttonEl.dataset.following = isFollowing ? "1" : "0";
-    buttonEl.disabled = !!busy;
-    buttonEl.setAttribute("aria-busy", busy ? "true" : "false");
-    // ✅ no class changes => no color changes
-  }
+    const parent = buttonEl.closest(".notification-item");
+    const username = parent ? parent.dataset.username : null;
+    if (!username) return;
 
-  getModelFollowing(username, fallbackButtonEl) {
-    const item = (this.unified || []).find(
-      (n) => n.type === "followers" && n?.user?.username === username
-    );
-    if (item) return !!item.isFollowing;
+    // ✅ hard-block spam clicks while request is in-flight
+    if (this.followInFlight.has(username)) return;
 
-    // fallback if model isn't ready
-    if (fallbackButtonEl) return fallbackButtonEl.dataset.following === "1";
-    return false;
-  }
-
-  patchModelFollowing(username, newVal) {
-    this.unified = (this.unified || []).map((n) => {
-      if (n.type === "followers" && n?.user?.username === username) {
-        return { ...n, isFollowing: !!newVal };
-      }
-      return n;
-    });
-    this.followers = (this.followers || []).map((n) => {
-      if (n?.user?.username === username) {
-        return { ...n, isFollowing: !!newVal };
-      }
-      return n;
-    });
-  }
-
-  async handleFollow(targetUsername, buttonEl) {
-    if (!this.currentUser || !targetUsername || !buttonEl) return;
-
-    if (this.followInFlight.has(targetUsername)) return;
-    this.followInFlight.add(targetUsername);
+    this.followInFlight.add(username);
 
     try {
       const token = this.getAuthToken();
       if (!token) return;
 
-      const wasFollowing = this.getModelFollowing(targetUsername, buttonEl);
+      const wasFollowing = buttonEl.dataset.following === "1";
       const optimistic = !wasFollowing;
 
-      // ✅ lock + update model (so polling/enrich can't override)
-      this.setLock(targetUsername, optimistic);
-      this.patchModelFollowing(targetUsername, optimistic);
-
-      // ✅ update ONLY the clicked button (no rerender => no jumping)
+      // ✅ instant UI update, NO disabling (prevents grey/white flash)
       this.setButtonState(buttonEl, optimistic, true);
 
+      // Keep cached state aligned so rerender/poll doesn't flip it
+      this.setLocalFollowState(username, optimistic);
+
       const res = await fetch(
-        `${NOTIF_API_BASE_URL}/users/${encodeURIComponent(targetUsername)}/follow`,
+        `${NOTIF_API_BASE_URL}/users/${encodeURIComponent(username)}/follow`,
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
@@ -596,40 +665,68 @@ class NotificationsManager {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to follow");
 
-      const serverFollowing = !!data.following;
+      const finalFollowing = !!data.following;
 
-      // ✅ lock again to the server truth
-      this.setLock(targetUsername, serverFollowing);
-      this.patchModelFollowing(targetUsername, serverFollowing);
-
-      // ✅ update button to final truth, and unlock the UI immediately
-      this.setButtonState(buttonEl, serverFollowing, false);
-
-      // Optional: refresh after a short delay (won’t flicker because lock wins)
-      setTimeout(() => this.loadAllNotifications({ force: true }), 600);
+      // ✅ final state from server
+      this.setButtonState(buttonEl, finalFollowing, false);
+      this.setLocalFollowState(username, finalFollowing);
     } catch (err) {
       console.error("handleFollow error", err);
 
-      // revert button to whatever model currently says, and re-enable
-      const current = this.getModelFollowing(targetUsername, buttonEl);
-      this.setButtonState(buttonEl, current, false);
-
-      // refresh to be safe
-      setTimeout(() => this.loadAllNotifications({ force: true }), 600);
+      // rollback UI if request failed
+      try {
+        const rollbackTo = buttonEl.dataset.following === "1";
+        this.setButtonState(buttonEl, rollbackTo, false);
+        this.setLocalFollowState(username, rollbackTo);
+      } catch {}
     } finally {
-      this.followInFlight.delete(targetUsername);
+      this.followInFlight.delete(username);
 
-      // Ensure button is clickable even if something weird happened
+      // ensure busy flag cleared (still not disabling)
       try {
         if (buttonEl && buttonEl.isConnected) {
-          buttonEl.disabled = false;
-          buttonEl.setAttribute("aria-busy", "false");
+          buttonEl.dataset.b
+
         }
       } catch {}
     }
   }
 
-  // ---------- UTIL ----------
+  // ✅ NEW: single place to update button state without disabled styling
+  setButtonState(buttonEl, isFollowing, busy) {
+    if (!buttonEl) return;
+
+    buttonEl.textContent = isFollowing ? "Following" : "Follow";
+    buttonEl.dataset.following = isFollowing ? "1" : "0";
+
+    // DO NOT set disabled (disabled causes grey/white iOS styling)
+    // buttonEl.disabled = !!busy;
+
+    buttonEl.dataset.busy = busy ? "1" : "0";
+    buttonEl.setAttribute("aria-busy", busy ? "true" : "false");
+  }
+
+  // ✅ NEW: update cached unified/followers state so re-renders keep it
+  setLocalFollowState(username, isFollowing) {
+    if (!username) return;
+
+    this.unified = (this.unified || []).map((n) => {
+      if (n.type !== "followers") return n;
+      if (n.user && n.user.username === username) {
+        return { ...n, isFollowing: !!isFollowing };
+      }
+      return n;
+    });
+
+    this.followers = (this.followers || []).map((n) => {
+      if (n.user && n.user.username === username) {
+        return { ...n, isFollowing: !!isFollowing };
+      }
+      return n;
+    });
+  }
+
+  // ========== UTILITIES ==========
 
   getAuthToken() {
     try {
