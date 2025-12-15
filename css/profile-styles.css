@@ -5,89 +5,72 @@
   color: var(--text-color, #fff);
 }
 
-/* =========================
-   FIXED TOP HEADER (REAL TOP)
-   ========================= */
+/* ✅ FIX: header must stick to TOP of viewport (NOT 60px down) */
 .profile-header-bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-
-  /* iPhone notch safe area */
-  padding-top: env(safe-area-inset-top);
-  height: calc(56px + env(safe-area-inset-top));
-
-  z-index: 999;
+  position: sticky;
+  top: 0 !important;
+  z-index: 90;
   background: #000;
   border-bottom: 1px solid var(--border-light, #2f3336);
-
+  height: 56px;
   display: flex;
-  align-items: flex-end; /* so title lines up nicely under safe-area */
+  align-items: center;
   justify-content: center;
-
-  padding-left: 12px;
-  padding-right: 12px;
-  padding-bottom: 10px;
 }
 
+/* centered title */
 .profile-header-title {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 700;
-  line-height: 1;
 }
 
-/* left back button */
+/* ✅ better back button (matches theme) */
 .profile-header-back {
   position: absolute;
   left: 12px;
-  bottom: 10px;
-  background: transparent;
-  border: none;
-  color: var(--text-color, #fff);
+  top: 50%;
+  transform: translateY(-50%);
   width: 38px;
   height: 38px;
   border-radius: 999px;
+  border: 1px solid var(--border-light, #2f3336);
+  background: rgba(17, 17, 17, 0.9);
+  color: var(--text-color, #fff);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
 }
-
 .profile-header-back:hover {
-  background: rgba(255,255,255,0.06);
+  background: rgba(30, 30, 30, 0.95);
 }
 
-/* right gear button */
+/* settings icon right */
 .profile-header-settings {
   position: absolute;
   right: 12px;
-  bottom: 10px;
-
-  background: #111;
-  border-radius: 999px;
-  border: 1px solid var(--border-color, #222);
+  top: 50%;
+  transform: translateY(-50%);
   width: 38px;
   height: 38px;
-
+  border-radius: 999px;
+  border: 1px solid var(--border-light, #2f3336);
+  background: rgba(17, 17, 17, 0.9);
+  color: var(--text-color, #fff);
   display: flex;
   align-items: center;
   justify-content: center;
-
   cursor: pointer;
-  color: var(--text-color, #fff);
   font-size: 0.95rem;
 }
-
 .profile-header-settings:hover {
-  background: #141414;
+  background: rgba(30, 30, 30, 0.95);
 }
 
-/* Main container (push content below fixed header) */
+/* Main container */
 .profile-main {
   padding-bottom: 72px; /* room for bottom nav */
-  padding-top: calc(56px + env(safe-area-inset-top));
 }
 
 /* ===== HERO SECTION (banner + avatar + basic info) ===== */
@@ -102,8 +85,6 @@
   height: 120px;
   background: #111;
 }
-
-/* If a real banner image is set */
 .profile-banner.profile-banner-image {
   background-size: cover;
   background-position: center;
@@ -192,18 +173,17 @@
   font-size: 0.8rem;
 }
 
-/* clickable stat buttons */
+/* ✅ clickable stats */
 .profile-stat-btn {
   background: transparent;
   border: none;
-  color: inherit;
   padding: 0;
+  color: inherit;
   cursor: pointer;
   text-align: left;
 }
-
-.profile-stat-btn:hover .profile-stat-label,
-.profile-stat-btn:hover .profile-stat-number {
+.profile-stat-btn:hover .profile-stat-number,
+.profile-stat-btn:hover .profile-stat-label {
   color: #1da1f2;
 }
 
@@ -257,7 +237,7 @@
   display: block;
 }
 
-/* ===== POSTS LIST (cards – match feed look) ===== */
+/* ===== POSTS LIST ===== */
 
 .profile-posts {
   padding: 4px 0 8px;
@@ -295,7 +275,7 @@
   display: none;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 100;
 }
 
 .profile-modal-backdrop.open {
@@ -409,179 +389,206 @@
   display: none !important;
 }
 
-/* ===== DELETE ICON ===== */
-.profile-posts .post-delete-btn {
-  position: static;
-  margin-left: 16px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 999px;
-  color: #ff4a4a;
-  font-size: 0.95rem;
-}
+/* ======================================================
+   ✅ FOLLOWERS / FOLLOWING MODAL (TikTok style)
+====================================================== */
 
-.profile-posts .post-delete-btn:hover {
-  background: rgba(255, 74, 74, 0.15);
-}
-
-/* Tags */
-.profile-posts .hashtag,
-.profile-posts .mention {
-  color: #1d9bf0;
-}
-
-/* ===== FOLLOW LIST MODAL (followers/following) ===== */
 .followlist-modal {
   width: 100%;
-  height: 100%;
+  max-width: 520px;
+  height: 92vh;
   background: #000;
-  border-radius: 0;
-  border: none;
-  box-shadow: none;
+  border-radius: 16px;
+  border: 1px solid var(--border-light, #2f3336);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
 .followlist-header {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  background: #000;
-  border-bottom: 1px solid var(--border-light, #2f3336);
-
-  padding-top: env(safe-area-inset-top);
-  height: calc(56px + env(safe-area-inset-top));
-  padding-left: 12px;
-  padding-right: 12px;
-  padding-bottom: 10px;
-
+  height: 56px;
   display: flex;
-  align-items: flex-end;
-  gap: 10px;
+  align-items: center;
+  border-bottom: 1px solid var(--border-light, #2f3336);
+  background: #000;
+  padding: 0 10px;
 }
 
 .followlist-back {
   width: 38px;
   height: 38px;
   border-radius: 999px;
-  background: transparent;
-  border: none;
+  border: 1px solid var(--border-light, #2f3336);
+  background: rgba(17, 17, 17, 0.9);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
 }
-
 .followlist-back:hover {
-  background: rgba(255,255,255,0.06);
+  background: rgba(30, 30, 30, 0.95);
 }
 
-.followlist-title {
+.followlist-tabs {
   flex: 1;
-  text-align: center;
-  font-weight: 700;
-  font-size: 1.05rem;
+  display: flex;
+  justify-content: center;
+  gap: 18px;
 }
 
-.followlist-spacer {
+.followlist-tab {
+  background: transparent;
+  border: none;
+  color: #9aa0a6;
+  cursor: pointer;
+  padding: 8px 8px;
+  border-bottom: 2px solid transparent;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.followlist-tab.active {
+  color: #fff;
+  border-bottom-color: #1da1f2;
+}
+
+.followlist-tab-count {
+  font-weight: 600;
+  color: #9aa0a6;
+}
+.followlist-tab.active .followlist-tab-count {
+  color: #1da1f2;
+}
+
+.followlist-header-spacer {
   width: 38px;
   height: 38px;
 }
 
 .followlist-body {
   flex: 1;
-  overflow-y: auto;
-  padding: 10px 12px 80px;
-}
-
-.followlist-items {
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 10px;
 }
 
+.followlist-error {
+  margin: 10px 12px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(244, 67, 54, 0.35);
+  background: rgba(244, 67, 54, 0.08);
+  color: #ff6b6b;
+  font-size: 0.9rem;
+}
+
+.followlist-pane {
+  display: none;
+  flex: 1;
+  overflow: hidden;
+}
+.followlist-pane.active {
+  display: flex;
+  flex-direction: column;
+}
+
+.followlist-loading {
+  padding: 14px 12px;
+  color: #9aa0a6;
+  font-style: italic;
+}
+
+.followlist-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 8px 12px;
+}
+
+/* Row */
 .followlist-row {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 10px;
-  border: 1px solid var(--border-light, #2f3336);
-  border-radius: 14px;
-  background: var(--bg-secondary, #111);
+  border-bottom: 1px solid rgba(47, 51, 54, 0.6);
+}
+
+.followlist-row:hover {
+  background: rgba(255,255,255,0.03);
 }
 
 .followlist-avatar {
   width: 42px;
   height: 42px;
-  border-radius: 999px;
+  border-radius: 50%;
   object-fit: cover;
+  background: #111;
   flex-shrink: 0;
-  background: #000;
 }
 
 .followlist-meta {
   flex: 1;
   min-width: 0;
-  cursor: pointer;
 }
 
 .followlist-name {
   font-weight: 700;
   font-size: 0.95rem;
-  line-height: 1.2;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .followlist-username {
-  opacity: 0.7;
+  color: #9aa0a6;
   font-size: 0.85rem;
-  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .followlist-action {
   flex-shrink: 0;
-}
-
-.follow-btn {
   border-radius: 999px;
-  padding: 7px 12px;
-  border: 1px solid var(--border-light, #2f3336);
-  background: #000;
-  color: #fff;
-  cursor: pointer;
-  font-weight: 600;
+  padding: 8px 12px;
+  font-weight: 800;
   font-size: 0.85rem;
+  cursor: pointer;
+  border: 1px solid var(--border-light, #2f3336);
+  background: rgba(17, 17, 17, 0.9);
+  color: #fff;
 }
 
-.follow-btn.primary {
+.followlist-action.primary {
   background: #1da1f2;
   border-color: #1da1f2;
   color: #000;
 }
 
-.follow-btn:hover {
-  opacity: 0.92;
+.followlist-action.ghost {
+  background: transparent;
+  color: #fff;
 }
 
 /* Small-screen tweaks */
 @media (max-width: 480px) {
+  .profile-header-bar {
+    height: 52px;
+  }
   .profile-avatar-wrapper {
     width: 72px;
     height: 72px;
     margin-bottom: 4px;
   }
-
   .profile-name {
     font-size: 1.15rem;
   }
-
-  .profile-header-bar {
-    height: calc(52px + env(safe-area-inset-top));
-  }
-
-  .profile-main {
-    padding-top: calc(52px + env(safe-area-inset-top));
+  .followlist-modal {
+    height: 96vh;
+    border-radius: 14px;
   }
 }
