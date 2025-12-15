@@ -177,6 +177,28 @@
   white-space: nowrap;
 }
 
+/* ✅ ADDED: keep follow button BLUE (no grey/white flash on iOS) */
+.notification-follow-btn {
+  background: var(--primary-color);
+  color: #ffffff;
+  border: none;
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Optional: subtle "busy" feedback without changing to grey */
+.notification-follow-btn[data-busy="1"] {
+  opacity: 0.9;
+}
+
+/* Prevent any disabled styles (even if something else sets disabled later) */
+.notification-follow-btn:disabled {
+  background: var(--primary-color);
+  color: #ffffff;
+  opacity: 1;
+}
+
 /* Empty state */
 .notifications-empty {
   text-align: center;
