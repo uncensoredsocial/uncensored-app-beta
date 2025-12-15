@@ -5,14 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Profile - Uncensored Social</title>
 
-  <!-- Base styles -->
   <link rel="stylesheet" href="css/styles.css" />
-  <!-- Reuse feed styling so posts look like the home feed -->
   <link rel="stylesheet" href="css/feed-styles.css" />
   <link rel="stylesheet" href="css/profile-styles.css" />
   <link rel="stylesheet" href="css/icons.css" />
 
-  <!-- Font Awesome for gear + bottom nav icons -->
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
@@ -21,7 +18,6 @@
     referrerpolicy="no-referrer"
   />
 
-  <!-- Optional: same bottom-nav layout tweaks as index.html -->
   <style>
     @media (min-width: 900px) {
       .content-wrapper {
@@ -57,28 +53,26 @@
 </head>
 
 <body class="profile-page-body">
+
   <!-- Top bar -->
   <header class="profile-header-bar">
-    <!-- Back button (when coming from search/user page) -->
     <button
       id="profileBackButton"
       class="profile-header-back"
       aria-label="Back"
       style="display:none;"
-      type="button"
     >
       <i class="fa-solid fa-arrow-left"></i>
     </button>
 
     <h1 class="profile-header-title">Profile</h1>
 
-    <button class="profile-header-settings" id="settingsButton" aria-label="Settings" type="button">
+    <button class="profile-header-settings" id="settingsButton" aria-label="Settings">
       <i class="fa-solid fa-gear"></i>
     </button>
   </header>
 
   <main class="profile-main">
-    <!-- Top section: banner + avatar + basic info -->
     <section class="profile-hero">
       <div class="profile-banner" id="profileBanner"></div>
 
@@ -92,7 +86,7 @@
           />
         </div>
 
-        <button class="btn btn-primary profile-edit-btn" id="editProfileBtn" type="button">
+        <button class="btn btn-primary profile-edit-btn" id="editProfileBtn">
           Edit Profile
         </button>
       </div>
@@ -109,13 +103,11 @@
             <span class="profile-stat-label">Posts</span>
           </div>
 
-          <!-- clickable -->
           <button class="profile-stat profile-stat-btn" id="followersStatBtn" type="button">
             <span id="followersCount" class="profile-stat-number">0</span>
             <span class="profile-stat-label">Followers</span>
           </button>
 
-          <!-- clickable -->
           <button class="profile-stat profile-stat-btn" id="followingStatBtn" type="button">
             <span id="followingCount" class="profile-stat-number">0</span>
             <span class="profile-stat-label">Following</span>
@@ -124,13 +116,11 @@
       </div>
     </section>
 
-    <!-- Tabs: Posts / Likes -->
     <section class="profile-tabs">
-      <button class="tab-btn active" data-tab="posts" type="button">Posts</button>
-      <button class="tab-btn" data-tab="likes" type="button">Likes</button>
+      <button class="tab-btn active" data-tab="posts">Posts</button>
+      <button class="tab-btn" data-tab="likes">Likes</button>
     </section>
 
-    <!-- Tab content -->
     <section class="profile-tab-content">
       <div id="postsTab" class="tab-pane active">
         <div id="profilePosts" class="profile-posts">
@@ -146,7 +136,7 @@
     </section>
   </main>
 
-  <!-- ================= BOTTOM NAV (matches index.html icons) ================= -->
+  <!-- ================= BOTTOM NAV ================= -->
   <nav class="bottom-nav" id="bottomNav">
     <a href="index.html" class="nav-item">
       <i class="fa-solid fa-house nav-icon"></i>
@@ -171,7 +161,7 @@
     <div class="profile-modal">
       <div class="profile-modal-header">
         <h2>Edit Profile</h2>
-        <button class="profile-modal-close" id="closeEditProfileBtn" aria-label="Close" type="button">✕</button>
+        <button class="profile-modal-close" id="closeEditProfileBtn" aria-label="Close">✕</button>
       </div>
 
       <div class="profile-modal-body">
@@ -201,27 +191,41 @@
     </div>
   </div>
 
-  <!-- FOLLOWERS / FOLLOWING MODAL -->
+  <!-- FOLLOWERS / FOLLOWING MODAL (TikTok style) -->
   <div class="profile-modal-backdrop" id="followListModal">
-    <div class="followlist-modal">
+    <div class="followlist-modal" role="dialog" aria-modal="true">
       <div class="followlist-header">
-        <button id="followListBackBtn" class="followlist-back" type="button" aria-label="Back">
+        <button class="followlist-back" id="followListBackBtn" type="button" aria-label="Back">
           <i class="fa-solid fa-arrow-left"></i>
         </button>
-        <div class="followlist-title" id="followListTitle">Followers</div>
-        <div class="followlist-spacer"></div>
+
+        <div class="followlist-tabs" role="tablist">
+          <button class="followlist-tab active" id="followersTabBtn" type="button" data-tab="followers" role="tab">
+            <span class="followlist-tab-label">Followers</span>
+            <span class="followlist-tab-count" id="followersTabCount">0</span>
+          </button>
+
+          <button class="followlist-tab" id="followingTabBtn" type="button" data-tab="following" role="tab">
+            <span class="followlist-tab-label">Following</span>
+            <span class="followlist-tab-count" id="followingTabCount">0</span>
+          </button>
+        </div>
+
+        <div class="followlist-header-spacer"></div>
       </div>
 
       <div class="followlist-body">
-        <div id="followListLoading" class="loading-indicator" style="display:none;">Loading...</div>
-        <div id="followListEmpty" class="empty-state" style="display:none;">
-          <h3>Nothing to show</h3>
-        </div>
-        <div id="followListError" class="empty-state" style="display:none;">
-          <h3>Could not load</h3>
+        <div id="followListError" class="followlist-error hidden"></div>
+
+        <div id="followersPane" class="followlist-pane active">
+          <div class="followlist-loading" id="followersLoading">Loading followers...</div>
+          <div class="followlist-list" id="followersList"></div>
         </div>
 
-        <div id="followListItems" class="followlist-items"></div>
+        <div id="followingPane" class="followlist-pane">
+          <div class="followlist-loading" id="followingLoading">Loading following...</div>
+          <div class="followlist-list" id="followingList"></div>
+        </div>
       </div>
     </div>
   </div>
