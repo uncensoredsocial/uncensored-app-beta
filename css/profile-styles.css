@@ -105,19 +105,34 @@
   margin-top: -40px;
 }
 
+/* ======================================================
+   ✅ FIX: PROFILE AVATAR STRETCH / OVAL BUG (REAL FIX)
+   - Hard-lock the wrapper size so flex/layout can’t stretch it
+   - Works on Safari + iOS (no aspect-ratio)
+====================================================== */
+
 .profile-avatar-wrapper {
   width: 80px;
   height: 80px;
+
+  /* ✅ NEW: prevent any layout engine from stretching it */
+  min-width: 80px;
+  min-height: 80px;
+  flex: 0 0 80px;          /* don’t allow grow/shrink */
+  display: block;          /* avoid flex child weirdness */
+
   border-radius: 50%;
   border: 4px solid #000;
   overflow: hidden;
   background: #000;
 }
 
+/* ✅ NEW: block-level image avoids weird inline baseline stretch */
 .profile-avatar {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
 
 .profile-edit-btn {
@@ -605,14 +620,21 @@
   .profile-header-bar {
     height: 52px;
   }
+
+  /* ✅ keep avatar locked even on mobile */
   .profile-avatar-wrapper {
     width: 72px;
     height: 72px;
+    min-width: 72px;
+    min-height: 72px;
+    flex: 0 0 72px;
     margin-bottom: 4px;
   }
+
   .profile-name {
     font-size: 1.15rem;
   }
+
   .followlist-modal {
     height: 96vh;
     border-radius: 14px;
