@@ -194,10 +194,14 @@
   <!-- FOLLOWERS / FOLLOWING MODAL (TikTok style) -->
   <div class="profile-modal-backdrop" id="followListModal">
     <div class="followlist-modal" role="dialog" aria-modal="true">
-      <div class="followlist-header">
-        <button class="followlist-back" id="followListBackBtn" type="button" aria-label="Back">
-          <i class="fa-solid fa-arrow-left"></i>
-        </button>
+
+      <!-- ✅ UPDATED HEADER (settings-style back button behavior) -->
+      <div class="followlist-header header header-centered">
+        <div class="header-left">
+          <button class="header-back-button" id="followListBackBtn" type="button" aria-label="Back">
+            <i class="fa-solid fa-arrow-left"></i>
+          </button>
+        </div>
 
         <div class="followlist-tabs" role="tablist">
           <button class="followlist-tab active" id="followersTabBtn" type="button" data-tab="followers" role="tab">
@@ -211,7 +215,7 @@
           </button>
         </div>
 
-        <div class="followlist-header-spacer"></div>
+        <div class="header-actions"></div>
       </div>
 
       <div class="followlist-body">
