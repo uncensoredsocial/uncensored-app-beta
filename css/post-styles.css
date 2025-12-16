@@ -438,7 +438,7 @@
   z-index: 2;
 }
 
-/* center play button (Twitter/X style) */
+/* Center play button (Twitter/X style) */
 .post-wrapper .us-video-player .us-video-center-btn {
   position: absolute;
   left: 50%;
@@ -475,10 +475,9 @@
   left: 0;
   right: 0;
   bottom: 0;
-
-  padding: 10px 10px 10px;
   z-index: 4;
 
+  padding: 10px 10px 10px;
   background: linear-gradient(to top, rgba(0,0,0,0.78), rgba(0,0,0,0));
   opacity: 0;
   transform: translateY(10px);
@@ -500,7 +499,7 @@
   gap: 10px;
 }
 
-/* NEW: modern “icon chip” buttons */
+/* NEW: modern "icon chip" buttons */
 .post-wrapper .us-video-player .us-video-btn {
   height: 34px;
   min-width: 34px;
@@ -582,169 +581,96 @@
 }
 
 /* ===================================================== */
-/* ✅ FINAL OVERRIDE: Custom video UI (ADD AT VERY BOTTOM)*/
+/* ✅ FIXED: Video Player CSS Fixes (ADD AT VERY BOTTOM) */
 /* ===================================================== */
 
-.post-wrapper .us-video-player,
-.post-wrapper .us-video-player * {
-  box-sizing: border-box !important;
-}
-
-/* hard reset globals */
-.post-wrapper .us-video-player button,
-.post-wrapper .us-video-player input {
-  -webkit-appearance: none !important;
-  appearance: none !important;
-  font: inherit !important;
-  border: 0 !important;
-  outline: none !important;
-  box-shadow: none !important;
-  background: transparent !important;
-  color: inherit !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  line-height: 1 !important;
-}
-
-.post-wrapper .us-video-player {
-  position: relative !important;
-  width: 100% !important;
-  border-radius: 14px !important;
-  overflow: hidden !important;
-  background: #000 !important;
-  border: 1px solid rgba(255,255,255,0.10) !important;
-}
-
+/* Ensure video element is properly sized */
 .post-wrapper .us-video-player .us-video {
   width: 100% !important;
-  display: block !important;
+  height: auto !important;
   max-height: 420px !important;
+  display: block !important;
   object-fit: contain !important;
   background: #000 !important;
 }
 
-/* tap layer */
-.post-wrapper .us-video-player .us-video-tap {
-  position: absolute !important;
-  inset: 0 !important;
-  z-index: 3 !important;
-  cursor: pointer !important;
-}
-
-/* Center button ONLY when paused OR user tapped */
+/* Fix center button visibility */
 .post-wrapper .us-video-player .us-video-center-btn {
-  position: absolute !important;
-  left: 50% !important;
-  top: 50% !important;
-  transform: translate(-50%, -50%) !important;
-  width: 72px !important;
-  height: 72px !important;
-  border-radius: 999px !important;
-  z-index: 6 !important;
-  display: grid !important;
-  place-items: center !important;
-  background: rgba(0,0,0,0.55) !important;
-  border: 1px solid rgba(255,255,255,0.22) !important;
-  color: #fff !important;
-  cursor: pointer !important;
-
   opacity: 0 !important;
   pointer-events: none !important;
+  transition: opacity 0.2s ease !important;
 }
 
-.post-wrapper .us-video-player.us-ui-visible .us-video-center-btn,
-.post-wrapper .us-video-player[data-state="paused"] .us-video-center-btn {
+.post-wrapper .us-video-player[data-state="paused"] .us-video-center-btn,
+.post-wrapper .us-video-player.us-controls-show .us-video-center-btn {
   opacity: 1 !important;
   pointer-events: auto !important;
 }
 
-.post-wrapper .us-video-player .us-video-center-btn i {
-  font-size: 1.35rem !important;
-  color: #fff !important;
+/* Ensure controls are properly layered */
+.post-wrapper .us-video-player .us-video-tap {
+  z-index: 2 !important;
 }
 
-/* bottom controls hidden until user tapped */
+.post-wrapper .us-video-player .us-video-center-btn {
+  z-index: 3 !important;
+}
+
 .post-wrapper .us-video-player .us-video-controls {
-  position: absolute !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  z-index: 6 !important;
-
-  padding: 12px 12px 10px !important;
-  background: linear-gradient(to top, rgba(0,0,0,0.82), rgba(0,0,0,0)) !important;
-
-  opacity: 0 !important;
-  transform: translateY(10px) !important;
-  pointer-events: none !important;
-  transition: opacity 160ms ease, transform 160ms ease !important;
+  z-index: 4 !important;
 }
 
-.post-wrapper .us-video-player.us-controls-show .us-video-controls {
-  opacity: 1 !important;
-  transform: translateY(0) !important;
-  pointer-events: auto !important;
-}
-
-.post-wrapper .us-video-player .us-video-controls-row {
-  display: flex !important;
-  align-items: center !important;
-  gap: 10px !important;
-}
-
+/* Fix button styling */
 .post-wrapper .us-video-player .us-video-btn {
-  height: 36px !important;
-  min-width: 36px !important;
-  padding: 0 12px !important;
-  border-radius: 999px !important;
-
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 6px !important;
-
+  border: none !important;
+  outline: none !important;
   background: rgba(18,18,18,0.60) !important;
-  border: 1px solid rgba(255,255,255,0.16) !important;
-  color: #fff !important;
-  cursor: pointer !important;
 }
 
-.post-wrapper .us-video-player .us-video-btn i {
-  font-size: 1.05rem !important;
-  color: #fff !important;
-}
-
-.post-wrapper .us-video-player .us-video-btn-text {
-  font-size: 0.86rem !important;
-  color: rgba(255,255,255,0.92) !important;
-}
-
-.post-wrapper .us-video-player .us-video-time {
-  margin-left: auto !important;
-  font-size: 0.88rem !important;
-  color: rgba(255,255,255,0.92) !important;
-  display: inline-flex !important;
-  gap: 6px !important;
-  align-items: center !important;
-  white-space: nowrap !important;
-}
-
-/* progress */
-.post-wrapper .us-video-player .us-video-progress {
-  width: 100% !important;
-  margin-top: 10px !important;
-  height: 4px !important;
-  border-radius: 999px !important;
-  background: rgba(255,255,255,0.22) !important;
-  accent-color: var(--primary-color, #1DA1F2) !important;
-}
-
+/* Fix progress bar thumb for all browsers */
 .post-wrapper .us-video-player .us-video-progress::-webkit-slider-thumb {
-  -webkit-appearance: none !important;
-  appearance: none !important;
   width: 14px !important;
   height: 14px !important;
   border-radius: 999px !important;
   background: #fff !important;
   border: 2px solid rgba(0,0,0,0.25) !important;
+  cursor: pointer !important;
+}
+
+.post-wrapper .us-video-player .us-video-progress::-moz-range-thumb {
+  width: 14px !important;
+  height: 14px !important;
+  border-radius: 999px !important;
+  background: #fff !important;
+  border: 2px solid rgba(0,0,0,0.25) !important;
+  cursor: pointer !important;
+}
+
+/* Ensure video loads properly */
+.post-wrapper .us-video-player .us-video {
+  background: #000 !important;
+}
+
+/* Fix autoplay styling */
+.post-wrapper .us-video-player .us-video[autoplay] {
+  display: block !important;
+}
+
+/* Remove any conflicting transitions */
+.post-wrapper .us-video-player .us-video-controls {
+  transition: opacity 0.2s ease, transform 0.2s ease !important;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .post-wrapper .us-video-player .us-video-center-btn {
+    width: 56px !important;
+    height: 56px !important;
+  }
+  
+  .post-wrapper .us-video-player .us-video-btn {
+    height: 32px !important;
+    min-width: 32px !important;
+    padding: 0 8px !important;
+  }
 }
