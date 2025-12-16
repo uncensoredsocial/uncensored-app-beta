@@ -3,6 +3,9 @@
 .profile-page-body {
   background: var(--bg-color, #000);
   color: var(--text-color, #fff);
+
+  /* ✅ FIX: prevent tiny horizontal scroll that cuts cards off */
+  overflow-x: hidden;
 }
 
 /* ✅ FIX: header must stick to TOP of viewport (NOT 60px down) */
@@ -71,6 +74,9 @@
 /* Main container */
 .profile-main {
   padding-bottom: 72px; /* room for bottom nav */
+
+  /* ✅ FIX: prevent layout from creating side scroll */
+  overflow-x: hidden;
 }
 
 /* ===== HERO SECTION (banner + avatar + basic info) ===== */
@@ -227,6 +233,9 @@
 /* Tab content containers */
 .profile-tab-content {
   min-height: 200px;
+
+  /* ✅ FIX: prevent tabs area from creating horizontal scroll */
+  overflow-x: hidden;
 }
 
 .tab-pane {
@@ -240,11 +249,13 @@
 /* ===== POSTS LIST ===== */
 
 .profile-posts {
-  padding: 4px 0 8px;
+  padding: 4px 12px 8px; /* ✅ FIX: add same side padding like home feed */
+  overflow-x: hidden;    /* ✅ FIX: no sideways scroll */
 }
 
+/* ✅ FIX: posts should be full width of container (no left cut-off) */
 .profile-posts .post {
-  margin: 8px 12px;
+  margin: 8px 0;              /* ✅ FIX: remove side margins that can push width */
   padding: 10px 14px;
   border-radius: var(--radius-lg);
   background: var(--bg-secondary);
@@ -252,6 +263,21 @@
   box-shadow: var(--shadow-sm);
   position: relative;
   cursor: pointer;
+
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+
+  /* ✅ FIX: keeps media/content from spilling past the card */
+  overflow: hidden;
+}
+
+/* ✅ FIX: media inside posts must not exceed card width */
+.profile-posts .post img,
+.profile-posts .post video {
+  max-width: 100%;
+  height: auto;
+  display: block;
 }
 
 .loading-indicator {
@@ -414,69 +440,20 @@
   padding: 0 10px;
 }
 
-/* ============================================================
-   ✅ CHANGE #1: Followers/Following back button = EXACT SETTINGS STYLE
-   (uses .header-back-button like settings page)
-============================================================ */
-
-.followlist-header .header-back-button {
-  border: none;
-  background: transparent;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px;
-  cursor: pointer;
+.followlist-back {
+  width: 38px;
+  height: 38px;
   border-radius: 999px;
-}
-
-.followlist-header .header-back-button i {
-  font-size: 18px;
+  border: 1px solid var(--border-light, #2f3336);
+  background: rgba(17, 17, 17, 0.9);
   color: #fff;
-}
-
-.followlist-header .header-back-button:hover,
-.followlist-header .header-back-button:focus-visible {
-  background: #111;
-  outline: none;
-}
-
-/* Make the header behave like settings centered header */
-.followlist-header.header-centered {
-  justify-content: center;
-  position: sticky;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 5;
-}
-
-/* Perfectly center title (tabs) without shifting */
-.followlist-header.header-centered .header-left,
-.followlist-header.header-centered .header-actions {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  min-width: auto;
-}
-
-.followlist-header.header-centered .header-left {
-  left: 16px;
-}
-
-.followlist-header.header-centered .header-actions {
-  right: 16px;
-}
-
-/* Tabs live in the center area */
-.followlist-header.header-centered .followlist-tabs {
-  flex: 1;
-  display: flex;
   justify-content: center;
-  gap: 18px;
+  cursor: pointer;
+}
+.followlist-back:hover {
+  background: rgba(30, 30, 30, 0.95);
 }
 
 .followlist-tabs {
@@ -640,59 +617,4 @@
     height: 96vh;
     border-radius: 14px;
   }
-}
-
-/* ============================================================
-   ✅ CHANGE #2: REMOVE TINY HORIZONTAL SCROLL + FORCE POSTS TO FIT
-   (ONLY styling fix, no layout redesign)
-============================================================ */
-
-html, body {
-  overflow-x: hidden;
-}
-
-#profilePosts,
-#profileLikes,
-.profile-posts {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
-  box-sizing: border-box;
-}
-
-/* Ensure the post card never exceeds the container width */
-.profile-posts .post {
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-/* Media must be responsive */
-.post-media,
-.post-media a {
-  display: block;
-  width: 100%;
-  max-width: 100%;
-  overflow: hidden;
-}
-
-.post-media img,
-.post-media video {
-  display: block;
-  width: 100%;
-  max-width: 100%;
-  height: auto;
-}
-
-/* Prevent long text/links from forcing width */
-.post-text {
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-
-/* Prevent flex children from forcing width */
-.post-header,
-.post-user,
-.post-actions {
-  min-width: 0;
 }
