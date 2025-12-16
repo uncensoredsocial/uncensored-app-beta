@@ -51,7 +51,8 @@ class ProfilePage {
     this.bindEvents();
 
     // hydrate UI from local storage immediately (fast)
-    const localUser = typeof getCurrentUser === "function" ? getCurrentUser() : null;
+    const localUser =
+      typeof getCurrentUser === "function" ? getCurrentUser() : null;
     if (localUser) this.setUser(localUser);
 
     // pull fresh user from server, then load posts
@@ -138,11 +139,15 @@ class ProfilePage {
       this.editProfileBtn.addEventListener("click", () => this.openEditModal());
     }
 
-    if (this.closeEditBtn) this.closeEditBtn.addEventListener("click", () => this.closeEditModal());
-    if (this.cancelEditBtn) this.cancelEditBtn.addEventListener("click", () => this.closeEditModal());
+    if (this.closeEditBtn)
+      this.closeEditBtn.addEventListener("click", () => this.closeEditModal());
+    if (this.cancelEditBtn)
+      this.cancelEditBtn.addEventListener("click", () => this.closeEditModal());
 
     if (this.editForm) {
-      this.editForm.addEventListener("submit", (e) => this.handleEditSubmit(e));
+      this.editForm.addEventListener("submit", (e) =>
+        this.handleEditSubmit(e)
+      );
     }
 
     if (this.editBioInput && this.bioCharCounter) {
@@ -166,15 +171,21 @@ class ProfilePage {
 
     // Follow list open
     if (this.followersStatBtn) {
-      this.followersStatBtn.addEventListener("click", () => this.openFollowList("followers"));
+      this.followersStatBtn.addEventListener("click", () =>
+        this.openFollowList("followers")
+      );
     }
     if (this.followingStatBtn) {
-      this.followingStatBtn.addEventListener("click", () => this.openFollowList("following"));
+      this.followingStatBtn.addEventListener("click", () =>
+        this.openFollowList("following")
+      );
     }
 
     // Follow list modal controls
     if (this.followListBackBtn) {
-      this.followListBackBtn.addEventListener("click", () => this.closeFollowList());
+      this.followListBackBtn.addEventListener("click", () =>
+        this.closeFollowList()
+      );
     }
     if (this.followListModal) {
       this.followListModal.addEventListener("click", (e) => {
@@ -183,10 +194,14 @@ class ProfilePage {
     }
 
     if (this.followersTabBtn) {
-      this.followersTabBtn.addEventListener("click", () => this.switchFollowTab("followers"));
+      this.followersTabBtn.addEventListener("click", () =>
+        this.switchFollowTab("followers")
+      );
     }
     if (this.followingTabBtn) {
-      this.followingTabBtn.addEventListener("click", () => this.switchFollowTab("following"));
+      this.followingTabBtn.addEventListener("click", () =>
+        this.switchFollowTab("following")
+      );
     }
   }
 
@@ -253,7 +268,7 @@ class ProfilePage {
       if (!token) return;
 
       const res = await fetch(`${PROFILE_API_BASE_URL}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!res.ok) {
@@ -267,6 +282,14 @@ class ProfilePage {
 
       this.setUser(user);
       if (typeof setCurrentUser === "function") setCurrentUser(user);
+
+      // ✅ If follow modal is open, keep its counts + buttons correct
+      if (this.followListModal && this.followListModal.classList.contains("open")) {
+        if (this.followersTabCount)
+          this.followersTabCount.textContent = String(this.user.followers_count || 0);
+        if (this.followingTabCount)
+          this.followingTabCount.textContent = String(this.user.following_count || 0);
+      }
     } catch (err) {
       console.warn("fetchCurrentUser error:", err);
     }
@@ -282,7 +305,9 @@ class ProfilePage {
 
     container.innerHTML = `<div class="loading-indicator">Loading posts...</div>`;
 
-    const url = `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(this.user.username)}/posts`;
+    const url = `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(
+      this.user.username
+    )}/posts`;
 
     try {
       const res = await fetch(url, { headers: this.buildOptionalAuthHeaders() });
@@ -302,7 +327,8 @@ class ProfilePage {
       });
 
       // Keep count in sync (either server count or array length)
-      if (this.postsCountEl) this.postsCountEl.textContent = String(this.posts.length);
+      if (this.postsCountEl)
+        this.postsCountEl.textContent = String(this.posts.length);
 
       if (!this.posts.length) {
         container.innerHTML = `<div class="empty-state"><h3>No posts yet</h3></div>`;
@@ -341,14 +367,18 @@ class ProfilePage {
 
     likesContainer.innerHTML = `<div class="loading-indicator">Loading likes...</div>`;
 
-    const url = `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(this.user.username)}/likes`;
+    const url = `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(
+      this.user.username
+    )}/likes`;
 
     try {
       const res = await fetch(url, { headers: this.buildOptionalAuthHeaders() });
 
       if (!res.ok) {
         const { text } = await this.readResponseSafe(res);
-        throw new Error(`Failed to load liked posts (${res.status}) ${text}`.trim());
+        throw new Error(
+          `Failed to load liked posts (${res.status}) ${text}`.trim()
+        );
       }
 
       const payload = await res.json().catch(() => null);
@@ -496,20 +526,40 @@ class ProfilePage {
     const deleteBtn = article.querySelector(".post-delete-btn");
     const userEl = article.querySelector(".post-user");
 
-    if (likeBtn) likeBtn.addEventListener("click", (e) => { e.stopPropagation(); this.handleLike(post, likeBtn); });
-    if (saveBtn) saveBtn.addEventListener("click", (e) => { e.stopPropagation(); this.handleSave(post, saveBtn); });
-    if (commentBtn) commentBtn.addEventListener("click", (e) => { e.stopPropagation(); this.goToPost(post); });
-    if (shareBtn) shareBtn.addEventListener("click", (e) => { e.stopPropagation(); this.handleSharePostClick(post); });
+    if (likeBtn)
+      likeBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.handleLike(post, likeBtn);
+      });
+    if (saveBtn)
+      saveBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.handleSave(post, saveBtn);
+      });
+    if (commentBtn)
+      commentBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.goToPost(post);
+      });
+    if (shareBtn)
+      shareBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.handleSharePostClick(post);
+      });
 
     if (deleteBtn && isOwnPost && !fromLikesTab) {
-      deleteBtn.addEventListener("click", (e) => { e.stopPropagation(); this.confirmDeletePost(post, article); });
+      deleteBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.confirmDeletePost(post, article);
+      });
     }
 
     if (userEl) {
       userEl.addEventListener("click", (e) => {
         e.stopPropagation();
         const uname = userEl.dataset.username;
-        if (this.user && this.user.username === uname) window.location.href = "profile.html";
+        if (this.user && this.user.username === uname)
+          window.location.href = "profile.html";
         else window.location.href = `user.html?user=${encodeURIComponent(uname)}`;
       });
     }
@@ -521,7 +571,8 @@ class ProfilePage {
         target.closest(".post-delete-btn") ||
         target.closest(".post-user") ||
         target.tagName === "A"
-      ) return;
+      )
+        return;
       this.goToPost(post);
     });
 
@@ -572,8 +623,12 @@ class ProfilePage {
       this.followListError.textContent = "";
     }
 
-    const fCount = Number(this.user.followers_count || this.followersCountEl?.textContent || 0);
-    const fgCount = Number(this.user.following_count || this.followingCountEl?.textContent || 0);
+    const fCount = Number(
+      this.user.followers_count || this.followersCountEl?.textContent || 0
+    );
+    const fgCount = Number(
+      this.user.following_count || this.followingCountEl?.textContent || 0
+    );
     if (this.followersTabCount) this.followersTabCount.textContent = String(fCount);
     if (this.followingTabCount) this.followingTabCount.textContent = String(fgCount);
 
@@ -589,11 +644,15 @@ class ProfilePage {
   switchFollowTab(tabName) {
     this.activeFollowTab = tabName;
 
-    if (this.followersTabBtn) this.followersTabBtn.classList.toggle("active", tabName === "followers");
-    if (this.followingTabBtn) this.followingTabBtn.classList.toggle("active", tabName === "following");
+    if (this.followersTabBtn)
+      this.followersTabBtn.classList.toggle("active", tabName === "followers");
+    if (this.followingTabBtn)
+      this.followingTabBtn.classList.toggle("active", tabName === "following");
 
-    if (this.followersPane) this.followersPane.classList.toggle("active", tabName === "followers");
-    if (this.followingPane) this.followingPane.classList.toggle("active", tabName === "following");
+    if (this.followersPane)
+      this.followersPane.classList.toggle("active", tabName === "followers");
+    if (this.followingPane)
+      this.followingPane.classList.toggle("active", tabName === "following");
 
     if (tabName === "followers" && !this.followersLoaded) this.fetchFollowers();
     if (tabName === "following" && !this.followingLoaded) this.fetchFollowing();
@@ -617,6 +676,9 @@ class ProfilePage {
       const data = json || {};
       this.followers = Array.isArray(data.users) ? data.users : [];
       this.followersLoaded = true;
+
+      // ✅ Some backends don’t include is_following for each row. Fix it:
+      this.followers = await this.enrichIsFollowing(this.followers);
 
       this.applyFollowCountsFromServer(data);
       this.renderFollowRows("followers");
@@ -647,6 +709,10 @@ class ProfilePage {
       this.following = Array.isArray(data.users) ? data.users : [];
       this.followingLoaded = true;
 
+      // ✅ Following list should always render as "Following" on load
+      // If server doesn't provide is_following, force true
+      this.following = this.following.map(u => ({ ...u, is_following: true }));
+
       this.applyFollowCountsFromServer(data);
       this.renderFollowRows("following");
     } catch (err) {
@@ -657,19 +723,57 @@ class ProfilePage {
     }
   }
 
+  // ✅ Ensure each row knows whether *I* follow them (used for followers tab "Follow back")
+  async enrichIsFollowing(list) {
+    try {
+      const token = typeof getAuthToken === "function" ? getAuthToken() : null;
+      if (!token) return list;
+
+      // If server already gave is_following booleans, don't waste calls
+      const needs = (list || []).filter(u => typeof u.is_following !== "boolean");
+      if (!needs.length) return list;
+
+      const out = [];
+      for (const u of list) {
+        if (!u?.username) { out.push(u); continue; }
+        if (typeof u.is_following === "boolean") { out.push(u); continue; }
+
+        // Ask server for that user's profile, which includes is_following
+        const res = await fetch(
+          `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(u.username)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const { json } = await this.readResponseSafe(res);
+        out.push({
+          ...u,
+          is_following: json && typeof json.is_following === "boolean" ? json.is_following : false
+        });
+      }
+      return out;
+    } catch {
+      return list;
+    }
+  }
+
   applyFollowCountsFromServer(data) {
-    const followersCount = typeof data.followers_count === "number" ? data.followers_count : null;
-    const followingCount = typeof data.following_count === "number" ? data.following_count : null;
+    const followersCount =
+      typeof data.followers_count === "number" ? data.followers_count : null;
+    const followingCount =
+      typeof data.following_count === "number" ? data.following_count : null;
 
     if (followersCount !== null) {
       this.user.followers_count = followersCount;
-      if (this.followersCountEl) this.followersCountEl.textContent = String(followersCount);
-      if (this.followersTabCount) this.followersTabCount.textContent = String(followersCount);
+      if (this.followersCountEl)
+        this.followersCountEl.textContent = String(followersCount);
+      if (this.followersTabCount)
+        this.followersTabCount.textContent = String(followersCount);
     }
     if (followingCount !== null) {
       this.user.following_count = followingCount;
-      if (this.followingCountEl) this.followingCountEl.textContent = String(followingCount);
-      if (this.followingTabCount) this.followingTabCount.textContent = String(followingCount);
+      if (this.followingCountEl)
+        this.followingCountEl.textContent = String(followingCount);
+      if (this.followingTabCount)
+        this.followingTabCount.textContent = String(followingCount);
     }
   }
 
@@ -737,7 +841,8 @@ class ProfilePage {
         if (btn) return;
         const uname = row.dataset.username;
         if (!uname) return;
-        if (this.user && uname === this.user.username) window.location.href = "profile.html";
+        if (this.user && uname === this.user.username)
+          window.location.href = "profile.html";
         else window.location.href = `user.html?user=${encodeURIComponent(uname)}`;
       });
 
@@ -766,12 +871,29 @@ class ProfilePage {
 
     btn.disabled = true;
 
+    // remember previous state for rollback
+    const prev = userObj.is_following === true;
+
+    // optimistic UI
+    const optimistic = !prev;
+    userObj.is_following = optimistic;
+    btn.dataset.following = optimistic ? "1" : "0";
+    if (mode === "followers") {
+      btn.textContent = optimistic ? "Following" : "Follow back";
+      btn.classList.toggle("primary", !optimistic);
+      btn.classList.toggle("ghost", optimistic);
+    } else {
+      btn.textContent = optimistic ? "Following" : "Follow";
+      btn.classList.toggle("primary", !optimistic);
+      btn.classList.toggle("ghost", optimistic);
+    }
+
     try {
       const res = await fetch(
         `${PROFILE_API_BASE_URL}/users/${encodeURIComponent(username)}/follow`,
         {
           method: "POST",
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
 
@@ -779,25 +901,17 @@ class ProfilePage {
       if (!res.ok) throw new Error((json && json.error) || text || "Failed to update follow");
 
       // ✅ Support different server response shapes
-      // Prefer: { following: true/false }
-      // Also accept: { is_following: true/false } or { followed: true/false }
       const nowFollowing =
         (json && typeof json.following === "boolean" ? json.following : null) ??
         (json && typeof json.is_following === "boolean" ? json.is_following : null) ??
         (json && typeof json.followed === "boolean" ? json.followed : null);
 
-      // If server didn’t return a boolean, flip current state as fallback
-      const current = userObj.is_following === true;
-      const finalFollowing = typeof nowFollowing === "boolean" ? nowFollowing : !current;
+      const finalFollowing =
+        typeof nowFollowing === "boolean" ? nowFollowing : optimistic;
 
-      // Refresh my counts from /auth/me (keeps stats correct)
-      await this.fetchCurrentUser();
-
-      // Update row state
       userObj.is_following = finalFollowing;
       btn.dataset.following = finalFollowing ? "1" : "0";
 
-      // Update label + style
       if (mode === "followers") {
         btn.textContent = finalFollowing ? "Following" : "Follow back";
         btn.classList.toggle("primary", !finalFollowing);
@@ -808,13 +922,33 @@ class ProfilePage {
         btn.classList.toggle("ghost", finalFollowing);
       }
 
-      // Optional: if you're in Following tab and unfollow, remove from list
+      // ✅ Update counts immediately from server response if present
+      if (json) this.applyFollowCountsFromServer(json);
+
+      // ✅ If you're in Following tab and unfollow, remove from list
       if (mode === "following" && !finalFollowing) {
         this.following = this.following.filter((x) => x.username !== username);
         this.renderFollowRows("following");
       }
+
+      // ✅ Refresh my user (keeps header counts correct even if server doesn't return counts)
+      await this.fetchCurrentUser();
     } catch (err) {
       console.error("toggleFollowUser error:", err);
+
+      // rollback
+      userObj.is_following = prev;
+      btn.dataset.following = prev ? "1" : "0";
+      if (mode === "followers") {
+        btn.textContent = prev ? "Following" : "Follow back";
+        btn.classList.toggle("primary", !prev);
+        btn.classList.toggle("ghost", prev);
+      } else {
+        btn.textContent = prev ? "Following" : "Follow";
+        btn.classList.toggle("primary", !prev);
+        btn.classList.toggle("ghost", prev);
+      }
+
       alert(err.message || "Could not update follow.");
     } finally {
       btn.disabled = false;
@@ -853,21 +987,29 @@ class ProfilePage {
       }
     }
 
-    if (this.postsCountEl) this.postsCountEl.textContent = String(this.user.posts_count || this.posts.length || 0);
-    if (this.followersCountEl) this.followersCountEl.textContent = String(this.user.followers_count || 0);
-    if (this.followingCountEl) this.followingCountEl.textContent = String(this.user.following_count || 0);
+    if (this.postsCountEl)
+      this.postsCountEl.textContent = String(
+        this.user.posts_count || this.posts.length || 0
+      );
+    if (this.followersCountEl)
+      this.followersCountEl.textContent = String(this.user.followers_count || 0);
+    if (this.followingCountEl)
+      this.followingCountEl.textContent = String(this.user.following_count || 0);
 
     if (this.followListModal && this.followListModal.classList.contains("open")) {
-      if (this.followersTabCount) this.followersTabCount.textContent = String(this.user.followers_count || 0);
-      if (this.followingTabCount) this.followingTabCount.textContent = String(this.user.following_count || 0);
+      if (this.followersTabCount)
+        this.followersTabCount.textContent = String(this.user.followers_count || 0);
+      if (this.followingTabCount)
+        this.followingTabCount.textContent = String(this.user.following_count || 0);
     }
   }
 
   openEditModal() {
     if (!this.editModal || !this.user) return;
 
-    this.editDisplayNameInput.value = this.user.display_name || "";
-    this.editBioInput.value = this.user.bio || "";
+    if (this.editDisplayNameInput)
+      this.editDisplayNameInput.value = this.user.display_name || "";
+    if (this.editBioInput) this.editBioInput.value = this.user.bio || "";
 
     if (this.avatarFileInput) this.avatarFileInput.value = "";
     if (this.bannerFileInput) this.bannerFileInput.value = "";
@@ -875,7 +1017,7 @@ class ProfilePage {
     if (this.editErrorEl) this.editErrorEl.classList.add("hidden");
     if (this.editSuccessEl) this.editSuccessEl.classList.add("hidden");
 
-    if (this.bioCharCounter) {
+    if (this.bioCharCounter && this.editBioInput) {
       const len = this.editBioInput.value.length;
       this.bioCharCounter.textContent = `${len}/160`;
     }
@@ -892,8 +1034,8 @@ class ProfilePage {
     e.preventDefault();
     if (!this.editForm) return;
 
-    const display_name = this.editDisplayNameInput.value.trim();
-    const bio = this.editBioInput.value.trim();
+    const display_name = (this.editDisplayNameInput?.value || "").trim();
+    const bio = (this.editBioInput?.value || "").trim();
 
     if (this.editErrorEl) this.editErrorEl.classList.add("hidden");
     if (this.editSuccessEl) this.editSuccessEl.classList.add("hidden");
@@ -908,11 +1050,17 @@ class ProfilePage {
       let banner_url = this.user.banner_url || null;
 
       if (this.avatarFileInput && this.avatarFileInput.files[0]) {
-        avatar_url = await this.uploadImageFile(this.avatarFileInput.files[0], "avatar");
+        avatar_url = await this.uploadImageFile(
+          this.avatarFileInput.files[0],
+          "avatar"
+        );
       }
 
       if (this.bannerFileInput && this.bannerFileInput.files[0]) {
-        banner_url = await this.uploadImageFile(this.bannerFileInput.files[0], "banner");
+        banner_url = await this.uploadImageFile(
+          this.bannerFileInput.files[0],
+          "banner"
+        );
       }
 
       const token = typeof getAuthToken === "function" ? getAuthToken() : null;
@@ -922,13 +1070,16 @@ class ProfilePage {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ display_name, bio, avatar_url, banner_url })
+        body: JSON.stringify({ display_name, bio, avatar_url, banner_url }),
       });
 
       const { json, text } = await this.readResponseSafe(res);
-      if (!res.ok) throw new Error((json && json.error) || text || "Failed to update profile");
+      if (!res.ok)
+        throw new Error(
+          (json && json.error) || text || "Failed to update profile"
+        );
 
       const data = json || null;
       if (!data) throw new Error("Bad response updating profile");
@@ -966,13 +1117,16 @@ class ProfilePage {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ imageData: base64, kind })
+      body: JSON.stringify({ imageData: base64, kind }),
     });
 
     const { json, text } = await this.readResponseSafe(res);
-    if (!res.ok || !json || !json.url) throw new Error((json && json.error) || text || `Failed to upload ${kind} image`);
+    if (!res.ok || !json || !json.url)
+      throw new Error(
+        (json && json.error) || text || `Failed to upload ${kind} image`
+      );
     return json.url;
   }
 
@@ -985,7 +1139,8 @@ class ProfilePage {
         if (commaIndex === -1) return resolve(String(result));
         resolve(String(result).slice(commaIndex + 1));
       };
-      reader.onerror = () => reject(reader.error || new Error("File read error"));
+      reader.onerror = () =>
+        reject(reader.error || new Error("File read error"));
       reader.readAsDataURL(file);
     });
   }
@@ -995,8 +1150,10 @@ class ProfilePage {
       btn.classList.toggle("active", btn.dataset.tab === tabName);
     });
 
-    if (this.postsTabPane) this.postsTabPane.classList.toggle("active", tabName === "posts");
-    if (this.likesTabPane) this.likesTabPane.classList.toggle("active", tabName === "likes");
+    if (this.postsTabPane)
+      this.postsTabPane.classList.toggle("active", tabName === "posts");
+    if (this.likesTabPane)
+      this.likesTabPane.classList.toggle("active", tabName === "likes");
 
     // ✅ Load the right content when switching
     if (tabName === "posts") {
@@ -1022,13 +1179,17 @@ class ProfilePage {
     if (!ok) return;
 
     try {
-      const res = await fetch(`${PROFILE_API_BASE_URL}/posts/${encodeURIComponent(post.id)}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(
+        `${PROFILE_API_BASE_URL}/posts/${encodeURIComponent(post.id)}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
       const { json, text } = await this.readResponseSafe(res);
-      if (!res.ok) throw new Error((json && json.error) || text || "Failed to delete post");
+      if (!res.ok)
+        throw new Error((json && json.error) || text || "Failed to delete post");
 
       this.posts = this.posts.filter((p) => p.id !== post.id);
 
@@ -1036,7 +1197,8 @@ class ProfilePage {
         articleEl.parentElement.removeChild(articleEl);
       }
 
-      if (this.postsCountEl) this.postsCountEl.textContent = String(this.posts.length);
+      if (this.postsCountEl)
+        this.postsCountEl.textContent = String(this.posts.length);
 
       const container = this.ensurePostsContainer();
       if (container && !this.posts.length) {
@@ -1063,7 +1225,10 @@ class ProfilePage {
     let currentCount = parseInt(countEl?.textContent || "0", 10);
     if (Number.isNaN(currentCount)) currentCount = 0;
 
-    const wasLiked = btn.classList.contains("liked") || post.liked_by_me === true || post.is_liked === true;
+    const wasLiked =
+      btn.classList.contains("liked") ||
+      post.liked_by_me === true ||
+      post.is_liked === true;
 
     let newCount = currentCount + (wasLiked ? -1 : 1);
     if (newCount < 0) newCount = 0;
@@ -1077,18 +1242,25 @@ class ProfilePage {
     if (countEl) countEl.textContent = String(newCount);
 
     try {
-      const res = await fetch(`${PROFILE_API_BASE_URL}/posts/${encodeURIComponent(post.id)}/like`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(
+        `${PROFILE_API_BASE_URL}/posts/${encodeURIComponent(post.id)}/like`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
       const { json, text } = await this.readResponseSafe(res);
-      if (!res.ok) throw new Error((json && json.error) || text || "Failed to update like");
+      if (!res.ok)
+        throw new Error((json && json.error) || text || "Failed to update like");
 
       const data = json || {};
       const serverLikes =
-        typeof data.likes === "number" ? data.likes :
-        typeof data.like_count === "number" ? data.like_count : null;
+        typeof data.likes === "number"
+          ? data.likes
+          : typeof data.like_count === "number"
+          ? data.like_count
+          : null;
 
       const nowLiked = typeof data.liked === "boolean" ? data.liked : !wasLiked;
 
@@ -1098,7 +1270,7 @@ class ProfilePage {
         liked_by_me: nowLiked,
         is_liked: nowLiked,
         likes: serverLikes !== null ? serverLikes : newCount,
-        like_count: serverLikes !== null ? serverLikes : newCount
+        like_count: serverLikes !== null ? serverLikes : newCount,
       });
     } catch (err) {
       console.error("handleLike error:", err);
@@ -1125,7 +1297,10 @@ class ProfilePage {
     }
 
     const icon = btn.querySelector("i");
-    const wasSaved = btn.classList.contains("saved") || post.saved_by_me === true || post.is_saved === true;
+    const wasSaved =
+      btn.classList.contains("saved") ||
+      post.saved_by_me === true ||
+      post.is_saved === true;
 
     // optimistic UI
     btn.classList.toggle("saved", !wasSaved);
@@ -1135,20 +1310,24 @@ class ProfilePage {
     }
 
     try {
-      const res = await fetch(`${PROFILE_API_BASE_URL}/posts/${encodeURIComponent(post.id)}/save`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(
+        `${PROFILE_API_BASE_URL}/posts/${encodeURIComponent(post.id)}/save`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
       const { json, text } = await this.readResponseSafe(res);
-      if (!res.ok) throw new Error((json && json.error) || text || "Failed to update save");
+      if (!res.ok)
+        throw new Error((json && json.error) || text || "Failed to update save");
 
       const data = json || {};
       const nowSaved = typeof data.saved === "boolean" ? data.saved : !wasSaved;
 
       this.updateLocalPostState(post.id, {
         saved_by_me: nowSaved,
-        is_saved: nowSaved
+        is_saved: nowSaved,
       });
     } catch (err) {
       console.error("handleSave error:", err);
@@ -1167,7 +1346,9 @@ class ProfilePage {
   handleSharePostClick(post) {
     if (!post || !post.id) return;
 
-    const url = `${window.location.origin}/post.html?id=${encodeURIComponent(post.id)}`;
+    const url = `${window.location.origin}/post.html?id=${encodeURIComponent(
+      post.id
+    )}`;
 
     if (navigator.share) {
       navigator.share({ title: "Check out this post", url }).catch(() => {});
@@ -1195,7 +1376,10 @@ class ProfilePage {
   formatContent(text) {
     const safe = this.escapeHtml(text || "");
     return safe
-      .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>')
+      .replace(
+        /(https?:\/\/[^\s]+)/g,
+        '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+      )
       .replace(/#(\w+)/g, '<span class="hashtag">#$1</span>')
       .replace(/@(\w+)/g, '<span class="mention">@$1</span>');
   }
