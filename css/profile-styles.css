@@ -105,29 +105,22 @@
   margin-top: -40px;
 }
 
-/* ======================================================
-   ✅ FIX: PROFILE AVATAR STRETCH / OVAL BUG (REAL FIX)
-   - Hard-lock the wrapper size so flex/layout can’t stretch it
-   - Works on Safari + iOS (no aspect-ratio)
-====================================================== */
-
+/* Big profile avatar (hero) */
 .profile-avatar-wrapper {
   width: 80px;
   height: 80px;
-
-  /* ✅ NEW: prevent any layout engine from stretching it */
-  min-width: 80px;
-  min-height: 80px;
-  flex: 0 0 80px;          /* don’t allow grow/shrink */
-  display: block;          /* avoid flex child weirdness */
-
   border-radius: 50%;
   border: 4px solid #000;
   overflow: hidden;
   background: #000;
+
+  /* ✅ keep it locked */
+  min-width: 80px;
+  min-height: 80px;
+  flex: 0 0 80px;
+  display: block;
 }
 
-/* ✅ NEW: block-level image avoids weird inline baseline stretch */
 .profile-avatar {
   width: 100%;
   height: 100%;
@@ -293,6 +286,43 @@
   max-width: 100%;
   height: auto;
   display: block;
+}
+
+/* ======================================================
+   ✅ REAL FIX: POST AVATAR STRETCH BUG (LIKES TAB TOO)
+   The stretched/oval avatars are .post-avatar inside the post header.
+   Lock them to a perfect square and prevent flex stretch.
+====================================================== */
+
+.profile-posts .post-header {
+  min-width: 0;
+}
+
+.profile-posts .post-user {
+  min-width: 0;
+  display: flex;
+  align-items: center;     /* ✅ keep avatar centered */
+  gap: 10px;
+}
+
+/* ✅ HARD-LOCK the small post avatars */
+.profile-posts .post-avatar {
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+  min-height: 42px !important;
+  flex: 0 0 42px !important;
+
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  display: block !important;
+  overflow: hidden;
+}
+
+/* Sometimes global img rules can mess with it */
+.profile-posts .post-avatar[style] {
+  width: 42px !important;
+  height: 42px !important;
 }
 
 .loading-indicator {
@@ -621,7 +651,6 @@
     height: 52px;
   }
 
-  /* ✅ keep avatar locked even on mobile */
   .profile-avatar-wrapper {
     width: 72px;
     height: 72px;
@@ -638,5 +667,14 @@
   .followlist-modal {
     height: 96vh;
     border-radius: 14px;
+  }
+
+  /* ✅ also keep post avatars locked on small screens */
+  .profile-posts .post-avatar {
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    flex: 0 0 40px !important;
   }
 }
