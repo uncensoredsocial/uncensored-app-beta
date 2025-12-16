@@ -336,3 +336,28 @@
 .notifications-page .notifications-page-title {
   display: none !important;
 }
+
+/* ================================
+   FIX: Remove extra top spacing under Alerts (notifications only)
+   ================================ */
+
+/* Many pages add header offset padding globally — kill it for notifications page */
+body.notifications-page {
+  padding-top: 0 !important;
+}
+
+/* If your global layout adds top padding/margin on wrappers, override here */
+.notifications-page .content-wrapper {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+
+/* Reduce the top padding inside the notifications main area */
+.notifications-page .notifications-main {
+  padding-top: var(--space-2) !important; /* smaller than space-4 */
+}
+
+/* If there’s still a tiny gap, tighten the filter bar spacing */
+.notifications-page .notifications-filter-bar {
+  margin-top: 0 !important;
+}
