@@ -1207,6 +1207,251 @@ app.get('/api/users/:username/following', async (req, res) => {
 });
 
 // ======================================================
+//            USER PROFILE + USER POSTS + FOLLOW TOGGLE
+// ======================================================
+
+// Get a public user profile + stats (+ is_following if viewer has token)
+app.get('/api/users/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const viewerId = getUserIdFromAuthHeader(req);
+
+    const { data: u, error } = await supabase
+      .from('users')
+      .select('id,username,display_name,avatar_url,banner_url,bio,created_at')
+      .eq('username', username)
+      .single();
+
+    if (error || !u) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const stats = await getUserStats(u.id);
+
+    let isFollowing = false;
+    if (viewerId) {
+      const { data: row } = await supabase
+        .from('follows')
+        .select('id')
+        .eq('follower_id', viewerId)
+        .eq('followed_id', u.id)
+        .maybeSingle();
+
+      isFollowing = !!row;
+    }
+
+    return res.json({
+      ...u,
+      ...stats,
+      is_following: isFollowing
+    });
+  } catch (err) {
+    console.error('GET /api/users/:username error:', err);
+    return res.status(500).json({ error: 'Failed to load user' });
+  }
+});
+
+// Get a user's posts (same shape as feed so your user.js render works)
+app.get('/api/users/:username/posts', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const currentUserId = getUserIdFromAuthHeader(req);
+
+    const { data: target, error: targetErr } = await supabase
+      .from('users')
+      .select('id,username')
+      .eq('username', username)
+      .single();
+
+    if (targetErr || !target) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const baseSelect = `
+      id,
+      user_id,
+      content,
+      media_url,
+      media_type,
+      created_at,
+      user:users (
+        id,
+        username,
+        display_name,
+        avatar_url
+      ),
+      post_likes ( user_id ),
+      post_comments ( id, user_id ),
+      post_saves ( user_id )
+    `;
+
+    const { data, error } = await supabase
+      .from('posts')
+      .select(baseSelect)
+      .eq('user_id', target.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('GET /api/users/:username/posts error:', error);
+      return res.status(500).json({ error: 'Failed to load posts' });
+    }
+
+    const shaped = (data || []).map(p => shapePostRow(p, currentUserId));
+    return res.json(shaped);
+  } catch (err) {
+    console.error('GET /api/users/:username/posts error:', err);
+    return res.status(500).json({ error: 'Failed to load posts' });
+  }
+});
+
+// Get posts this user has liked (for your "Liked posts" tab)
+app.get('/api/users/:username/likes', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const currentUserId = getUserIdFromAuthHeader(req);
+
+    const { data: target, error: targetErr } = await supabase
+      .from('users')
+      .select('id,username')
+      .eq('username', username)
+      .single();
+
+    if (targetErr || !target) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // 1) get post_ids liked by target
+    const { data: likeRows, error: likesErr } = await supabase
+      .from('post_likes')
+      .select('post_id, created_at')
+      .eq('user_id', target.id)
+      .order('created_at', { ascending: false })
+      .limit(500);
+
+    if (likesErr) {
+      console.error('liked posts lookup error:', likesErr);
+      return res.status(500).json({ error: 'Failed to load liked posts' });
+    }
+
+    const postIds = (likeRows || []).map(r => r.post_id).filter(Boolean);
+    if (!postIds.length) return res.json([]);
+
+    const baseSelect = `
+      id,
+      user_id,
+      content,
+      media_url,
+      media_type,
+      created_at,
+      user:users (
+        id,
+        username,
+        display_name,
+        avatar_url
+      ),
+      post_likes ( user_id ),
+      post_comments ( id, user_id ),
+      post_saves ( user_id )
+    `;
+
+    // 2) fetch those posts
+    const { data: posts, error: postsErr } = await supabase
+      .from('posts')
+      .select(baseSelect)
+      .in('id', postIds)
+      .order('created_at', { ascending: false });
+
+    if (postsErr) {
+      console.error('liked posts fetch error:', postsErr);
+      return res.status(500).json({ error: 'Failed to load liked posts' });
+    }
+
+    const shaped = (posts || []).map(p => shapePostRow(p, currentUserId));
+    return res.json(shaped);
+  } catch (err) {
+    console.error('GET /api/users/:username/likes error:', err);
+    return res.status(500).json({ error: 'Failed to load liked posts' });
+  }
+});
+
+// Follow / unfollow toggle (THIS fixes your Cannot POST error once frontend points to Railway)
+app.post('/api/users/:username/follow', authMiddleware, async (req, res) => {
+  try {
+    const { username } = req.params;
+    const followerId = req.user.id;
+
+    const { data: target, error: targetErr } = await supabase
+      .from('users')
+      .select('id,username')
+      .eq('username', username)
+      .single();
+
+    if (targetErr || !target) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (target.id === followerId) {
+      return res.status(400).json({ error: 'You cannot follow yourself' });
+    }
+
+    const { data: existing, error: checkErr } = await supabase
+      .from('follows')
+      .select('id')
+      .eq('follower_id', followerId)
+      .eq('followed_id', target.id)
+      .maybeSingle();
+
+    if (checkErr) {
+      console.error('follow check error:', checkErr);
+      return res.status(500).json({ error: 'Failed to update follow status' });
+    }
+
+    let following = false;
+
+    if (existing) {
+      const { error: delErr } = await supabase
+        .from('follows')
+        .delete()
+        .eq('id', existing.id);
+
+      if (delErr) {
+        console.error('unfollow error:', delErr);
+        return res.status(500).json({ error: 'Failed to unfollow user' });
+      }
+
+      following = false;
+    } else {
+      const { error: insErr } = await supabase
+        .from('follows')
+        .insert({
+          id: uuidv4(),
+          follower_id: followerId,
+          followed_id: target.id,
+          created_at: new Date().toISOString()
+        });
+
+      if (insErr) {
+        console.error('follow insert error:', insErr);
+        return res.status(500).json({ error: 'Failed to follow user' });
+      }
+
+      following = true;
+    }
+
+    const stats = await getUserStats(target.id);
+
+    return res.json({
+      following,
+      followers_count: stats.followers_count || 0,
+      following_count: stats.following_count || 0
+    });
+  } catch (err) {
+    console.error('POST /api/users/:username/follow error:', err);
+    return res.status(500).json({ error: 'Failed to update follow status' });
+  }
+});
+
+// ======================================================
 //                          SEARCH
 // ======================================================
 
