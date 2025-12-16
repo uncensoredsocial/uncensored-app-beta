@@ -56,17 +56,27 @@
   </style>
 </head>
 
-<body>
-  <!-- ============== HEADER (centered logo, no profile pic) ============== -->
-  <header class="header header-centered">
+<!-- ✅ ADDED: page-specific body class so CSS targets only notifications page -->
+<body class="notifications-page">
+  <!-- ============== HEADER (centered title only, no UncensoredSocial visible) ============== -->
+  <!-- ✅ ADDED: notifications-header class for the sticky/center title behavior -->
+  <header class="header header-centered notifications-header">
     <div class="header-left"></div>
+
+    <!-- KEEPING your original logo markup (not removed) -->
+    <!-- Your CSS you added should hide this on notifications page -->
     <h1 class="logo">Uncensored<span>Social</span></h1>
+
+    <!-- ✅ ADDED: the centered title you want (like Search page) -->
+    <h1 class="notifications-header-title">Alerts</h1>
+
     <div class="header-actions"></div>
   </header>
 
   <!-- ================= MAIN CONTENT ================= -->
   <div class="content-wrapper">
     <main class="main-content notifications-main">
+      <!-- KEEPING this (not removed) — your CSS can hide it to prevent duplicate "Alerts" -->
       <h2 class="notifications-page-title">Alerts</h2>
 
       <!-- Filter tabs (All / Likes / Comments / Followers) -->
