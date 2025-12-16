@@ -294,3 +294,45 @@
 .notification-follow-btn:focus-visible {
   outline: none;
 }
+
+/* ================================
+   Notifications: top title only (no UncensoredSocial)
+   Perfect center on ALL devices
+   ================================ */
+
+.notifications-page .notifications-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg-color, #000);
+  border-bottom: 1px solid var(--border-light, #2f3336);
+  height: 56px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Hard-center the title (true middle, not flex-offset) */
+.notifications-page .notifications-header-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Ensure left/right placeholders can't shift centering */
+.notifications-page .notifications-header .header-left,
+.notifications-page .notifications-header .header-actions {
+  width: 56px; /* keeps the center exact even if you add icons later */
+  flex: 0 0 56px;
+}
+
+/* Remove any leftover spacing from the old page title if it still exists */
+.notifications-page .notifications-page-title {
+  display: none !important;
+}
