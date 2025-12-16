@@ -33,14 +33,12 @@
       }
     }
 
-    /* Force bottom nav visible on desktop */
     @media (min-width: 768px) {
       .bottom-nav {
         display: flex !important;
       }
     }
 
-    /* Font Awesome icons above labels in bottom nav */
     .bottom-nav .nav-item {
       display: flex;
       flex-direction: column;
@@ -56,18 +54,13 @@
   </style>
 </head>
 
-<!-- ✅ ADDED: page-specific body class so CSS targets only notifications page -->
 <body class="notifications-page">
-  <!-- ============== HEADER (centered title only, no UncensoredSocial visible) ============== -->
-  <!-- ✅ ADDED: notifications-header class for the sticky/center title behavior -->
-  <header class="header header-centered notifications-header">
+
+  <!-- ============== HEADER (Alerts ONLY, perfectly centered) ============== -->
+  <header class="header notifications-header">
     <div class="header-left"></div>
 
-    <!-- KEEPING your original logo markup (not removed) -->
-    <!-- Your CSS you added should hide this on notifications page -->
-    <h1 class="logo">Uncensored<span>Social</span></h1>
-
-    <!-- ✅ ADDED: the centered title you want (like Search page) -->
+    <!-- ✅ ONLY TITLE THAT EXISTS -->
     <h1 class="notifications-header-title">Alerts</h1>
 
     <div class="header-actions"></div>
@@ -76,10 +69,11 @@
   <!-- ================= MAIN CONTENT ================= -->
   <div class="content-wrapper">
     <main class="main-content notifications-main">
-      <!-- KEEPING this (not removed) — your CSS can hide it to prevent duplicate "Alerts" -->
+
+      <!-- (kept for accessibility, hidden by your CSS) -->
       <h2 class="notifications-page-title">Alerts</h2>
 
-      <!-- Filter tabs (All / Likes / Comments / Followers) -->
+      <!-- Filter tabs -->
       <div class="notifications-filter-bar" id="notificationsFilterBar">
         <button class="notif-filter-btn active" data-filter="all">
           <i class="fa-solid fa-fire"></i>
@@ -99,7 +93,7 @@
         </button>
       </div>
 
-      <!-- Single unified notifications list -->
+      <!-- Notifications list -->
       <div id="notificationsList" class="notifications-list"></div>
 
       <!-- Empty state -->
@@ -107,6 +101,7 @@
         <h3>No notifications yet</h3>
         <p>When you get likes, comments, or new followers, they’ll show up here.</p>
       </div>
+
     </main>
   </div>
 
