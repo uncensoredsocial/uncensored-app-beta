@@ -618,3 +618,21 @@
     border-radius: 14px;
   }
 }
+
+/* ======================================================
+   FIX: PROFILE AVATAR STRETCH / OVAL BUG
+   Lock avatar to a perfect circle
+====================================================== */
+
+.profile-avatar-wrapper {
+  aspect-ratio: 1 / 1;          /* hard-lock square */
+  flex-shrink: 0;               /* prevent flex distortion */
+  align-self: flex-start;       /* stop vertical stretch */
+}
+
+.profile-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
