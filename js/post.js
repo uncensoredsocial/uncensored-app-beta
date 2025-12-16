@@ -116,8 +116,7 @@ class PostPage {
   }
 
   updateAuthUI() {
-    const token =
-      typeof getAuthToken === "function" ? getAuthToken() : null;
+    const token = typeof getAuthToken === "function" ? getAuthToken() : null;
     const loggedIn = !!token;
 
     if (!loggedIn) {
@@ -165,8 +164,7 @@ class PostPage {
 
     try {
       const headers = {};
-      const token =
-        typeof getAuthToken === "function" ? getAuthToken() : null;
+      const token = typeof getAuthToken === "function" ? getAuthToken() : null;
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
       const res = await fetch(
@@ -187,6 +185,9 @@ class PostPage {
 
       const article = this.renderPostCard(data);
       this.postContainer.appendChild(article);
+
+      // ✅ NEW: init custom video players after the post card is in the DOM
+      this.initCustomVideoPlayers(article);
     } catch (err) {
       console.error("loadPost exception:", err);
       this.showError("Failed to load post.");
@@ -201,8 +202,7 @@ class PostPage {
     article.dataset.postId = post.id;
 
     const author = post.user || {};
-    const avatar =
-      author.avatar_url || "default-profile.PNG";
+    const avatar = author.avatar_url || "default-profile.PNG";
     const username = author.username || "unknown";
     const displayName = author.display_name || username;
     const createdAt = post.created_at;
@@ -317,6 +317,7 @@ class PostPage {
     return article;
   }
 
+  // ✅ UPDATED: custom video player markup (no native controls)
   renderMediaHtml(url, type) {
     const lower = (url || "").toLowerCase();
     const isVideo =
@@ -329,10 +330,52 @@ class PostPage {
     if (isVideo) {
       return `
         <div class="post-media">
-          <video controls playsinline preload="metadata">
-            <source src="${url}">
-            Your browser does not support video.
-          </video>
+          <div class="us-video-player us-controls-show" data-state="paused">
+            <video class="us-video" playsinline preload="metadata">
+              <source src="${url}">
+              Your browser does not support video.
+            </video>
+
+            <button class="us-video-tap" type="button" aria-label="Toggle controls"></button>
+
+            <button class="us-video-center-btn" type="button" aria-label="Play/Pause">
+              <i class="fa-solid fa-play"></i>
+            </button>
+
+            <div class="us-video-controls" role="group" aria-label="Video controls">
+              <div class="us-video-controls-row">
+                <button class="us-video-btn us-back" type="button" aria-label="Back 10 seconds">
+                  <i class="fa-solid fa-rotate-left"></i>
+                  <span class="us-video-btn-text">10</span>
+                </button>
+
+                <button class="us-video-btn us-play" type="button" aria-label="Play/Pause">
+                  <i class="fa-solid fa-play"></i>
+                </button>
+
+                <button class="us-video-btn us-forward" type="button" aria-label="Forward 10 seconds">
+                  <i class="fa-solid fa-rotate-right"></i>
+                  <span class="us-video-btn-text">10</span>
+                </button>
+
+                <span class="us-video-time" aria-label="Time">
+                  <span class="us-current">0:00</span>
+                  <span class="us-sep">/</span>
+                  <span class="us-duration">0:00</span>
+                </span>
+
+                <button class="us-video-btn us-mute" type="button" aria-label="Mute/Unmute">
+                  <i class="fa-solid fa-volume-high"></i>
+                </button>
+
+                <button class="us-video-btn us-fullscreen" type="button" aria-label="Fullscreen">
+                  <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
+                </button>
+              </div>
+
+              <input class="us-video-progress" type="range" min="0" max="1000" value="0" aria-label="Seek" />
+            </div>
+          </div>
         </div>
       `;
     }
@@ -344,6 +387,195 @@ class PostPage {
         </a>
       </div>
     `;
+  }
+
+  // ✅ NEW: initialize custom video players inside a DOM subtree
+  initCustomVideoPlayers(rootEl = document) {
+    const players = rootEl.querySelectorAll(".us-video-player");
+    players.forEach((player) => this.bindCustomVideoPlayer(player));
+  }
+
+  // ✅ NEW: custom player behavior
+  bindCustomVideoPlayer(player) {
+    const video = player.querySelector(".us-video");
+    const tap = player.querySelector(".us-video-tap");
+    const centerBtn = player.querySelector(".us-video-center-btn");
+
+    const btnPlay = player.querySelector(".us-play");
+    const btnBack = player.querySelector(".us-back");
+    const btnForward = player.querySelector(".us-forward");
+    const btnMute = player.querySelector(".us-mute");
+    const btnFs = player.querySelector(".us-fullscreen");
+
+    const range = player.querySelector(".us-video-progress");
+    const currentEl = player.querySelector(".us-current");
+    const durationEl = player.querySelector(".us-duration");
+
+    if (!video || !range) return;
+
+    let hideTimer = null;
+    let isScrubbing = false;
+
+    const fmt = (secs) => {
+      secs = Math.max(0, secs || 0);
+      const m = Math.floor(secs / 60);
+      const s = Math.floor(secs % 60);
+      return `${m}:${String(s).padStart(2, "0")}`;
+    };
+
+    const setIcons = () => {
+      const paused = video.paused || video.ended;
+      player.dataset.state = paused ? "paused" : "playing";
+
+      const iconClass = paused ? "fa-play" : "fa-pause";
+
+      const cIcon = centerBtn?.querySelector("i");
+      if (cIcon) cIcon.className = `fa-solid ${iconClass}`;
+
+      const pIcon = btnPlay?.querySelector("i");
+      if (pIcon) pIcon.className = `fa-solid ${iconClass}`;
+
+      const mIcon = btnMute?.querySelector("i");
+      if (mIcon) {
+        mIcon.className = video.muted
+          ? "fa-solid fa-volume-xmark"
+          : "fa-solid fa-volume-high";
+      }
+    };
+
+    const showControls = () => {
+      player.classList.add("us-controls-show");
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => {
+        if (!video.paused && !isScrubbing) {
+          player.classList.remove("us-controls-show");
+        }
+      }, 1800);
+    };
+
+    const toggleControls = () => {
+      const isShown = player.classList.contains("us-controls-show");
+      if (isShown) player.classList.remove("us-controls-show");
+      else showControls();
+    };
+
+    const togglePlay = async () => {
+      try {
+        // pause other videos on page
+        document.querySelectorAll("video.us-video").forEach((v) => {
+          if (v !== video) v.pause();
+        });
+
+        if (video.paused) await video.play();
+        else video.pause();
+      } catch {}
+    };
+
+    const syncProgress = () => {
+      const dur = video.duration || 0;
+      const cur = video.currentTime || 0;
+
+      if (!isScrubbing) {
+        range.value = dur > 0 ? Math.round((cur / dur) * 1000) : 0;
+      }
+
+      if (currentEl) currentEl.textContent = fmt(cur);
+      if (durationEl) durationEl.textContent = fmt(dur);
+
+      setIcons();
+    };
+
+    video.addEventListener("loadedmetadata", () => {
+      syncProgress();
+      showControls();
+    });
+
+    video.addEventListener("timeupdate", () => {
+      syncProgress();
+    });
+
+    video.addEventListener("play", () => {
+      setIcons();
+      showControls();
+    });
+
+    video.addEventListener("pause", () => {
+      setIcons();
+      player.classList.add("us-controls-show");
+    });
+
+    tap?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleControls();
+    });
+
+    centerBtn?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      showControls();
+      togglePlay();
+    });
+
+    btnPlay?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      showControls();
+      togglePlay();
+    });
+
+    btnBack?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      showControls();
+      video.currentTime = Math.max(0, (video.currentTime || 0) - 10);
+    });
+
+    btnForward?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      showControls();
+      video.currentTime = Math.min(video.duration || 0, (video.currentTime || 0) + 10);
+    });
+
+    btnMute?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      showControls();
+      video.muted = !video.muted;
+      setIcons();
+    });
+
+    btnFs?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      showControls();
+
+      const el = player;
+      const doc = document;
+
+      const isFs = doc.fullscreenElement || doc.webkitFullscreenElement;
+
+      if (!isFs) {
+        (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+      } else {
+        (doc.exitFullscreen || doc.webkitExitFullscreen)?.call(doc);
+      }
+    });
+
+    range.addEventListener("input", () => {
+      isScrubbing = true;
+      const dur = video.duration || 0;
+      const pct = (parseInt(range.value || "0", 10) / 1000) || 0;
+      const target = dur * pct;
+      if (currentEl) currentEl.textContent = fmt(target);
+    });
+
+    range.addEventListener("change", () => {
+      const dur = video.duration || 0;
+      const pct = (parseInt(range.value || "0", 10) / 1000) || 0;
+      video.currentTime = dur * pct;
+      isScrubbing = false;
+      showControls();
+    });
+
+    // initial state
+    player.classList.add("us-controls-show");
+    setIcons();
+    syncProgress();
   }
 
   // ========= LOAD COMMENTS =========
@@ -390,8 +622,7 @@ class PostPage {
     this.commentsList.innerHTML = this.comments
       .map((c) => {
         const user = c.user || {};
-        const avatar =
-          user.avatar_url || "default-profile.PNG";
+        const avatar = user.avatar_url || "default-profile.PNG";
         const username = user.username || "unknown";
         const displayName = user.display_name || username;
         const time = c.created_at ? this.formatTime(c.created_at) : "";
@@ -468,8 +699,7 @@ class PostPage {
     }
     if (!this.commentInput || !this.commentSubmitBtn) return;
 
-    const token =
-      typeof getAuthToken === "function" ? getAuthToken() : null;
+    const token = typeof getAuthToken === "function" ? getAuthToken() : null;
     if (!token) {
       alert("Please log in to comment.");
       return;
@@ -487,9 +717,7 @@ class PostPage {
 
     try {
       const res = await fetch(
-        `${POST_API_BASE_URL}/posts/${encodeURIComponent(
-          this.postId
-        )}/comments`,
+        `${POST_API_BASE_URL}/posts/${encodeURIComponent(this.postId)}/comments`,
         {
           method: "POST",
           headers: {
@@ -536,8 +764,7 @@ class PostPage {
   async handleDeleteComment(commentId) {
     if (!commentId) return;
 
-    const token =
-      typeof getAuthToken === "function" ? getAuthToken() : null;
+    const token = typeof getAuthToken === "function" ? getAuthToken() : null;
     if (!token) {
       alert("Please log in.");
       return;
@@ -586,8 +813,7 @@ class PostPage {
   async handleLike(post, btn) {
     if (!post || !post.id || !btn) return;
 
-    const token =
-      typeof getAuthToken === "function" ? getAuthToken() : null;
+    const token = typeof getAuthToken === "function" ? getAuthToken() : null;
     if (!token) {
       alert("Please log in to like posts.");
       return;
@@ -627,8 +853,7 @@ class PostPage {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to update like");
 
-      const serverLikes =
-        typeof data.likes === "number" ? data.likes : null;
+      const serverLikes = typeof data.likes === "number" ? data.likes : null;
       const nowLiked = data.liked === true ? true : !wasLiked;
 
       if (serverLikes !== null && countEl) {
@@ -655,16 +880,14 @@ class PostPage {
   async handleSave(post, btn) {
     if (!post || !post.id || !btn) return;
 
-    const token =
-      typeof getAuthToken === "function" ? getAuthToken() : null;
+    const token = typeof getAuthToken === "function" ? getAuthToken() : null;
     if (!token) {
       alert("Please log in to save posts.");
       return;
     }
 
     const icon = btn.querySelector("i");
-    const wasSaved =
-      btn.classList.contains("saved") || post.saved_by_me === true;
+    const wasSaved = btn.classList.contains("saved") || post.saved_by_me === true;
 
     // optimistic
     btn.classList.toggle("saved", !wasSaved);
