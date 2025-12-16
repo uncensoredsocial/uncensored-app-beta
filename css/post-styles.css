@@ -251,3 +251,137 @@
     padding: 12px 8px 80px;
   }
 }
+
+/* ===================================================== */
+/* ✅ NEW: Custom video player styles (added)             */
+/* ===================================================== */
+
+.us-video-player {
+  position: relative;
+  width: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+}
+
+/* Video itself */
+.us-video-player .us-video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  max-height: 420px;
+  object-fit: contain;
+  background: #000;
+}
+
+/* Full click area (to toggle controls) */
+.us-video-tap {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* Center play button */
+.us-video-center-btn {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.us-video-player[data-state="paused"] .us-video-center-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.us-video-center-btn i {
+  font-size: 1.25rem;
+}
+
+/* Bottom controls */
+.us-video-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+
+  padding: 10px 10px 8px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0));
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.us-video-player.us-controls-show .us-video-controls {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.us-video-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.us-video-btn {
+  border: none;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.us-video-btn:active {
+  transform: scale(0.98);
+}
+
+.us-video-btn i {
+  font-size: 1rem;
+}
+
+.us-video-btn-text {
+  font-size: 0.85rem;
+  opacity: 0.9;
+  margin-left: -2px;
+}
+
+.us-video-time {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.9);
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.us-video-progress {
+  margin-top: 8px;
+  width: 100%;
+  height: 4px;
+  accent-color: var(--primary-color, #1DA1F2);
+}
