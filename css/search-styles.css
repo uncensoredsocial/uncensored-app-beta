@@ -519,3 +519,65 @@
 .bottom-nav .nav-label {
   font-size: 10px;
 }
+
+/* =========================================================
+   ✅ FIX CENTERING + OVERLAP (added — do not remove old code)
+   ========================================================= */
+
+/* Make the header behave consistently like Alerts page */
+.app-body .header.header-centered {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  height: 56px;
+  background: var(--bg-color, #000);
+  border-bottom: 1px solid var(--border-light, #2f3336);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Hard-center the title on ALL devices */
+.app-body .header.header-centered .logo {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* Ensure left/right placeholders never shift the center */
+.app-body .header.header-centered .header-left,
+.app-body .header.header-centered .header-actions {
+  width: 56px;
+  flex: 0 0 56px;
+}
+
+/* ✅ Fix sticky stacking so filters never overlap the search box */
+.search-header {
+  top: 56px !important;          /* directly under header */
+  z-index: 180 !important;
+  padding-bottom: var(--space-4) !important; /* reduce extra height so less overlap risk */
+}
+
+.search-filters {
+  top: 132px !important;         /* header (56) + approx search-header height */
+  z-index: 170 !important;
+
+  /* kill the extra margins that were pushing it into the search box */
+  margin-top: 0 !important;
+  margin-bottom: var(--space-3) !important;
+}
+
+/* ✅ Move the "Recent/Trending" content down just a bit so it clears both sticky bars */
+.search-default-state {
+  margin-top: var(--space-3) !important;
+}
+
+/* On very small screens, the search header can be taller */
+@media (max-width: 420px) {
+  .search-filters {
+    top: 140px !important;
+  }
+}
