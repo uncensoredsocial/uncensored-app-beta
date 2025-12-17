@@ -880,3 +880,82 @@
     font-size: 0.82rem !important;
   }
 }
+
+/* ===================================================== */
+/* ✅ CRITICAL VIDEO PLAYER FIXES (ADD AT VERY END)      */
+/* ===================================================== */
+
+/* Force video to be properly centered in container */
+.post-wrapper .post-media {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+  background: #000 !important;
+  min-height: 240px !important;
+}
+
+/* Ensure video player takes full width and is centered */
+.post-wrapper .post-media .us-video-player {
+  width: 100% !important;
+  margin: 0 auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Force video element to be centered and properly sized */
+.post-wrapper .post-media .us-video-player .us-video {
+  width: auto !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: 420px !important;
+  margin: 0 auto !important;
+  display: block !important;
+}
+
+/* Fix for iOS Safari to prevent native controls from appearing */
+.us-video {
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+/* Ensure all controls are visible when they should be */
+.us-video-player.us-ui-visible .us-video-center-btn,
+.us-video-player[data-state="paused"] .us-video-center-btn {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* Fix tap area to cover entire video */
+.us-video-tap {
+  z-index: 10 !important;
+}
+
+/* Make sure controls don't get hidden by other elements */
+.us-video-controls {
+  z-index: 20 !important;
+}
+
+.us-video-center-btn {
+  z-index: 15 !important;
+}
+
+/* Fix button states */
+.us-video-btn:active {
+  transform: scale(0.95) !important;
+  transition: transform 0.1s !important;
+}
+
+/* Ensure progress bar is visible and functional */
+.us-video-progress {
+  cursor: pointer !important;
+}
+
+/* Fix for Firefox */
+@-moz-document url-prefix() {
+  .us-video-player .us-video {
+    width: 100% !important;
+  }
+}
