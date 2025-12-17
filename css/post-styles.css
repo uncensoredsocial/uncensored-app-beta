@@ -2252,3 +2252,435 @@
   max-height: 160px !important;
   overflow-y: auto !important;
 }
+
+/* ===================================================== */
+/* ✅ VIDEO FULLSCREEN OVERLAY STYLES                    */
+/* ===================================================== */
+
+.video-fullscreen-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.video-fullscreen-overlay.hidden {
+  display: none;
+}
+
+.overlay-content {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Top bar */
+.overlay-top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 20px 24px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.9), rgba(0,0,0,0.3), transparent);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 10;
+  backdrop-filter: blur(10px);
+}
+
+.overlay-user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.overlay-user-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255,255,255,0.3);
+  flex-shrink: 0;
+}
+
+.overlay-user-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.overlay-user-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: white;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.overlay-user-handle {
+  font-size: 14px;
+  color: rgba(255,255,255,0.7);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.overlay-follow-btn {
+  padding: 8px 20px;
+  border-radius: 9999px;
+  background: white;
+  color: black;
+  border: none;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  margin-left: 12px;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.overlay-follow-btn:hover {
+  background: #e0e0e0;
+}
+
+.overlay-follow-btn.following {
+  background: transparent;
+  color: white;
+  border: 1px solid rgba(255,255,255,0.3);
+}
+
+.overlay-follow-btn.following:hover {
+  background: rgba(255,0,0,0.1);
+  color: #ff4444;
+  border-color: #ff4444;
+}
+
+.overlay-close-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 20px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  margin-left: 12px;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.overlay-close-btn:hover {
+  background: rgba(255,255,255,0.2);
+  transform: scale(1.05);
+}
+
+/* Video container */
+.overlay-video-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.overlay-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.overlay-center-play-btn {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.7);
+  border: 2px solid rgba(255,255,255,0.3);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  cursor: pointer;
+  font-size: 24px;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.overlay-center-play-btn:hover {
+  background: rgba(0,0,0,0.9);
+  transform: translate(-50%, -50%) scale(1.05);
+}
+
+/* Bottom controls */
+.overlay-bottom-controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 20px 24px;
+  background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.5), transparent);
+  z-index: 10;
+  backdrop-filter: blur(10px);
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.video-fullscreen-overlay:not(.controls-visible) .overlay-bottom-controls {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.overlay-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.overlay-control-btn {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.25);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s ease;
+  min-height: 44px;
+}
+
+.overlay-control-btn:hover {
+  background: rgba(255,255,255,0.25);
+  transform: scale(1.05);
+}
+
+.overlay-control-btn:active {
+  transform: scale(0.95);
+}
+
+.overlay-time-display {
+  margin-left: auto;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.overlay-separator {
+  color: rgba(255,255,255,0.6);
+}
+
+.overlay-progress {
+  flex: 1;
+  height: 4px;
+  background: rgba(255,255,255,0.25);
+  border-radius: 2px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+  border: none;
+  min-height: 44px; /* For accessibility */
+}
+
+.overlay-progress::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid rgba(0,0,0,0.3);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+/* Engagement row */
+.overlay-engagement-row {
+  position: absolute;
+  right: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  z-index: 8;
+}
+
+.overlay-engagement-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0,0,0,0.7);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 50px;
+  padding: 12px 14px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 64px;
+  min-height: 64px;
+  backdrop-filter: blur(10px);
+}
+
+.overlay-engagement-btn:hover {
+  background: rgba(0,0,0,0.9);
+  transform: scale(1.08);
+}
+
+.overlay-engagement-btn i {
+  font-size: 20px;
+}
+
+.overlay-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: white;
+}
+
+.overlay-engagement-btn.liked i,
+.overlay-engagement-btn.liked .overlay-count {
+  color: #f91880;
+}
+
+.overlay-engagement-btn.saved i,
+.overlay-engagement-btn.saved .overlay-count {
+  color: #1d9bf0;
+}
+
+/* Mobile responsive fixes */
+@media (max-width: 768px) {
+  .overlay-top-bar {
+    padding: 16px;
+  }
+  
+  .overlay-user-avatar {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .overlay-user-name {
+    font-size: 15px;
+  }
+  
+  .overlay-user-handle {
+    font-size: 13px;
+  }
+  
+  .overlay-follow-btn {
+    padding: 6px 16px;
+    font-size: 14px;
+  }
+  
+  .overlay-close-btn {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .overlay-center-play-btn {
+    width: 60px;
+    height: 60px;
+    font-size: 20px;
+  }
+  
+  .overlay-bottom-controls {
+    padding: 16px;
+  }
+  
+  .overlay-control-btn {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+  }
+  
+  .overlay-engagement-row {
+    right: 16px;
+    gap: 16px;
+  }
+  
+  .overlay-engagement-btn {
+    padding: 10px 12px;
+    min-width: 56px;
+    min-height: 56px;
+  }
+  
+  .overlay-engagement-btn i {
+    font-size: 18px;
+  }
+}
+
+/* Safe area insets for notched phones */
+@supports (padding: max(0px)) {
+  .video-fullscreen-overlay {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  
+  .overlay-top-bar {
+    padding-top: calc(20px + env(safe-area-inset-top));
+    padding-left: calc(24px + env(safe-area-inset-left));
+    padding-right: calc(24px + env(safe-area-inset-right));
+  }
+  
+  .overlay-bottom-controls {
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    padding-left: calc(24px + env(safe-area-inset-left));
+    padding-right: calc(24px + env(safe-area-inset-right));
+  }
+  
+  .overlay-engagement-row {
+    right: calc(24px + env(safe-area-inset-right));
+  }
+}
+
+/* Highlight effect for comments section */
+.comments-section.highlighted {
+  animation: highlightPulse 2s ease;
+  border-color: var(--primary-color, #1DA1F2);
+}
+
+@keyframes highlightPulse {
+  0%, 100% { border-color: rgba(255,255,255,0.07); }
+  50% { border-color: var(--primary-color, #1DA1F2); box-shadow: 0 0 20px rgba(29, 161, 242, 0.3); }
+}
