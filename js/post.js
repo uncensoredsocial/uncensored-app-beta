@@ -330,6 +330,13 @@ class PostPage {
       lower.endsWith(".mov");
 
     if (isVideo) {
+      const post = this.post;
+      const author = post?.user || {};
+      const avatar = author.avatar_url || "default-profile.PNG";
+      const username = author.username || "unknown";
+      const displayName = author.display_name || username;
+      const isCurrentUser = this.currentUser && this.currentUser.username === username;
+      
       return `
         <div class="post-media">
           <div class="us-video-player" data-state="paused" data-fullscreen="false">
@@ -344,26 +351,56 @@ class PostPage {
               Your browser does not support video.
             </video>
 
-            <!-- Tap area for play/pause -->
-            <div class="us-video-tap-area"></div>
+            <!-- Tap area for fullscreen toggle -->
+            <div class="us-video-tap-area" data-action="toggle-fullscreen"></div>
 
             <!-- Center play button -->
             <button class="us-video-center-btn" type="button" aria-label="Play/Pause">
               <i class="fa-solid fa-play"></i>
             </button>
 
-            <!-- Top overlay (for fullscreen) -->
+            <!-- Top overlay (for fullscreen) - Twitter/X style -->
             <div class="us-video-top-overlay">
               <div class="us-video-user-info">
-                <img class="us-video-user-avatar" src="${this.post?.user?.avatar_url || 'default-profile.PNG'}" 
-                     alt="${this.post?.user?.username || 'User'}">
+                <img class="us-video-user-avatar" src="${avatar}" 
+                     alt="${displayName}"
+                     onerror="this.src='default-profile.PNG'">
                 <div class="us-video-user-details">
-                  <span class="us-video-user-name">${this.post?.user?.display_name || this.post?.user?.username || 'User'}</span>
-                  <span class="us-video-user-handle">@${this.post?.user?.username || 'user'}</span>
+                  <span class="us-video-user-name">${this.escape(displayName)}</span>
+                  <span class="us-video-user-handle">@${this.escape(username)}</span>
                 </div>
+                ${!isCurrentUser ? `
+                  <button class="us-video-follow-btn" type="button" aria-label="Follow">
+                    Follow
+                  </button>
+                ` : ''}
               </div>
               <button class="us-video-close-fullscreen" type="button" aria-label="Exit fullscreen">
                 <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+
+            <!-- Post text overlay (for fullscreen) -->
+            <div class="us-video-text-overlay">
+              <div class="us-video-post-text">${this.formatContent(post?.content || "")}</div>
+            </div>
+
+            <!-- Video Actions Overlay (Twitter/X style) -->
+            <div class="us-video-actions-overlay">
+              <button class="us-video-action-btn us-video-like" type="button" data-action="like">
+                <i class="fa-regular fa-heart"></i>
+                <span class="us-video-action-count">${post?.likes || 0}</span>
+              </button>
+              <button class="us-video-action-btn us-video-comment" type="button" data-action="comment">
+                <i class="fa-regular fa-comment"></i>
+                <span class="us-video-action-count">${post?.comments_count || 0}</span>
+              </button>
+              <button class="us-video-action-btn us-video-share" type="button" data-action="share">
+                <i class="fa-solid fa-share"></i>
+              </button>
+              <button class="us-video-action-btn us-video-save" type="button" data-action="save">
+                <i class="fa-regular fa-bookmark"></i>
+                <span class="us-video-action-count">${post?.saves_count || 0}</span>
               </button>
             </div>
 
@@ -390,11 +427,6 @@ class PostPage {
                   <span class="us-duration">0:00</span>
                 </span>
 
-                <!-- NEW: Video Settings Button -->
-                <button class="us-video-btn us-settings" type="button" aria-label="Video settings">
-                  <i class="fa-solid fa-sliders"></i>
-                </button>
-
                 <button class="us-video-btn us-mute" type="button" aria-label="Mute/Unmute">
                   <i class="fa-solid fa-volume-high"></i>
                 </button>
@@ -405,69 +437,6 @@ class PostPage {
               </div>
 
               <input class="us-video-progress" type="range" min="0" max="1000" value="0" aria-label="Seek" />
-            </div>
-
-            <!-- Video Actions (Like/Comment/Share/Save) - Shows on tap when not fullscreen -->
-            <div class="us-video-actions-overlay">
-              <button class="us-video-action-btn us-video-like" type="button">
-                <i class="fa-regular fa-heart"></i>
-                <span class="us-video-action-count">${this.post?.likes || 0}</span>
-              </button>
-              <button class="us-video-action-btn us-video-comment" type="button">
-                <i class="fa-regular fa-comment"></i>
-                <span class="us-video-action-count">${this.post?.comments_count || 0}</span>
-              </button>
-              <button class="us-video-action-btn us-video-share" type="button">
-                <i class="fa-solid fa-share"></i>
-              </button>
-              <button class="us-video-action-btn us-video-save" type="button">
-                <i class="fa-regular fa-bookmark"></i>
-                <span class="us-video-action-count">${this.post?.saves_count || 0}</span>
-              </button>
-            </div>
-
-            <!-- Settings Dropdown (Hidden by default) -->
-            <div class="us-video-settings-dropdown">
-              <div class="us-video-settings-header">
-                <h4>Video Settings</h4>
-                <button class="us-video-settings-close" type="button">
-                  <i class="fa-solid fa-xmark"></i>
-                </button>
-              </div>
-              <div class="us-video-settings-options">
-                <div class="us-video-setting">
-                  <span>Playback Speed</span>
-                  <select class="us-video-speed-select">
-                    <option value="0.5">0.5x</option>
-                    <option value="0.75">0.75x</option>
-                    <option value="1" selected>Normal</option>
-                    <option value="1.25">1.25x</option>
-                    <option value="1.5">1.5x</option>
-                    <option value="2">2x</option>
-                  </select>
-                </div>
-                <div class="us-video-setting">
-                  <span>Quality</span>
-                  <select class="us-video-quality-select">
-                    <option value="auto">Auto</option>
-                    <option value="720p">720p</option>
-                    <option value="480p">480p</option>
-                    <option value="360p">360p</option>
-                  </select>
-                </div>
-                <div class="us-video-setting">
-                  <button class="us-video-setting-btn us-video-download" type="button">
-                    <i class="fa-solid fa-download"></i>
-                    <span>Download Video</span>
-                  </button>
-                </div>
-                <div class="us-video-setting">
-                  <button class="us-video-setting-btn us-video-report" type="button">
-                    <i class="fa-solid fa-flag"></i>
-                    <span>Report Video</span>
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -489,49 +458,54 @@ class PostPage {
     players.forEach((player) => this.bindCustomVideoPlayer(player));
   }
 
-  // ✅ Enhanced custom player behavior with fullscreen support and actions
+  // ✅ Enhanced custom player behavior with Twitter/X style fullscreen
   bindCustomVideoPlayer(player) {
     const video = player.querySelector(".us-video");
     const tapArea = player.querySelector(".us-video-tap-area");
     const centerBtn = player.querySelector(".us-video-center-btn");
-
+    
     const btnPlay = player.querySelector(".us-play");
     const btnBack = player.querySelector(".us-back");
     const btnForward = player.querySelector(".us-forward");
     const btnMute = player.querySelector(".us-mute");
     const btnFs = player.querySelector(".us-fullscreen");
-    const btnSettings = player.querySelector(".us-settings");
-
+    const closeFullscreenBtn = player.querySelector(".us-video-close-fullscreen");
+    const followBtn = player.querySelector(".us-video-follow-btn");
+    
     const range = player.querySelector(".us-video-progress");
     const currentEl = player.querySelector(".us-current");
     const durationEl = player.querySelector(".us-duration");
-
-    // New elements for enhanced functionality
-    const settingsBtn = player.querySelector('.us-settings');
-    const settingsDropdown = player.querySelector('.us-video-settings-dropdown');
-    const settingsClose = player.querySelector('.us-video-settings-close');
-    const speedSelect = player.querySelector('.us-video-speed-select');
-    const qualitySelect = player.querySelector('.us-video-quality-select');
-    const closeFullscreenBtn = player.querySelector('.us-video-close-fullscreen');
-    const topOverlay = player.querySelector('.us-video-top-overlay');
-    const videoActions = player.querySelector('.us-video-actions-overlay');
+    
+    // Action buttons
     const likeBtnAction = player.querySelector('.us-video-like');
     const commentBtnAction = player.querySelector('.us-video-comment');
     const shareBtnAction = player.querySelector('.us-video-share');
     const saveBtnAction = player.querySelector('.us-video-save');
-
+    
+    // Post text overlay
+    const textOverlay = player.querySelector('.us-video-text-overlay');
+    
     if (!video || !range) return;
 
-    // ===== HARD FORCE: prevent native browser controls (iOS/Safari) =====
-    // (Even if something accidentally adds controls elsewhere)
+    // Store original position for returning from fullscreen
+    let originalParent = player.parentElement;
+    let originalPosition = {
+      top: player.offsetTop,
+      left: player.offsetLeft,
+      width: player.offsetWidth,
+      height: player.offsetHeight
+    };
+
+    // Store scroll position
+    let scrollPositionBeforeFullscreen = window.scrollY;
+    let isCommentAction = false; // Flag for comment button click
+
+    // ===== HARD FORCE: prevent native browser controls =====
     try {
       video.controls = false;
       video.removeAttribute("controls");
-
       video.setAttribute("playsinline", "");
       video.setAttribute("webkit-playsinline", "");
-
-      // iOS autoplay requires muted
       video.muted = true;
       video.setAttribute("muted", "");
       video.setAttribute("autoplay", "");
@@ -540,8 +514,9 @@ class PostPage {
 
     let hideTimer = null;
     let isScrubbing = false;
-    let hasPlayed = false;      // autoplay success flag
-    let userActivated = false;  // user tapped at least once
+    let hasPlayed = false;
+    let userActivated = false;
+    let isFullscreen = false;
 
     const fmt = (secs) => {
       secs = Math.max(0, secs || 0);
@@ -571,53 +546,21 @@ class PostPage {
     };
 
     const showControls = () => {
-      // show both: bottom controls + (via CSS) center icon if us-ui-visible
-      player.classList.add("us-controls-show", "us-ui-visible");
+      if (isFullscreen) return; // Don't show bottom controls in fullscreen
+      
+      player.classList.add("us-controls-show");
       clearTimeout(hideTimer);
       hideTimer = setTimeout(() => {
         if (!video.paused && !isScrubbing) {
-          player.classList.remove("us-controls-show", "us-ui-visible");
+          player.classList.remove("us-controls-show");
         }
       }, 1800);
     };
 
     const hideControlsNow = () => {
-      player.classList.remove("us-controls-show", "us-ui-visible");
+      player.classList.remove("us-controls-show");
       clearTimeout(hideTimer);
       hideTimer = null;
-    };
-
-    const toggleControls = () => {
-      const isShown = player.classList.contains("us-controls-show");
-      if (isShown) hideControlsNow();
-      else showControls();
-    };
-
-    const pauseAllOtherVideos = () => {
-      document.querySelectorAll("video.us-video").forEach((v) => {
-        if (v !== video) v.pause();
-      });
-    };
-
-    const tryAutoplay = async () => {
-      if (hasPlayed) return;
-      try {
-        pauseAllOtherVideos();
-        await video.play();
-        hasPlayed = true;
-        // Don't keep UI on screen during autoplay; show briefly then hide
-        player.dataset.state = "playing";
-        setIcons();
-        showControls();
-        setTimeout(() => {
-          if (!video.paused) player.classList.remove("us-controls-show", "us-ui-visible");
-        }, 900);
-      } catch {
-        // Autoplay blocked -> leave paused state so center button shows
-        player.dataset.state = "paused";
-        setIcons();
-        player.classList.add("us-ui-visible"); // show center button
-      }
     };
 
     const togglePlay = async () => {
@@ -631,10 +574,99 @@ class PostPage {
           showControls();
         } else {
           video.pause();
-          // When paused, keep UI visible
-          player.classList.add("us-controls-show", "us-ui-visible");
+          player.classList.add("us-controls-show");
         }
       } catch {}
+    };
+
+    const enterFullscreen = () => {
+      if (isFullscreen) return;
+      
+      // Store scroll position
+      scrollPositionBeforeFullscreen = window.scrollY;
+      
+      // Store original position for animation
+      const rect = player.getBoundingClientRect();
+      originalPosition = {
+        top: rect.top + window.scrollY,
+        left: rect.left + window.scrollX,
+        width: rect.width,
+        height: rect.height
+      };
+      
+      // Move player to body for fullscreen
+      document.body.appendChild(player);
+      player.dataset.fullscreen = "true";
+      isFullscreen = true;
+      
+      // Hide other elements
+      document.body.style.overflow = "hidden";
+      
+      // Show fullscreen overlays
+      player.classList.add("us-controls-show");
+      
+      // Force play if paused
+      if (video.paused) {
+        video.play().catch(() => {});
+      }
+    };
+
+    const exitFullscreen = () => {
+      if (!isFullscreen) return;
+      
+      // Return player to original position
+      originalParent.appendChild(player);
+      player.dataset.fullscreen = "false";
+      isFullscreen = false;
+      
+      // Restore body scroll
+      document.body.style.overflow = "";
+      
+      // Hide fullscreen overlays
+      player.classList.remove("us-controls-show");
+      
+      // If comment button was clicked, scroll to comments
+      if (isCommentAction) {
+        setTimeout(() => {
+          const commentsSection = document.getElementById("commentsSection");
+          if (commentsSection) {
+            // Add highlight effect
+            commentsSection.classList.add("highlighted");
+            
+            // Scroll to comments
+            commentsSection.scrollIntoView({ behavior: 'smooth' });
+            
+            // Focus on comment input
+            const commentInput = document.getElementById("commentInput");
+            if (commentInput) {
+              commentInput.focus();
+            }
+            
+            // Remove highlight after animation
+            setTimeout(() => {
+              commentsSection.classList.remove("highlighted");
+            }, 2000);
+          }
+          isCommentAction = false;
+        }, 300);
+      } else {
+        // Restore scroll position
+        window.scrollTo(0, scrollPositionBeforeFullscreen);
+      }
+    };
+
+    const toggleFullscreen = () => {
+      if (isFullscreen) {
+        exitFullscreen();
+      } else {
+        enterFullscreen();
+      }
+    };
+
+    const pauseAllOtherVideos = () => {
+      document.querySelectorAll("video.us-video").forEach((v) => {
+        if (v !== video) v.pause();
+      });
     };
 
     const syncProgress = () => {
@@ -651,241 +683,215 @@ class PostPage {
       setIcons();
     };
 
+    const tryAutoplay = async () => {
+      if (hasPlayed) return;
+      try {
+        pauseAllOtherVideos();
+        await video.play();
+        hasPlayed = true;
+        player.dataset.state = "playing";
+        setIcons();
+        showControls();
+        setTimeout(() => {
+          if (!video.paused) player.classList.remove("us-controls-show");
+        }, 900);
+      } catch {
+        player.dataset.state = "paused";
+        setIcons();
+        player.classList.add("us-controls-show");
+      }
+    };
+
     // ===== Events =====
 
     video.addEventListener("loadedmetadata", () => {
       syncProgress();
-      // Try autoplay shortly after metadata (iOS needs user gesture sometimes; this will fail gracefully)
       setTimeout(() => {
         tryAutoplay();
       }, 120);
     });
 
-    video.addEventListener("timeupdate", () => {
-      syncProgress();
-    });
-
+    video.addEventListener("timeupdate", syncProgress);
     video.addEventListener("play", () => {
       hasPlayed = true;
       player.dataset.state = "playing";
       setIcons();
-
-      // If user tapped, show controls briefly then hide. If autoplay, we already hide soon.
-      if (userActivated) showControls();
+      if (userActivated && !isFullscreen) showControls();
     });
 
     video.addEventListener("pause", () => {
       player.dataset.state = "paused";
       setIcons();
-      // Keep UI visible when paused
-      player.classList.add("us-controls-show", "us-ui-visible");
+      if (!isFullscreen) player.classList.add("us-controls-show");
     });
 
-    video.addEventListener("ended", () => {
-      // loop usually prevents ended, but keep safe state
-      player.dataset.state = "paused";
-      setIcons();
-      player.classList.add("us-controls-show", "us-ui-visible");
-    });
-
-    // Tap area: show/hide video actions and controls
+    // Tap area: toggle fullscreen on click
     tapArea?.addEventListener("click", (e) => {
       e.stopPropagation();
       userActivated = true;
       
-      // Don't toggle play/pause, just show/hide video actions when not in fullscreen
-      if (player.dataset.fullscreen === "false") {
-        const isVisible = videoActions.classList.contains("visible");
-        if (isVisible) {
-          videoActions.classList.remove("visible");
-        } else {
-          videoActions.classList.add("visible");
-          // Auto-hide after 3 seconds if video is playing
-          setTimeout(() => {
-            if (!video.paused) {
-              videoActions.classList.remove("visible");
-            }
-          }, 3000);
-        }
+      // Don't toggle if clicking on buttons
+      if (e.target.closest('button') || e.target.closest('.us-video-action-btn')) {
+        return;
       }
       
-      // Also show controls
-      showControls();
+      if (!isFullscreen) {
+        toggleFullscreen();
+      }
     });
 
     // Center play button
     centerBtn?.addEventListener("click", (e) => {
       e.stopPropagation();
       userActivated = true;
-      showControls();
+      if (!isFullscreen) showControls();
       togglePlay();
     });
 
-    // Play button in row
+    // Play button in controls
     btnPlay?.addEventListener("click", (e) => {
       e.stopPropagation();
       userActivated = true;
-      showControls();
+      if (!isFullscreen) showControls();
       togglePlay();
     });
 
     btnBack?.addEventListener("click", (e) => {
       e.stopPropagation();
       userActivated = true;
-      showControls();
+      if (!isFullscreen) showControls();
       video.currentTime = Math.max(0, (video.currentTime || 0) - 10);
     });
 
     btnForward?.addEventListener("click", (e) => {
       e.stopPropagation();
       userActivated = true;
-      showControls();
+      if (!isFullscreen) showControls();
       video.currentTime = Math.min(video.duration || 0, (video.currentTime || 0) + 10);
     });
 
     btnMute?.addEventListener("click", (e) => {
       e.stopPropagation();
       userActivated = true;
-      showControls();
+      if (!isFullscreen) showControls();
       video.muted = !video.muted;
       setIcons();
     });
 
-    // Enhanced Fullscreen button with cross-browser support
+    // Fullscreen button
     btnFs?.addEventListener("click", (e) => {
       e.stopPropagation();
       userActivated = true;
-      showControls();
-      
-      const doc = document;
-      const isFs = doc.fullscreenElement || doc.webkitFullscreenElement || 
-                   doc.mozFullScreenElement || doc.msFullscreenElement;
-      
-      if (!isFs) {
-        const requestFs = player.requestFullscreen || player.webkitRequestFullscreen || 
-                          player.mozRequestFullScreen || player.msRequestFullscreen;
-        if (requestFs) {
-          requestFs.call(player).then(() => {
-            player.dataset.fullscreen = "true";
-            // Show top overlay with user info in fullscreen
-            if (topOverlay) topOverlay.style.display = "flex";
-            // Hide video actions in fullscreen
-            if (videoActions) videoActions.style.display = "none";
-          }).catch(err => {
-            console.error('Fullscreen error:', err);
-          });
-        }
-      } else {
-        const exitFs = doc.exitFullscreen || doc.webkitExitFullscreen || 
-                       doc.mozCancelFullScreen || doc.msExitFullscreen;
-        if (exitFs) {
-          exitFs.call(doc).then(() => {
-            player.dataset.fullscreen = "false";
-            // Hide top overlay when exiting fullscreen
-            if (topOverlay) topOverlay.style.display = "none";
-            // Show video actions again
-            if (videoActions) videoActions.style.display = "flex";
-          });
-        }
-      }
+      toggleFullscreen();
     });
 
-    // Close fullscreen button (in top overlay)
+    // Close fullscreen button
     closeFullscreenBtn?.addEventListener("click", (e) => {
       e.stopPropagation();
-      const doc = document;
-      const exitFs = doc.exitFullscreen || doc.webkitExitFullscreen || 
-                     doc.mozCancelFullScreen || doc.msExitFullscreen;
-      if (exitFs) {
-        exitFs.call(doc);
-        player.dataset.fullscreen = "false";
-        if (topOverlay) topOverlay.style.display = "none";
-        if (videoActions) videoActions.style.display = "flex";
+      exitFullscreen();
+    });
+
+    // Follow button
+    followBtn?.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const post = this.post;
+      const user = post?.user;
+      if (!user) return;
+      
+      // Implement follow functionality here
+      const token = typeof getAuthToken === "function" ? getAuthToken() : null;
+      if (!token) {
+        alert("Please log in to follow users.");
+        return;
+      }
+      
+      try {
+        const res = await fetch(
+          `${POST_API_BASE_URL}/users/${encodeURIComponent(user.username)}/follow`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        
+        if (res.ok) {
+          followBtn.textContent = "Following";
+          followBtn.style.background = "#1d9bf0";
+          followBtn.style.color = "white";
+        }
+      } catch (err) {
+        console.error("Follow error:", err);
       }
     });
 
-    // Video actions (Like/Comment/Share/Save)
+    // Video action buttons
     likeBtnAction?.addEventListener("click", (e) => {
       e.stopPropagation();
-      // Trigger the post's like functionality
+      const post = this.post;
       const likeBtn = document.querySelector('.post .like-btn');
-      if (likeBtn) likeBtn.click();
+      if (likeBtn) {
+        likeBtn.click();
+        
+        // Update action button
+        const count = likeBtnAction.querySelector('.us-video-action-count');
+        const icon = likeBtnAction.querySelector('i');
+        const isLiked = likeBtn.classList.contains('liked');
+        
+        likeBtnAction.classList.toggle('liked', isLiked);
+        if (icon) {
+          icon.className = isLiked ? 'fa-solid fa-heart' : 'fa-regular fa-heart';
+          icon.style.color = isLiked ? '#f91880' : 'white';
+        }
+        if (count && isLiked) {
+          count.style.color = '#f91880';
+        }
+      }
     });
 
     commentBtnAction?.addEventListener("click", (e) => {
       e.stopPropagation();
-      // Scroll to comments section
-      if (this.commentsSection) {
-        this.commentsSection.scrollIntoView({ behavior: 'smooth' });
-        if (this.commentInput) this.commentInput.focus();
+      isCommentAction = true;
+      
+      if (isFullscreen) {
+        exitFullscreen();
+      } else {
+        const commentsSection = document.getElementById("commentsSection");
+        if (commentsSection) {
+          commentsSection.classList.add("highlighted");
+          commentsSection.scrollIntoView({ behavior: 'smooth' });
+          const commentInput = document.getElementById("commentInput");
+          if (commentInput) commentInput.focus();
+          
+          setTimeout(() => {
+            commentsSection.classList.remove("highlighted");
+          }, 2000);
+        }
       }
     });
 
     shareBtnAction?.addEventListener("click", (e) => {
       e.stopPropagation();
-      // Trigger share functionality
       this.handleSharePostClick(this.post);
     });
 
     saveBtnAction?.addEventListener("click", (e) => {
       e.stopPropagation();
-      // Trigger save functionality
+      const post = this.post;
       const saveBtn = document.querySelector('.post .save-btn');
-      if (saveBtn) saveBtn.click();
-    });
-
-    // Settings button
-    settingsBtn?.addEventListener("click", (e) => {
-      e.stopPropagation();
-      userActivated = true;
-      showControls();
-      
-      // Toggle settings dropdown
-      const isVisible = settingsDropdown.classList.contains("visible");
-      if (isVisible) {
-        settingsDropdown.classList.remove("visible");
-      } else {
-        // Hide other dropdowns if any
-        document.querySelectorAll(".us-video-settings-dropdown.visible").forEach(dropdown => {
-          dropdown.classList.remove("visible");
-        });
-        settingsDropdown.classList.add("visible");
-      }
-    });
-
-    // Close settings
-    settingsClose?.addEventListener("click", (e) => {
-      e.stopPropagation();
-      settingsDropdown.classList.remove("visible");
-    });
-
-    // Playback speed change
-    speedSelect?.addEventListener("change", (e) => {
-      video.playbackRate = parseFloat(e.target.value);
-    });
-
-    // Close settings when clicking outside
-    document.addEventListener("click", (e) => {
-      if (settingsDropdown && !player.contains(e.target)) {
-        settingsDropdown.classList.remove("visible");
-      }
-    });
-
-    // Fullscreen change listener
-    document.addEventListener("fullscreenchange", () => {
-      const isFullscreen = !!(document.fullscreenElement || 
-                             document.webkitFullscreenElement || 
-                             document.mozFullScreenElement || 
-                             document.msFullscreenElement);
-      
-      player.dataset.fullscreen = isFullscreen ? "true" : "false";
-      
-      if (isFullscreen) {
-        if (topOverlay) topOverlay.style.display = "flex";
-        if (videoActions) videoActions.style.display = "none";
-      } else {
-        if (topOverlay) topOverlay.style.display = "none";
-        if (videoActions) videoActions.style.display = "flex";
+      if (saveBtn) {
+        saveBtn.click();
+        
+        // Update action button
+        const icon = saveBtnAction.querySelector('i');
+        const isSaved = saveBtn.classList.contains('saved');
+        
+        saveBtnAction.classList.toggle('saved', isSaved);
+        if (icon) {
+          icon.className = isSaved ? 'fa-solid fa-bookmark' : 'fa-regular fa-bookmark';
+          icon.style.color = isSaved ? '#1d9bf0' : 'white';
+        }
       }
     });
 
@@ -896,8 +902,7 @@ class PostPage {
       const pct = (parseInt(range.value || "0", 10) / 1000) || 0;
       const target = dur * pct;
       if (currentEl) currentEl.textContent = fmt(target);
-      // keep UI visible while scrubbing
-      player.classList.add("us-controls-show", "us-ui-visible");
+      if (!isFullscreen) player.classList.add("us-controls-show");
     });
 
     range.addEventListener("change", () => {
@@ -906,21 +911,38 @@ class PostPage {
       const pct = (parseInt(range.value || "0", 10) / 1000) || 0;
       video.currentTime = dur * pct;
       isScrubbing = false;
-      showControls();
+      if (!isFullscreen) showControls();
     });
 
-    // Keep icons/progress correct at start
-    player.classList.add("us-controls-show");
+    // Handle ESC key to exit fullscreen
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && isFullscreen) {
+        exitFullscreen();
+      }
+    });
+
+    // Handle click outside player in fullscreen
+    document.addEventListener("click", (e) => {
+      if (isFullscreen && !player.contains(e.target)) {
+        // Only exit if clicking outside AND not on action buttons
+        if (!e.target.closest('.us-video-action-btn') && 
+            !e.target.closest('.us-video-close-fullscreen') &&
+            !e.target.closest('.us-video-follow-btn')) {
+          exitFullscreen();
+        }
+      }
+    });
+
+    // Initialize
     setIcons();
     syncProgress();
-
-    // IMPORTANT: do not show UI forever on load; only show if paused
-    // (autoplay will hide soon; paused will stay visible)
+    
+    // Show UI briefly on load
     setTimeout(() => {
       if (!video.paused) {
-        player.classList.remove("us-controls-show", "us-ui-visible");
+        player.classList.remove("us-controls-show");
       } else {
-        player.classList.add("us-ui-visible");
+        player.classList.add("us-controls-show");
       }
     }, 700);
   }
