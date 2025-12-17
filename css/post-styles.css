@@ -1637,3 +1637,570 @@
   min-height: 100vh !important;
   object-fit: contain !important;
 }
+
+/* ===================================================== */
+/* ✅ TWITTER/X STYLE FULLSCREEN VIDEO PLAYER            */
+/* ===================================================== */
+
+/* Force proper video container sizing */
+.post-wrapper .post-media {
+  position: relative !important;
+  display: block !important;
+  width: 100% !important;
+  max-height: 420px !important;
+  min-height: 240px !important;
+  margin-top: 12px !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  background: #000 !important;
+}
+
+/* Video player container */
+.post-wrapper .post-media .us-video-player {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 420px !important;
+  min-height: 240px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  background: #000 !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  display: block !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+}
+
+/* Video element */
+.post-wrapper .post-media .us-video-player .us-video {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 420px !important;
+  min-height: 240px !important;
+  object-fit: contain !important;
+  display: block !important;
+  background: #000 !important;
+}
+
+/* Hide ALL native video controls */
+.post-wrapper .post-media .us-video-player .us-video::-webkit-media-controls {
+  display: none !important;
+}
+
+.post-wrapper .post-media .us-video-player .us-video {
+  controlslist: nodownload noplaybackrate nofullscreen !important;
+}
+
+/* Tap area for fullscreen toggle */
+.post-wrapper .post-media .us-video-player .us-video-tap-area {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: transparent !important;
+  z-index: 5 !important;
+  cursor: pointer !important;
+}
+
+/* Center play button */
+.post-wrapper .post-media .us-video-player .us-video-center-btn {
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: 72px !important;
+  height: 72px !important;
+  border-radius: 50% !important;
+  background: rgba(0, 0, 0, 0.7) !important;
+  border: 2px solid rgba(255, 255, 255, 0.3) !important;
+  color: white !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 10 !important;
+  cursor: pointer !important;
+  font-size: 24px !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.2s ease !important;
+}
+
+.post-wrapper .post-media .us-video-player[data-state="paused"] .us-video-center-btn {
+  opacity: 1 !important;
+  pointer-events: all !important;
+}
+
+/* ========== FULLSCREEN OVERLAY (Twitter/X Style) ========== */
+
+/* Top overlay - user info */
+.post-wrapper .post-media .us-video-player .us-video-top-overlay {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  padding: 20px 24px !important;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.9), rgba(0,0,0,0.3), transparent) !important;
+  display: none !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  z-index: 15 !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+.post-wrapper .post-media .us-video-player[data-fullscreen="true"] .us-video-top-overlay {
+  display: flex !important;
+  animation: slideDown 0.3s ease !important;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* User info */
+.post-wrapper .post-media .us-video-player .us-video-user-info {
+  display: flex !important;
+  align-items: center !important;
+  gap: 16px !important;
+}
+
+.post-wrapper .post-media .us-video-player .us-video-user-avatar {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  border: 2px solid rgba(255,255,255,0.3) !important;
+}
+
+.post-wrapper .post-media .us-video-player .us-video-user-details {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+.post-wrapper .post-media .us-video-player .us-video-user-name {
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  color: white !important;
+  line-height: 1.2 !important;
+}
+
+.post-wrapper .post-media .us-video-player .us-video-user-handle {
+  font-size: 15px !important;
+  color: rgba(255,255,255,0.7) !important;
+  line-height: 1.2 !important;
+}
+
+/* Follow button */
+.post-wrapper .post-media .us-video-player .us-video-follow-btn {
+  padding: 8px 20px !important;
+  border-radius: 9999px !important;
+  background: white !important;
+  color: black !important;
+  border: none !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  margin-left: 20px !important;
+}
+
+.post-wrapper .post-media .us-video-player .us-video-follow-btn:hover {
+  background: #e0e0e0 !important;
+}
+
+/* Close fullscreen button */
+.post-wrapper .post-media .us-video-player .us-video-close-fullscreen {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 50% !important;
+  background: rgba(255,255,255,0.1) !important;
+  border: 1px solid rgba(255,255,255,0.2) !important;
+  color: white !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  font-size: 20px !important;
+  transition: all 0.2s ease !important;
+}
+
+.post-wrapper .post-media .us-video-player .us-video-close-fullscreen:hover {
+  background: rgba(255,255,255,0.2) !important;
+  transform: scale(1.05) !important;
+}
+
+/* ========== POST TEXT OVERLAY ========== */
+
+.post-wrapper .post-media .us-video-player .us-video-text-overlay {
+  position: absolute !important;
+  bottom: 100px !important;
+  left: 0 !important;
+  right: 0 !important;
+  padding: 0 24px !important;
+  display: none !important;
+  z-index: 12 !important;
+}
+
+.post-wrapper .post-media .us-video-player[data-fullscreen="true"] .us-video-text-overlay {
+  display: block !important;
+  animation: fadeInUp 0.4s ease 0.1s backwards !important;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.post-wrapper .post-media .us-video-player .us-video-post-text {
+  color: white !important;
+  font-size: 16px !important;
+  line-height: 1.5 !important;
+  background: rgba(0,0,0,0.5) !important;
+  backdrop-filter: blur(10px) !important;
+  border-radius: 12px !important;
+  padding: 16px 20px !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  max-height: 200px !important;
+  overflow-y: auto !important;
+}
+
+/* ========== VIDEO ACTIONS OVERLAY (Twitter/X Style) ========== */
+
+.post-wrapper .post-media .us-video-player .us-video-actions-overlay {
+  position: absolute !important;
+  right: 24px !important;
+  bottom: 100px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 20px !important;
+  z-index: 12 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.3s ease !important;
+}
+
+.post-wrapper .post-media .us-video-player[data-fullscreen="true"] .us-video-actions-overlay {
+  opacity: 1 !important;
+  pointer-events: all !important;
+  animation: fadeIn 0.3s ease 0.2s backwards !important;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Video action buttons (Twitter/X style) */
+.post-wrapper .post-media .us-video-player .us-video-action-btn {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 4px !important;
+  background: rgba(0,0,0,0.7) !important;
+  border: 1px solid rgba(255,255,255,0.2) !important;
+  border-radius: 50px !important;
+  padding: 12px 16px !important;
+  color: white !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  min-width: 68px !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+.post-wrapper .post-media .us-video-player .us-video-action-btn:hover {
+  background: rgba(0,0,0,0.9) !important;
+  transform: scale(1.05) !important;
+}
+
+.post-wrapper .post-media .us-video-player .us-video-action-btn i {
+  font-size: 22px !important;
+}
+
+.post-wrapper .post-media .us-video-player .us-video-action-count {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: white !important;
+}
+
+/* Liked state */
+.post-wrapper .post-media .us-video-player .us-video-action-btn.us-video-like.liked i {
+  color: #f91880 !important;
+}
+
+.post-wrapper .post-media .us-video-player .us-video-action-btn.us-video-like.liked .us-video-action-count {
+  color: #f91880 !important;
+}
+
+/* Saved state */
+.post-wrapper .post-media .us-video-player .us-video-action-btn.us-video-save.saved i {
+  color: #1d9bf0 !important;
+}
+
+.post-wrapper .post-media .us-video-player .us-video-action-btn.us-video-save.saved .us-video-action-count {
+  color: #1d9bf0 !important;
+}
+
+/* ========== BOTTOM CONTROLS ========== */
+
+.post-wrapper .post-media .us-video-player .us-video-controls {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 15 !important;
+  padding: 16px 20px 20px !important;
+  background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.5), transparent) !important;
+  opacity: 0 !important;
+  transform: translateY(10px) !important;
+  pointer-events: none !important;
+  transition: opacity 0.2s ease, transform 0.2s ease !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+.post-wrapper .post-media .us-video-player.us-controls-show .us-video-controls {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+  pointer-events: all !important;
+}
+
+.post-wrapper .post-media .us-video-player[data-fullscreen="true"] .us-video-controls {
+  padding-bottom: 40px !important;
+}
+
+/* Controls row */
+.post-wrapper .post-media .us-video-player .us-video-controls-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  width: 100% !important;
+}
+
+/* Control buttons */
+.post-wrapper .post-media .us-video-player .us-video-btn {
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+  border-radius: 50% !important;
+  background: rgba(255,255,255,0.15) !important;
+  border: 1px solid rgba(255,255,255,0.25) !important;
+  color: white !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  font-size: 16px !important;
+  transition: all 0.2s ease !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+.post-wrapper .post-media .us-video-player .us-video-btn:hover {
+  background: rgba(255,255,255,0.25) !important;
+  transform: scale(1.05) !important;
+}
+
+.post-wrapper .post-media .us-video-player .us-video-btn:active {
+  transform: scale(0.95) !important;
+}
+
+.post-wrapper .post-media .us-video-player .us-video-btn i {
+  font-size: 18px !important;
+}
+
+/* Time display */
+.post-wrapper .post-media .us-video-player .us-video-time {
+  margin-left: auto !important;
+  color: white !important;
+  font-size: 15px !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+/* Progress bar */
+.post-wrapper .post-media .us-video-player .us-video-progress {
+  width: 100% !important;
+  height: 4px !important;
+  margin-top: 16px !important;
+  background: rgba(255,255,255,0.25) !important;
+  border-radius: 2px !important;
+  cursor: pointer !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  accent-color: #1d9bf0 !important;
+}
+
+.post-wrapper .post-media .us-video-player .us-video-progress::-webkit-slider-thumb {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 50% !important;
+  background: white !important;
+  border: 2px solid rgba(0,0,0,0.3) !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+}
+
+/* ========== FULLSCREEN MODE ========== */
+
+/* Fullscreen styles */
+.post-wrapper .post-media .us-video-player[data-fullscreen="true"] {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  min-height: 100vh !important;
+  z-index: 9999 !important;
+  border-radius: 0 !important;
+  background: #000 !important;
+  cursor: default !important;
+}
+
+.post-wrapper .post-media .us-video-player[data-fullscreen="true"] .us-video {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 100vh !important;
+  min-height: 100vh !important;
+  object-fit: contain !important;
+}
+
+/* Hide regular controls in fullscreen */
+.post-wrapper .post-media .us-video-player[data-fullscreen="true"] .us-video-controls {
+  display: block !important;
+}
+
+/* Hide center play button in fullscreen when playing */
+.post-wrapper .post-media .us-video-player[data-fullscreen="true"][data-state="playing"] .us-video-center-btn {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* ========== MOBILE OPTIMIZATIONS ========== */
+
+@media (max-width: 768px) {
+  .post-wrapper .post-media .us-video-player .us-video-center-btn {
+    width: 60px !important;
+    height: 60px !important;
+    font-size: 20px !important;
+  }
+  
+  .post-wrapper .post-media .us-video-player .us-video-btn {
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    font-size: 14px !important;
+  }
+  
+  .post-wrapper .post-media .us-video-player .us-video-time {
+    font-size: 14px !important;
+  }
+  
+  .post-wrapper .post-media .us-video-player .us-video-top-overlay {
+    padding: 16px 20px !important;
+  }
+  
+  .post-wrapper .post-media .us-video-player .us-video-user-avatar {
+    width: 40px !important;
+    height: 40px !important;
+  }
+  
+  .post-wrapper .post-media .us-video-player .us-video-user-name {
+    font-size: 16px !important;
+  }
+  
+  .post-wrapper .post-media .us-video-player .us-video-user-handle {
+    font-size: 14px !important;
+  }
+  
+  .post-wrapper .post-media .us-video-player .us-video-follow-btn {
+    padding: 6px 16px !important;
+    font-size: 14px !important;
+    margin-left: 12px !important;
+  }
+  
+  .post-wrapper .post-media .us-video-player .us-video-close-fullscreen {
+    width: 40px !important;
+    height: 40px !important;
+  }
+  
+  .post-wrapper .post-media .us-video-player .us-video-actions-overlay {
+    right: 16px !important;
+    bottom: 80px !important;
+    gap: 16px !important;
+  }
+  
+  .post-wrapper .post-media .us-video-player .us-video-action-btn {
+    padding: 10px 14px !important;
+    min-width: 60px !important;
+  }
+  
+  .post-wrapper .post-media .us-video-player .us-video-action-btn i {
+    font-size: 20px !important;
+  }
+  
+  .post-wrapper .post-media .us-video-player .us-video-action-count {
+    font-size: 12px !important;
+  }
+  
+  .post-wrapper .post-media .us-video-player .us-video-text-overlay {
+    bottom: 80px !important;
+    padding: 0 16px !important;
+  }
+  
+  .post-wrapper .post-media .us-video-player .us-video-post-text {
+    font-size: 15px !important;
+    padding: 12px 16px !important;
+    max-height: 150px !important;
+  }
+}
+
+/* ========== ANIMATIONS ========== */
+
+/* Staggered animation for action buttons */
+.post-wrapper .post-media .us-video-player[data-fullscreen="true"] .us-video-actions-overlay .us-video-action-btn:nth-child(1) {
+  animation-delay: 0.2s !important;
+}
+.post-wrapper .post-media .us-video-player[data-fullscreen="true"] .us-video-actions-overlay .us-video-action-btn:nth-child(2) {
+  animation-delay: 0.3s !important;
+}
+.post-wrapper .post-media .us-video-player[data-fullscreen="true"] .us-video-actions-overlay .us-video-action-btn:nth-child(3) {
+  animation-delay: 0.4s !important;
+}
+.post-wrapper .post-media .us-video-player[data-fullscreen="true"] .us-video-actions-overlay .us-video-action-btn:nth-child(4) {
+  animation-delay: 0.5s !important;
+}
+
+/* ========== COMMENTS SCROLL FUNCTIONALITY ========== */
+
+/* Class to mark position for scrolling back */
+.comments-section.highlighted {
+  animation: highlightComments 2s ease !important;
+  border-left: 4px solid #1d9bf0 !important;
+}
+
+@keyframes highlightComments {
+  0%, 100% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: rgba(29, 155, 240, 0.1);
+  }
+}
