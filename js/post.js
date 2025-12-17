@@ -190,7 +190,6 @@ class PostPage {
       setTimeout(() => {
         this.initCustomVideoPlayers(article);
       }, 100);
-      
     } catch (err) {
       console.error("loadPost exception:", err);
       this.showError("Failed to load post.");
@@ -334,13 +333,14 @@ class PostPage {
       return `
         <div class="post-media">
           <div class="us-video-player us-controls-show" data-state="paused">
-            <video class="us-video" 
-                   playsinline 
+            <video class="us-video"
+                   playsinline
+                   webkit-playsinline
                    preload="metadata"
-                   loop
+                   autoplay
                    muted
-                   style="width: 100%; height: auto; max-height: 420px;">
-              <source src="${url}" type="${type || 'video/mp4'}">
+                   loop>
+              <source src="${url}" type="${type || "video/mp4"}">
               Your browser does not support video.
             </video>
 
@@ -397,14 +397,13 @@ class PostPage {
     `;
   }
 
-  // ✅ FIXED: initialize custom video players inside a DOM subtree
+  // ✅ initialize custom video players inside a DOM subtree
   initCustomVideoPlayers(rootEl = document) {
     const players = rootEl.querySelectorAll(".us-video-player");
-    console.log(`Found ${players.length} video players to initialize`);
     players.forEach((player) => this.bindCustomVideoPlayer(player));
   }
 
-  // ✅ FIXED: custom player behavior with autoplay
+  // ✅ custom player behavior (autoplay + hide iOS native controls + UI only on tap/paused)
   bindCustomVideoPlayer(player) {
     const video = player.querySelector(".us-video");
     const tap = player.querySelector(".us-video-tap");
@@ -420,14 +419,28 @@ class PostPage {
     const currentEl = player.querySelector(".us-current");
     const durationEl = player.querySelector(".us-duration");
 
-    if (!video) {
-      console.error("No video element found in player");
-      return;
-    }
+    if (!video || !range) return;
+
+    // ===== HARD FORCE: prevent native browser controls (iOS/Safari) =====
+    // (Even if something accidentally adds controls elsewhere)
+    try {
+      video.controls = false;
+      video.removeAttribute("controls");
+
+      video.setAttribute("playsinline", "");
+      video.setAttribute("webkit-playsinline", "");
+
+      // iOS autoplay requires muted
+      video.muted = true;
+      video.setAttribute("muted", "");
+      video.setAttribute("autoplay", "");
+      video.setAttribute("loop", "");
+    } catch {}
 
     let hideTimer = null;
     let isScrubbing = false;
-    let hasPlayed = false;
+    let hasPlayed = false;      // autoplay success flag
+    let userActivated = false;  // user tapped at least once
 
     const fmt = (secs) => {
       secs = Math.max(0, secs || 0);
@@ -457,27 +470,59 @@ class PostPage {
     };
 
     const showControls = () => {
-      player.classList.add("us-controls-show");
+      // show both: bottom controls + (via CSS) center icon if us-ui-visible
+      player.classList.add("us-controls-show", "us-ui-visible");
       clearTimeout(hideTimer);
       hideTimer = setTimeout(() => {
-        if (!video.paused && !isScrubbing && hasPlayed) {
-          player.classList.remove("us-controls-show");
+        if (!video.paused && !isScrubbing) {
+          player.classList.remove("us-controls-show", "us-ui-visible");
         }
-      }, 2000);
+      }, 1800);
+    };
+
+    const hideControlsNow = () => {
+      player.classList.remove("us-controls-show", "us-ui-visible");
+      clearTimeout(hideTimer);
+      hideTimer = null;
     };
 
     const toggleControls = () => {
       const isShown = player.classList.contains("us-controls-show");
-      if (isShown) player.classList.remove("us-controls-show");
+      if (isShown) hideControlsNow();
       else showControls();
+    };
+
+    const pauseAllOtherVideos = () => {
+      document.querySelectorAll("video.us-video").forEach((v) => {
+        if (v !== video) v.pause();
+      });
+    };
+
+    const tryAutoplay = async () => {
+      if (hasPlayed) return;
+      try {
+        pauseAllOtherVideos();
+        await video.play();
+        hasPlayed = true;
+        // Don’t keep UI on screen during autoplay; show briefly then hide
+        player.dataset.state = "playing";
+        setIcons();
+        showControls();
+        setTimeout(() => {
+          if (!video.paused) player.classList.remove("us-controls-show", "us-ui-visible");
+        }, 900);
+      } catch {
+        // Autoplay blocked -> leave paused state so center button shows
+        player.dataset.state = "paused";
+        setIcons();
+        player.classList.add("us-ui-visible"); // show center button
+      }
     };
 
     const togglePlay = async () => {
       try {
-        // Pause other videos on page
-        document.querySelectorAll("video.us-video").forEach((v) => {
-          if (v !== video && !v.paused) v.pause();
-        });
+        userActivated = true;
+        pauseAllOtherVideos();
 
         if (video.paused) {
           await video.play();
@@ -485,11 +530,10 @@ class PostPage {
           showControls();
         } else {
           video.pause();
-          player.classList.add("us-controls-show");
+          // When paused, keep UI visible
+          player.classList.add("us-controls-show", "us-ui-visible");
         }
-      } catch (err) {
-        console.error("Playback error:", err);
-      }
+      } catch {}
     };
 
     const syncProgress = () => {
@@ -501,38 +545,19 @@ class PostPage {
       }
 
       if (currentEl) currentEl.textContent = fmt(cur);
-      if (durationEl && dur > 0) {
-        durationEl.textContent = fmt(dur);
-      }
+      if (durationEl) durationEl.textContent = fmt(dur);
 
       setIcons();
     };
 
-    // ✅ AUTO-PLAY WHEN PAGE LOADS (muted for browser compliance)
-    const autoPlayVideo = () => {
-      if (!hasPlayed) {
-        // Video is already muted from HTML, try to play
-        video.play().then(() => {
-          hasPlayed = true;
-          console.log("Video autoplayed successfully");
-          showControls();
-        }).catch(err => {
-          console.log("Autoplay may require user interaction:", err.message);
-          // Center button will be visible for user to click
-        });
-      }
-    };
+    // ===== Events =====
 
-    // Event Listeners
     video.addEventListener("loadedmetadata", () => {
-      console.log("Video metadata loaded");
       syncProgress();
-      if (durationEl && video.duration > 0) {
-        durationEl.textContent = fmt(video.duration);
-      }
-      
-      // Try to autoplay after metadata loads
-      setTimeout(autoPlayVideo, 300);
+      // Try autoplay shortly after metadata (iOS needs user gesture sometimes; this will fail gracefully)
+      setTimeout(() => {
+        tryAutoplay();
+      }, 120);
     });
 
     video.addEventListener("timeupdate", () => {
@@ -540,59 +565,68 @@ class PostPage {
     });
 
     video.addEventListener("play", () => {
-      console.log("Video playing");
+      hasPlayed = true;
+      player.dataset.state = "playing";
       setIcons();
-      showControls();
+
+      // If user tapped, show controls briefly then hide. If autoplay, we already hide soon.
+      if (userActivated) showControls();
     });
 
     video.addEventListener("pause", () => {
-      console.log("Video paused");
+      player.dataset.state = "paused";
       setIcons();
-      player.classList.add("us-controls-show");
+      // Keep UI visible when paused
+      player.classList.add("us-controls-show", "us-ui-visible");
     });
 
     video.addEventListener("ended", () => {
-      console.log("Video ended");
+      // loop usually prevents ended, but keep safe state
       player.dataset.state = "paused";
       setIcons();
-      player.classList.add("us-controls-show");
-      
-      // Reset to start and pause
-      video.currentTime = 0;
+      player.classList.add("us-controls-show", "us-ui-visible");
     });
 
-    // Click handlers
+    // Tap layer: show/hide UI ONLY (doesn't play/pause)
     tap?.addEventListener("click", (e) => {
       e.stopPropagation();
+      userActivated = true;
       toggleControls();
     });
 
+    // Center play button
     centerBtn?.addEventListener("click", (e) => {
       e.stopPropagation();
+      userActivated = true;
       showControls();
       togglePlay();
     });
 
+    // Play button in row
     btnPlay?.addEventListener("click", (e) => {
       e.stopPropagation();
+      userActivated = true;
       showControls();
       togglePlay();
     });
 
     btnBack?.addEventListener("click", (e) => {
       e.stopPropagation();
+      userActivated = true;
       showControls();
       video.currentTime = Math.max(0, (video.currentTime || 0) - 10);
     });
 
     btnForward?.addEventListener("click", (e) => {
       e.stopPropagation();
+      userActivated = true;
       showControls();
       video.currentTime = Math.min(video.duration || 0, (video.currentTime || 0) + 10);
     });
 
     btnMute?.addEventListener("click", (e) => {
       e.stopPropagation();
+      userActivated = true;
       showControls();
       video.muted = !video.muted;
       setIcons();
@@ -600,6 +634,7 @@ class PostPage {
 
     btnFs?.addEventListener("click", (e) => {
       e.stopPropagation();
+      userActivated = true;
       showControls();
 
       const el = player;
@@ -616,13 +651,17 @@ class PostPage {
 
     range.addEventListener("input", () => {
       isScrubbing = true;
+      userActivated = true;
       const dur = video.duration || 0;
       const pct = (parseInt(range.value || "0", 10) / 1000) || 0;
       const target = dur * pct;
       if (currentEl) currentEl.textContent = fmt(target);
+      // keep UI visible while scrubbing
+      player.classList.add("us-controls-show", "us-ui-visible");
     });
 
     range.addEventListener("change", () => {
+      userActivated = true;
       const dur = video.duration || 0;
       const pct = (parseInt(range.value || "0", 10) / 1000) || 0;
       video.currentTime = dur * pct;
@@ -630,30 +669,20 @@ class PostPage {
       showControls();
     });
 
-    // Also support clicking on the video to play/pause
-    video.addEventListener("click", (e) => {
-      e.stopPropagation();
-      togglePlay();
-    });
-
-    // Fullscreen change handler
-    document.addEventListener("fullscreenchange", () => {
-      if (!document.fullscreenElement) {
-        showControls();
-      }
-    });
-
-    // Initial state - show controls for a moment
+    // Keep icons/progress correct at start
     player.classList.add("us-controls-show");
-    setTimeout(() => {
-      if (!video.paused && hasPlayed) {
-        player.classList.remove("us-controls-show");
-      }
-    }, 2000);
-
-    // Initialize icons and progress
     setIcons();
     syncProgress();
+
+    // IMPORTANT: do not show UI forever on load; only show if paused
+    // (autoplay will hide soon; paused will stay visible)
+    setTimeout(() => {
+      if (!video.paused) {
+        player.classList.remove("us-controls-show", "us-ui-visible");
+      } else {
+        player.classList.add("us-ui-visible");
+      }
+    }, 700);
   }
 
   // ========= LOAD COMMENTS =========
