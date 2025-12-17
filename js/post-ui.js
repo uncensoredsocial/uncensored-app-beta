@@ -66,11 +66,73 @@ window.createPostElement = function createPostElement(post) {
     const mediaWrapper = document.createElement('div');
     mediaWrapper.className = 'post-media';
 
-    if (post.media_type && post.media_type.startsWith('video')) {
-      const video = document.createElement('video');
-      video.src = post.media_url;
-      video.controls = true;
-      mediaWrapper.appendChild(video);
+    const mediaType = String(post.media_type || '').toLowerCase();
+    const lowerUrl = String(post.media_url || '').toLowerCase();
+    const isVideo =
+      (mediaType && mediaType.startsWith('video')) ||
+      lowerUrl.endsWith('.mp4') ||
+      lowerUrl.endsWith('.webm') ||
+      lowerUrl.endsWith('.ogg') ||
+      lowerUrl.endsWith('.mov');
+
+    if (isVideo) {
+      // ✅ IMPORTANT: NO native controls. Use custom player markup that your CSS targets.
+      mediaWrapper.innerHTML = `
+        <div class="us-video-player" data-state="paused">
+          <video
+            class="us-video"
+            playsinline
+            webkit-playsinline
+            preload="metadata"
+            autoplay
+            muted
+            loop
+          >
+            <source src="${post.media_url}" type="${post.media_type || 'video/mp4'}">
+            Your browser does not support video.
+          </video>
+
+          <button class="us-video-tap" type="button" aria-label="Toggle controls"></button>
+
+          <button class="us-video-center-btn" type="button" aria-label="Play/Pause">
+            <i class="fa-solid fa-play"></i>
+          </button>
+
+          <div class="us-video-controls" role="group" aria-label="Video controls">
+            <div class="us-video-controls-row">
+              <button class="us-video-btn us-back" type="button" aria-label="Back 10 seconds">
+                <i class="fa-solid fa-rotate-left"></i>
+                <span class="us-video-btn-text">10</span>
+              </button>
+
+              <button class="us-video-btn us-play" type="button" aria-label="Play/Pause">
+                <i class="fa-solid fa-play"></i>
+              </button>
+
+              <button class="us-video-btn us-forward" type="button" aria-label="Forward 10 seconds">
+                <i class="fa-solid fa-rotate-right"></i>
+                <span class="us-video-btn-text">10</span>
+              </button>
+
+              <span class="us-video-time" aria-label="Time">
+                <span class="us-current">0:00</span>
+                <span class="us-sep">/</span>
+                <span class="us-duration">0:00</span>
+              </span>
+
+              <button class="us-video-btn us-mute" type="button" aria-label="Mute/Unmute">
+                <i class="fa-solid fa-volume-high"></i>
+              </button>
+
+              <button class="us-video-btn us-fullscreen" type="button" aria-label="Fullscreen">
+                <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
+              </button>
+            </div>
+
+            <input class="us-video-progress" type="range" min="0" max="1000" value="0" aria-label="Seek" />
+          </div>
+        </div>
+      `;
     } else {
       const img = document.createElement('img');
       img.src = post.media_url;
@@ -113,6 +175,15 @@ window.createPostElement = function createPostElement(post) {
 
   // Hook up like/save behavior
   attachPostActionHandlers(el);
+
+  // ✅ If post.js exposes an initializer, use it (safe no-op if not present)
+  // This ensures custom controls get bound on feed cards too.
+  try {
+    const root = el;
+    if (window.postPage && typeof window.postPage.initCustomVideoPlayers === 'function') {
+      window.postPage.initCustomVideoPlayers(root);
+    }
+  } catch {}
 
   return el;
 };
