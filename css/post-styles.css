@@ -2797,3 +2797,237 @@
   cursor: pointer !important;
   z-index: 10 !important;
 }
+
+/* ===================================================== */
+/* ✅ FIXES FOR PLAY BUTTON, LAYOUT, AND BLACK SPACING  */
+/* ===================================================== */
+
+/* FIX 1: Ensure video fills entire post section */
+.post-wrapper .post-media {
+  position: relative !important;
+  width: 100% !important;
+  margin-top: 12px !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  background: #000 !important;
+  display: block !important;
+  min-height: 280px !important;
+  max-height: 500px !important;
+  height: auto !important;
+  aspect-ratio: 16/9 !important;
+}
+
+/* Force video player to fill container */
+.post-wrapper .post-media .us-video-player {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  background: #000 !important;
+  display: block !important;
+}
+
+/* Force video element to fill container */
+.post-wrapper .post-media .us-video-player .us-video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important; /* Changed from contain to cover */
+  display: block !important;
+  background: #000 !important;
+  border-radius: 14px !important;
+}
+
+/* FIX 2: Fix play button visibility and functionality */
+.post-wrapper .post-media .us-video-player .us-video-center-btn,
+.us-video-player .us-video-center-btn {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.2s ease !important;
+  cursor: pointer !important;
+  z-index: 10 !important;
+}
+
+/* Show center button when paused OR controls are visible */
+.post-wrapper .post-media .us-video-player[data-state="paused"] .us-video-center-btn,
+.post-wrapper .post-media .us-video-player.us-controls-show .us-video-center-btn,
+.us-video-player[data-state="paused"] .us-video-center-btn,
+.us-video-player.us-controls-show .us-video-center-btn {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* FIX 3: Move engagement buttons to bottom in overlay */
+.video-fullscreen-overlay .overlay-engagement-row {
+  position: absolute !important;
+  bottom: 120px !important; /* Position above bottom controls */
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  display: flex !important;
+  flex-direction: row !important; /* Horizontal layout */
+  gap: 20px !important;
+  z-index: 8 !important;
+  width: auto !important;
+  right: auto !important;
+  top: auto !important;
+}
+
+/* Engagement buttons styling */
+.overlay-engagement-btn {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 4px !important;
+  background: rgba(0, 0, 0, 0.7) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 50px !important;
+  padding: 10px 14px !important;
+  color: white !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  min-width: 60px !important;
+  min-height: 60px !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+.overlay-engagement-btn i {
+  font-size: 20px !important;
+}
+
+.overlay-engagement-btn .overlay-count {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: white !important;
+}
+
+/* FIX 4: Ensure overlay video fills entire screen */
+.video-fullscreen-overlay .overlay-video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important; /* Changed to cover */
+  background: #000 !important;
+}
+
+.overlay-video-container {
+  flex: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative !important;
+  background: #000 !important;
+}
+
+/* FIX 5: Remove black spacing - Ensure containers have no padding/margin */
+.post-wrapper .post,
+.post-wrapper .post-media,
+.post-wrapper .post-media .us-video-player {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* FIX 6: Make controls always clickable */
+.us-video-btn,
+.us-video-center-btn,
+.overlay-control-btn,
+.overlay-center-play-btn,
+.overlay-engagement-btn {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+}
+
+/* FIX 7: Fix overlay controls positioning */
+.overlay-bottom-controls {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  padding: 20px 24px !important;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 0.5), transparent) !important;
+  z-index: 10 !important;
+  backdrop-filter: blur(10px) !important;
+  opacity: 1 !important;
+}
+
+/* FIX 8: Center play button in overlay */
+.overlay-center-play-btn {
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: 72px !important;
+  height: 72px !important;
+  border-radius: 50% !important;
+  background: rgba(0, 0, 0, 0.7) !important;
+  border: 2px solid rgba(255, 255, 255, 0.3) !important;
+  color: white !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 5 !important;
+  cursor: pointer !important;
+  font-size: 24px !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.2s ease !important;
+}
+
+.video-fullscreen-overlay .overlay-video[data-state="paused"] + .overlay-center-play-btn,
+.video-fullscreen-overlay.controls-visible .overlay-center-play-btn {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* FIX 9: Remove any min-height constraints causing black space */
+.post-wrapper {
+  margin-bottom: 0 !important;
+}
+
+/* FIX 10: Ensure video loads properly and plays */
+.us-video,
+.overlay-video {
+  display: block !important;
+  background: #000 !important;
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+/* Mobile responsive fixes */
+@media (max-width: 768px) {
+  .post-wrapper .post-media {
+    min-height: 320px !important;
+    max-height: 500px !important;
+    aspect-ratio: 9/16 !important; /* Better for mobile */
+  }
+  
+  .video-fullscreen-overlay .overlay-engagement-row {
+    bottom: 100px !important;
+    gap: 15px !important;
+  }
+  
+  .overlay-engagement-btn {
+    min-width: 50px !important;
+    min-height: 50px !important;
+    padding: 8px 12px !important;
+  }
+  
+  .overlay-engagement-btn i {
+    font-size: 18px !important;
+  }
+}
+
+/* Fix for iPhone notch */
+@supports (padding: max(0px)) {
+  .video-fullscreen-overlay {
+    padding-top: env(safe-area-inset-top) !important;
+    padding-bottom: env(safe-area-inset-bottom) !important;
+    padding-left: env(safe-area-inset-left) !important;
+    padding-right: env(safe-area-inset-right) !important;
+  }
+  
+  .overlay-engagement-row {
+    bottom: calc(120px + env(safe-area-inset-bottom)) !important;
+  }
+}
