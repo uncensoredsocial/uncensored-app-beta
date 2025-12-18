@@ -14,6 +14,7 @@ class PostPage {
     this.comments = [];
     this.currentUser = null;
     this.currentOverlayVideo = null;
+    this.overlayPlayPromise = null;
   }
 
   async init() {
@@ -89,7 +90,7 @@ class PostPage {
         </div>
         
         <div class="overlay-video-container">
-          <video class="overlay-video" playsinline webkit-playsinline preload="auto"></video>
+          <video class="overlay-video" playsinline webkit-playsinline preload="metadata" autoplay muted loop></video>
           <button class="overlay-center-play-btn" type="button" aria-label="Play">
             <i class="fa-solid fa-play"></i>
           </button>
@@ -99,25 +100,8 @@ class PostPage {
           <div class="overlay-double-tap-right"></div>
         </div>
         
-        <!-- Engagement buttons at bottom -->
-        <div class="overlay-engagement-row">
-          <button class="overlay-engagement-btn overlay-like-btn" type="button">
-            <i class="fa-regular fa-heart"></i>
-            <span class="overlay-count">0</span>
-          </button>
-          <button class="overlay-engagement-btn overlay-comment-btn" type="button">
-            <i class="fa-regular fa-comment"></i>
-            <span class="overlay-count">0</span>
-          </button>
-          <button class="overlay-engagement-btn overlay-share-btn" type="button">
-            <i class="fa-solid fa-share"></i>
-          </button>
-          <button class="overlay-engagement-btn overlay-save-btn" type="button">
-            <i class="fa-regular fa-bookmark"></i>
-          </button>
-        </div>
-        
-        <div class="overlay-bottom-controls">
+        <!-- Main video controls at top -->
+        <div class="overlay-main-controls">
           <div class="overlay-controls-row">
             <button class="overlay-control-btn overlay-play-btn" type="button" aria-label="Play/Pause">
               <i class="fa-solid fa-play"></i>
@@ -135,6 +119,27 @@ class PostPage {
               <i class="fa-solid fa-compress"></i>
             </button>
           </div>
+        </div>
+        
+        <!-- Separator line -->
+        <div class="overlay-separator-line"></div>
+        
+        <!-- Engagement buttons at bottom -->
+        <div class="overlay-engagement-row">
+          <button class="overlay-engagement-btn overlay-like-btn" type="button">
+            <i class="fa-regular fa-heart"></i>
+            <span class="overlay-count">0</span>
+          </button>
+          <button class="overlay-engagement-btn overlay-comment-btn" type="button">
+            <i class="fa-regular fa-comment"></i>
+            <span class="overlay-count">0</span>
+          </button>
+          <button class="overlay-engagement-btn overlay-share-btn" type="button">
+            <i class="fa-solid fa-share"></i>
+          </button>
+          <button class="overlay-engagement-btn overlay-save-btn" type="button">
+            <i class="fa-regular fa-bookmark"></i>
+          </button>
         </div>
       </div>
     `;
@@ -415,7 +420,7 @@ class PostPage {
             <video class="us-video"
                    playsinline
                    webkit-playsinline
-                   preload="auto"
+                   preload="metadata"
                    autoplay
                    muted
                    loop>
@@ -473,11 +478,16 @@ class PostPage {
   // Initialize custom video players
   initCustomVideoPlayers(rootEl = document) {
     const players = rootEl.querySelectorAll(".us-video-player");
-    players.forEach((player) => this.bindCustomVideoPlayer(player));
+    console.log(`Found ${players.length} video players to initialize`);
+    players.forEach((player, index) => {
+      console.log(`Initializing video player ${index + 1}`);
+      this.bindCustomVideoPlayer(player);
+    });
   }
 
   // Bind custom video player with updated logic
   bindCustomVideoPlayer(player) {
+    console.log("Binding custom video player");
     const video = player.querySelector(".us-video");
     const centerBtn = player.querySelector(".us-video-center-btn");
     const doubleTapLeft = player.querySelector(".us-video-double-tap-left");
@@ -489,7 +499,17 @@ class PostPage {
     const currentEl = player.querySelector(".us-current");
     const durationEl = player.querySelector(".us-duration");
 
-    if (!video || !range) return;
+    if (!video) {
+      console.error("No video element found in player");
+      return;
+    }
+    
+    if (!range) {
+      console.error("No progress range found in player");
+      return;
+    }
+
+    console.log("Video element found:", video.src);
 
     // Prevent native controls
     video.controls = false;
@@ -498,9 +518,6 @@ class PostPage {
     let hideTimer = null;
     let isScrubbing = false;
     let hasPlayed = false;
-    let lastTapTime = 0;
-    let tapTimeout = null;
-    let tapCount = 0;
 
     const fmt = (secs) => {
       secs = Math.max(0, secs || 0);
@@ -542,12 +559,23 @@ class PostPage {
 
     const togglePlay = async () => {
       console.log("togglePlay called - Video state:", video.paused ? "paused" : "playing");
+      console.log("Video readyState:", video.readyState);
+      
       try {
         this.pauseAllOtherVideos(video);
 
         if (video.paused) {
           console.log("Attempting to play video");
-          await video.play();
+          // Cancel any pending play promise
+          if (this.overlayPlayPromise) {
+            this.overlayPlayPromise.catch(() => {});
+            this.overlayPlayPromise = null;
+          }
+          
+          const playPromise = video.play();
+          this.overlayPlayPromise = playPromise;
+          
+          await playPromise;
           console.log("Video play successful");
           hasPlayed = true;
           showControls();
@@ -560,19 +588,23 @@ class PostPage {
       } catch (err) {
         console.error("Play error:", err);
         console.error("Error details:", err.name, err.message);
+        // If autoplay fails, show controls so user can manually play
+        player.classList.add("us-controls-show");
       }
     };
 
     const skipForward10 = () => {
-      video.currentTime = Math.min(video.duration, video.currentTime + 10);
-      showControls();
-      
-      // Show feedback animation
-      const feedback = document.createElement("div");
-      feedback.className = "skip-feedback forward";
-      feedback.innerHTML = '<i class="fa-solid fa-forward"></i>';
-      player.appendChild(feedback);
-      setTimeout(() => feedback.remove(), 500);
+      if (video.duration) {
+        video.currentTime = Math.min(video.duration, video.currentTime + 10);
+        showControls();
+        
+        // Show feedback animation
+        const feedback = document.createElement("div");
+        feedback.className = "skip-feedback forward";
+        feedback.innerHTML = '<i class="fa-solid fa-forward"></i>';
+        player.appendChild(feedback);
+        setTimeout(() => feedback.remove(), 500);
+      }
     };
 
     const skipBackward10 = () => {
@@ -647,23 +679,11 @@ class PostPage {
       overlayVideo.loop = video.loop;
       overlayVideo.autoplay = true;
       
-      // Copy playback state - AUTO PLAY in overlay
-      if (!video.paused) {
-        overlayVideo.play().catch(err => {
-          console.error("Auto-play failed in overlay:", err);
-          // If autoplay fails, show play button
-          overlay.classList.add("controls-visible");
-        });
-      } else {
-        overlayVideo.pause();
-        overlay.classList.add("controls-visible");
-      }
-      
       // Show overlay
       overlay.classList.remove("hidden");
       document.body.style.overflow = "hidden";
       
-      // Load video
+      // Force video to load
       overlayVideo.load();
       
       // Show controls initially
@@ -672,14 +692,20 @@ class PostPage {
       // Bind overlay events
       this.bindOverlayEvents(overlay, video);
       
-      // Auto-hide controls after 2 seconds if video is playing
-      if (!video.paused) {
-        setTimeout(() => {
-          if (!overlayVideo.paused) {
-            overlay.classList.remove("controls-visible");
-          }
-        }, 2000);
-      }
+      // Auto-play if original video was playing
+      setTimeout(() => {
+        if (!video.paused && overlayVideo.readyState >= 2) {
+          console.log("Auto-playing video in overlay");
+          overlayVideo.play().catch(err => {
+            console.error("Auto-play failed:", err);
+            // Show controls if autoplay fails
+            overlay.classList.add("controls-visible");
+          });
+        } else {
+          // Show controls if video is paused
+          overlay.classList.add("controls-visible");
+        }
+      }, 300);
     };
 
     // Setup double tap detection
@@ -724,10 +750,11 @@ class PostPage {
     video.addEventListener('click', (e) => {
       e.stopPropagation();
       e.preventDefault();
+      console.log("Video clicked");
       togglePlay();
     });
 
-    // Center button click
+    // Center button click - FIXED
     if (centerBtn) {
       centerBtn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -801,10 +828,12 @@ class PostPage {
 
     // Video events
     video.addEventListener("loadedmetadata", () => {
+      console.log("Video metadata loaded, duration:", video.duration);
       syncProgress();
       setTimeout(() => {
-        if (!hasPlayed) {
+        if (!hasPlayed && video.readyState >= 2) {
           video.play().then(() => {
+            console.log("Autoplay successful");
             hasPlayed = true;
             setTimeout(() => {
               if (!video.paused) player.classList.remove("us-controls-show");
@@ -819,6 +848,7 @@ class PostPage {
 
     video.addEventListener("timeupdate", syncProgress);
     video.addEventListener("play", () => {
+      console.log("Video play event fired");
       hasPlayed = true;
       player.dataset.state = "playing";
       setIcons();
@@ -826,6 +856,7 @@ class PostPage {
     });
 
     video.addEventListener("pause", () => {
+      console.log("Video pause event fired");
       player.dataset.state = "paused";
       setIcons();
       showControls();
@@ -841,14 +872,16 @@ class PostPage {
     
     // Auto-hide controls after load
     setTimeout(() => {
-      if (!video.paused) {
+      if (!video.paused && hasPlayed) {
         player.classList.remove("us-controls-show");
       }
     }, 700);
   }
 
-  // Bind overlay events - UPDATED TO FIX PLAY BUTTON
+  // Bind overlay events - COMPLETELY REVISED
   bindOverlayEvents(overlay, originalVideo) {
+    console.log("Binding overlay events");
+    
     const overlayVideo = overlay.querySelector(".overlay-video");
     const closeBtn = overlay.querySelector(".overlay-close-btn");
     const exitBtn = overlay.querySelector(".overlay-exit-btn");
@@ -880,7 +913,7 @@ class PostPage {
       const dur = overlayVideo.duration || 0;
       const cur = overlayVideo.currentTime || 0;
 
-      if (!isScrubbing) {
+      if (!isScrubbing && progress) {
         progress.value = dur > 0 ? Math.round((cur / dur) * 1000) : 0;
       }
 
@@ -888,24 +921,28 @@ class PostPage {
       if (durationEl) durationEl.textContent = fmt(dur);
       
       // Update play button icon
-      const icon = playBtn?.querySelector("i");
-      if (icon) {
-        icon.className = overlayVideo.paused ? "fa-solid fa-play" : "fa-solid fa-pause";
+      if (playBtn) {
+        const icon = playBtn.querySelector("i");
+        if (icon) {
+          icon.className = overlayVideo.paused ? "fa-solid fa-play" : "fa-solid fa-pause";
+        }
       }
       
       // Update center play button
-      const centerIcon = centerPlayBtn?.querySelector("i");
-      if (centerIcon) {
-        centerIcon.className = overlayVideo.paused ? "fa-solid fa-play" : "fa-solid fa-pause";
-      }
       if (centerPlayBtn) {
+        const centerIcon = centerPlayBtn.querySelector("i");
+        if (centerIcon) {
+          centerIcon.className = overlayVideo.paused ? "fa-solid fa-play" : "fa-solid fa-pause";
+        }
         centerPlayBtn.style.display = overlayVideo.paused ? "flex" : "none";
       }
       
       // Update mute button
-      const muteIcon = muteBtn?.querySelector("i");
-      if (muteIcon) {
-        muteIcon.className = overlayVideo.muted ? "fa-solid fa-volume-xmark" : "fa-solid fa-volume-high";
+      if (muteBtn) {
+        const muteIcon = muteBtn.querySelector("i");
+        if (muteIcon) {
+          muteIcon.className = overlayVideo.muted ? "fa-solid fa-volume-xmark" : "fa-solid fa-volume-high";
+        }
       }
     };
 
@@ -921,6 +958,8 @@ class PostPage {
 
     const toggleOverlayPlay = () => {
       console.log("toggleOverlayPlay called - Overlay video state:", overlayVideo.paused ? "paused" : "playing");
+      console.log("Overlay video readyState:", overlayVideo.readyState);
+      
       if (overlayVideo.paused) {
         overlayVideo.play().then(() => {
           console.log("Overlay video play successful");
@@ -938,8 +977,10 @@ class PostPage {
     };
 
     const skipOverlayForward10 = () => {
-      overlayVideo.currentTime = Math.min(overlayVideo.duration, overlayVideo.currentTime + 10);
-      showOverlayControls();
+      if (overlayVideo.duration) {
+        overlayVideo.currentTime = Math.min(overlayVideo.duration, overlayVideo.currentTime + 10);
+        showOverlayControls();
+      }
     };
 
     const skipOverlayBackward10 = () => {
@@ -976,17 +1017,10 @@ class PostPage {
     };
 
     // Initialize overlay video
-    overlayVideo.addEventListener('loadeddata', () => {
+    overlayVideo.addEventListener('loadedmetadata', () => {
+      console.log("Overlay video metadata loaded, duration:", overlayVideo.duration);
       syncOverlayProgress();
       showOverlayControls();
-      
-      // Auto-play if original video was playing
-      if (!originalVideo.paused) {
-        overlayVideo.play().catch(err => {
-          console.error("Auto-play failed on load:", err);
-          overlay.classList.add("controls-visible");
-        });
-      }
     });
     
     // Video events
@@ -1084,6 +1118,12 @@ class PostPage {
       overlay.classList.add("hidden");
       document.body.style.overflow = "";
       this.currentOverlayVideo = null;
+      
+      // Cancel any pending play promise
+      if (this.overlayPlayPromise) {
+        this.overlayPlayPromise.catch(() => {});
+        this.overlayPlayPromise = null;
+      }
     };
 
     if (closeBtn) {
@@ -1220,7 +1260,7 @@ class PostPage {
         toggleOverlayPlay();
       } else if (e.key === "m" || e.key === "M") {
         e.preventDefault();
-        overlayVideo.muted = !overlayVideo.muted;
+        if (overlayVideo) overlayVideo.muted = !overlayVideo.muted;
         showOverlayControls();
       } else if (e.key === "Escape") {
         e.preventDefault();
@@ -1251,13 +1291,16 @@ class PostPage {
       }
     }
 
-    // Play video automatically when overlay opens if original was playing
-    if (overlayVideo && !originalVideo.paused) {
-      overlayVideo.play().catch(err => {
-        console.error("Auto-play on overlay open failed:", err);
-        overlay.classList.add("controls-visible");
-      });
-    }
+    // Auto-play when overlay opens
+    setTimeout(() => {
+      if (overlayVideo && overlayVideo.readyState >= 2 && !originalVideo.paused) {
+        console.log("Auto-playing video in overlay");
+        overlayVideo.play().catch(err => {
+          console.error("Auto-play on overlay open failed:", err);
+          overlay.classList.add("controls-visible");
+        });
+      }
+    }, 500);
   }
 
   closeFullscreenOverlay() {
@@ -1265,6 +1308,12 @@ class PostPage {
     overlay.classList.add("hidden");
     document.body.style.overflow = "";
     this.currentOverlayVideo = null;
+    
+    // Cancel any pending play promise
+    if (this.overlayPlayPromise) {
+      this.overlayPlayPromise.catch(() => {});
+      this.overlayPlayPromise = null;
+    }
   }
 
   // Scroll to comments section
@@ -1738,7 +1787,9 @@ class PostPage {
 // ========= INIT =========
 
 document.addEventListener("DOMContentLoaded", () => {
+  console.log("DOM loaded, initializing PostPage");
   const page = new PostPage();
   page.init();
   window.postPage = page;
+  console.log("PostPage initialized");
 });
