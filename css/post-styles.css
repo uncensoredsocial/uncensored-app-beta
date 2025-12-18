@@ -3136,3 +3136,207 @@
   gap: 16px !important;
   background: rgba(0, 0, 0, 0.7) !important;
   backdrop-filter: blur
+}
+
+/* ===================================================== */
+/* ✅ ULTIMATE FIXES FOR ALL ISSUES - MUST BE AT END    */
+/* ===================================================== */
+
+/* FIX 1: Post header spacing */
+.post-page-card .post-header {
+  padding: 12px 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.post-page-card .post-user {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding-left: 4px !important;
+}
+
+.post-page-card .post-avatar {
+  width: 44px !important;
+  height: 44px !important;
+  margin-right: 4px !important;
+}
+
+.post-page-card .post-user-meta {
+  margin-left: 8px !important;
+  min-width: 0 !important;
+}
+
+.post-page-card .post-display-name {
+  font-weight: 700 !important;
+  margin-right: 8px !important;
+  display: block !important;
+}
+
+.post-page-card .post-username {
+  color: rgba(255, 255, 255, 0.7) !important;
+  margin-right: 12px !important;
+  display: block !important;
+}
+
+.post-page-card .post-time {
+  color: rgba(255, 255, 255, 0.5) !important;
+  font-size: 14px !important;
+  margin-right: 8px !important;
+  white-space: nowrap !important;
+}
+
+/* FIX 2: Remove ALL black spacing from video */
+.post-page-card .post-media {
+  position: relative !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  background: #000 !important;
+  min-height: 300px !important;
+  max-height: 500px !important;
+  height: auto !important;
+}
+
+.post-page-card .post-media .us-video-player {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #000 !important;
+  display: block !important;
+}
+
+.post-page-card .post-media .us-video-player .us-video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  background: #000 !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+}
+
+/* FIX 3: Make play button ALWAYS clickable */
+.us-video-player .us-video-center-btn,
+.us-video-player .us-play,
+.us-video-player .us-fullscreen {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  z-index: 100 !important;
+}
+
+.us-video-player .us-video-center-btn {
+  opacity: 0 !important;
+  transition: opacity 0.2s ease !important;
+}
+
+.us-video-player[data-state="paused"] .us-video-center-btn,
+.us-video-player:hover .us-video-center-btn {
+  opacity: 1 !important;
+}
+
+/* FIX 4: Overlay layout - engagement buttons at VERY bottom */
+.video-fullscreen-overlay .overlay-main-controls {
+  position: absolute !important;
+  top: 80px !important;
+  left: 0 !important;
+  right: 0 !important;
+  padding: 16px 24px !important;
+  z-index: 30 !important;
+  background: rgba(0, 0, 0, 0.3) !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+.video-fullscreen-overlay .overlay-separator-line {
+  position: absolute !important;
+  bottom: 100px !important;
+  left: 24px !important;
+  right: 24px !important;
+  height: 1px !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+  z-index: 25 !important;
+}
+
+.video-fullscreen-overlay .overlay-engagement-container {
+  position: absolute !important;
+  bottom: 20px !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 20 !important;
+  padding: 0 24px !important;
+}
+
+.video-fullscreen-overlay .overlay-engagement-row {
+  display: flex !important;
+  justify-content: center !important;
+  gap: 40px !important;
+  background: rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(10px) !important;
+  border-radius: 50px !important;
+  padding: 12px 24px !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.video-fullscreen-overlay .overlay-engagement-btn {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 4px !important;
+  background: transparent !important;
+  border: none !important;
+  color: white !important;
+  cursor: pointer !important;
+  padding: 8px !important;
+  min-width: 60px !important;
+}
+
+.video-fullscreen-overlay .overlay-engagement-btn i {
+  font-size: 24px !important;
+}
+
+.video-fullscreen-overlay .overlay-engagement-btn .overlay-count {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+
+/* FIX 5: Ensure overlay video fills screen */
+.video-fullscreen-overlay .overlay-video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  background: #000 !important;
+}
+
+.video-fullscreen-overlay .overlay-video-container {
+  width: 100% !important;
+  height: 100% !important;
+  background: #000 !important;
+}
+
+/* FIX 6: Debug styling - add border to see what's happening */
+.post-page-card .post-media {
+  border: 2px solid red !important;
+}
+
+.post-page-card .post-media .us-video-player {
+  border: 2px solid green !important;
+}
+
+.post-page-card .post-media .us-video-player .us-video {
+  border: 2px solid blue !important;
+}
+
+/* Remove debug borders after fixing */
+/*
+.post-page-card .post-media,
+.post-page-card .post-media .us-video-player,
+.post-page-card .post-media .us-video-player .us-video {
+  border: none !important;
+}
+*/
