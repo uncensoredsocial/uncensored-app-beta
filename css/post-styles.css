@@ -3031,3 +3031,108 @@
     bottom: calc(120px + env(safe-area-inset-bottom)) !important;
   }
 }
+
+/* ===================================================== */
+/* ✅ ULTIMATE FIXES FOR ALL ISSUES                     */
+/* ===================================================== */
+
+/* FIX: Post header spacing - move elements away from edges */
+.post-header {
+  padding: 0 12px !important;
+  margin-bottom: 8px !important;
+}
+
+.post-user {
+  padding-left: 4px !important;
+}
+
+.post-user-meta {
+  margin-left: 8px !important;
+}
+
+.post-display-name {
+  margin-right: 6px !important;
+}
+
+.post-username {
+  margin-right: 8px !important;
+}
+
+.post-time {
+  margin-right: 4px !important;
+  opacity: 0.7;
+}
+
+/* FIX: Video fills entire post section with NO black spacing */
+.post-wrapper .post-media {
+  position: relative !important;
+  width: 100% !important;
+  margin: 12px 0 !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  background: #000 !important;
+  display: block !important;
+  min-height: 300px !important;
+  max-height: 500px !important;
+  height: auto !important;
+  aspect-ratio: 16/9 !important;
+  padding: 0 !important;
+}
+
+/* Force video player to fill container */
+.post-wrapper .post-media .us-video-player {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  background: #000 !important;
+  display: block !important;
+}
+
+/* Force video element to fill container - NO black bars */
+.post-wrapper .post-media .us-video-player .us-video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  background: #000 !important;
+  border-radius: 14px !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+}
+
+/* FIX: Play button visibility */
+.us-video-player .us-video-center-btn {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.2s ease !important;
+  z-index: 10 !important;
+}
+
+.us-video-player[data-state="paused"] .us-video-center-btn,
+.us-video-player.us-controls-show .us-video-center-btn {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* FIX: Overlay layout - engagement buttons at bottom with separator */
+.video-fullscreen-overlay .overlay-main-controls {
+  position: absolute !important;
+  top: 80px !important;
+  left: 0 !important;
+  right: 0 !important;
+  padding: 16px 24px !important;
+  z-index: 20 !important;
+  background: transparent !important;
+}
+
+.video-fullscreen-overlay .overlay-controls-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 16px !important;
+  background: rgba(0, 0, 0, 0.7) !important;
+  backdrop-filter: blur
