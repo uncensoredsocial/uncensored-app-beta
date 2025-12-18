@@ -503,7 +503,7 @@ class PostPage {
     });
   }
 
-  // Bind custom video player - FIXED VERSION
+  // Bind custom video player - UPDATED FIXED VERSION
   bindCustomVideoPlayer(player) {
     console.log("PostPage: bindCustomVideoPlayer called");
     
@@ -543,13 +543,16 @@ class PostPage {
       const isPaused = video.paused;
       player.dataset.state = isPaused ? "paused" : "playing";
       
-      // Center button icon
+      // Center button - ONLY show when video is paused
       if (centerBtn) {
         const centerIcon = centerBtn.querySelector("i");
         if (centerIcon) {
           centerIcon.className = isPaused ? "fa-solid fa-play" : "fa-solid fa-pause";
         }
+        // FIX: Only show center button when paused, hide when playing
         centerBtn.style.opacity = isPaused ? "1" : "0";
+        centerBtn.style.pointerEvents = isPaused ? "auto" : "none";
+        centerBtn.style.display = isPaused ? "flex" : "none";
       }
       
       // Play button icon
@@ -603,6 +606,14 @@ class PostPage {
 
         if (video.paused) {
           console.log("Attempting to play video...");
+          
+          // FIX: Hide center button immediately before playing
+          if (centerBtn) {
+            centerBtn.style.opacity = "0";
+            centerBtn.style.pointerEvents = "none";
+            centerBtn.style.display = "none";
+          }
+          
           const playPromise = video.play();
           
           if (playPromise !== undefined) {
@@ -612,13 +623,25 @@ class PostPage {
           }
         } else {
           video.pause();
+          // FIX: Show center button when paused
+          if (centerBtn) {
+            centerBtn.style.opacity = "1";
+            centerBtn.style.pointerEvents = "auto";
+            centerBtn.style.display = "flex";
+          }
         }
         
         updateUI();
         showControls();
       } catch (error) {
         console.error("Error toggling play:", error);
-        showControls(); // Ensure controls are visible if play fails
+        // If play fails, ensure center button is visible if still paused
+        if (centerBtn && video.paused) {
+          centerBtn.style.opacity = "1";
+          centerBtn.style.pointerEvents = "auto";
+          centerBtn.style.display = "flex";
+        }
+        showControls();
       }
     };
 
@@ -903,7 +926,7 @@ class PostPage {
     }, 700);
   }
 
-  // Bind overlay events - FIXED VERSION
+  // Bind overlay events - UPDATED FIXED VERSION
   bindOverlayEvents(overlay, originalVideo) {
     console.log("PostPage: Binding overlay events");
     
@@ -944,13 +967,15 @@ class PostPage {
         }
       }
       
-      // Center play button
+      // Center play button - ONLY show when paused
       if (centerPlayBtn) {
         const centerIcon = centerPlayBtn.querySelector("i");
         if (centerIcon) {
           centerIcon.className = isPaused ? "fa-solid fa-play" : "fa-solid fa-pause";
         }
         centerPlayBtn.style.display = isPaused ? "flex" : "none";
+        centerPlayBtn.style.opacity = isPaused ? "1" : "0";
+        centerPlayBtn.style.pointerEvents = isPaused ? "auto" : "none";
       }
       
       // Mute button icon
@@ -986,15 +1011,34 @@ class PostPage {
       console.log("=== TOGGLE OVERLAY PLAY ===");
       
       if (overlayVideo.paused) {
+        // FIX: Hide center button immediately before playing
+        if (centerPlayBtn) {
+          centerPlayBtn.style.display = "none";
+          centerPlayBtn.style.opacity = "0";
+          centerPlayBtn.style.pointerEvents = "none";
+        }
+        
         overlayVideo.play().then(() => {
           console.log("Overlay video PLAY successful!");
           showOverlayControls();
         }).catch(err => {
           console.error("Overlay video PLAY failed:", err);
+          // If play fails, show center button
+          if (centerPlayBtn) {
+            centerPlayBtn.style.display = "flex";
+            centerPlayBtn.style.opacity = "1";
+            centerPlayBtn.style.pointerEvents = "auto";
+          }
           overlay.classList.add("controls-visible");
         });
       } else {
         overlayVideo.pause();
+        // FIX: Show center button when paused
+        if (centerPlayBtn) {
+          centerPlayBtn.style.display = "flex";
+          centerPlayBtn.style.opacity = "1";
+          centerPlayBtn.style.pointerEvents = "auto";
+        }
         showOverlayControls();
       }
     };
