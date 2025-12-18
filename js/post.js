@@ -95,7 +95,7 @@ class PostPage {
         </div>
         
         <div class="overlay-video-container">
-          <video class="overlay-video" playsinline webkit-playsinline preload="metadata" autoplay muted loop></video>
+          <video class="overlay-video" playsinline webkit-playsinline preload="metadata" muted loop></video>
           <button class="overlay-center-play-btn" type="button" aria-label="Play">
             <i class="fa-solid fa-play"></i>
           </button>
@@ -437,10 +437,9 @@ class PostPage {
                    playsinline
                    webkit-playsinline
                    preload="metadata"
-                   autoplay
                    muted
                    loop
-                   style="width: 100%; height: 100%; object-fit: cover; display: block;">
+                   style="width: 100%; height: 100%; object-fit: contain; display: block; background: #000;">
               <source src="${url}" type="${type || "video/mp4"}">
               Your browser does not support video.
             </video>
@@ -502,20 +501,14 @@ class PostPage {
       console.log(`Initializing video player ${index + 1}`);
       this.bindCustomVideoPlayer(player);
     });
-    
-    // Also check for any videos without the player wrapper
-    const standaloneVideos = rootEl.querySelectorAll("video:not(.us-video)");
-    console.log(`Found ${standaloneVideos.length} standalone videos`);
   }
 
-  // Bind custom video player with updated logic
+  // Bind custom video player - FIXED VERSION
   bindCustomVideoPlayer(player) {
     console.log("PostPage: bindCustomVideoPlayer called");
     
     const video = player.querySelector(".us-video");
     const centerBtn = player.querySelector(".us-video-center-btn");
-    const doubleTapLeft = player.querySelector(".us-video-double-tap-left");
-    const doubleTapRight = player.querySelector(".us-video-double-tap-right");
     const btnPlay = player.querySelector(".us-play");
     const btnMute = player.querySelector(".us-mute");
     const btnFs = player.querySelector(".us-fullscreen");
@@ -528,11 +521,7 @@ class PostPage {
       return;
     }
     
-    console.log("Video element found:", {
-      src: video.src,
-      readyState: video.readyState,
-      paused: video.paused
-    });
+    console.log("Video element found:", video.src);
 
     // Prevent native controls
     video.controls = false;
@@ -542,44 +531,58 @@ class PostPage {
     let isScrubbing = false;
     let hasPlayed = false;
 
-    const fmt = (secs) => {
-      secs = Math.max(0, secs || 0);
-      const m = Math.floor(secs / 60);
-      const s = Math.floor(secs % 60);
-      return `${m}:${String(s).padStart(2, "0")}`;
+    const formatTime = (seconds) => {
+      if (isNaN(seconds)) return "0:00";
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    const setIcons = () => {
-      const paused = video.paused || video.ended;
-      player.dataset.state = paused ? "paused" : "playing";
-      console.log("Setting icons - video paused:", paused);
-
-      const iconClass = paused ? "fa-play" : "fa-pause";
+    const updateUI = () => {
+      // Update play/pause icons
+      const isPaused = video.paused;
+      player.dataset.state = isPaused ? "paused" : "playing";
       
+      // Center button icon
       if (centerBtn) {
-        const cIcon = centerBtn.querySelector("i");
-        if (cIcon) cIcon.className = `fa-solid ${iconClass}`;
+        const centerIcon = centerBtn.querySelector("i");
+        if (centerIcon) {
+          centerIcon.className = isPaused ? "fa-solid fa-play" : "fa-solid fa-pause";
+        }
+        centerBtn.style.opacity = isPaused ? "1" : "0";
       }
       
+      // Play button icon
       if (btnPlay) {
-        const pIcon = btnPlay.querySelector("i");
-        if (pIcon) pIcon.className = `fa-solid ${iconClass}`;
-      }
-
-      if (btnMute) {
-        const mIcon = btnMute.querySelector("i");
-        if (mIcon) {
-          mIcon.className = video.muted
-            ? "fa-solid fa-volume-xmark"
-            : "fa-solid fa-volume-high";
+        const playIcon = btnPlay.querySelector("i");
+        if (playIcon) {
+          playIcon.className = isPaused ? "fa-solid fa-play" : "fa-solid fa-pause";
         }
+      }
+      
+      // Mute button icon
+      if (btnMute) {
+        const muteIcon = btnMute.querySelector("i");
+        if (muteIcon) {
+          muteIcon.className = video.muted ? "fa-solid fa-volume-xmark" : "fa-solid fa-volume-high";
+        }
+      }
+      
+      // Time display
+      if (currentEl) currentEl.textContent = formatTime(video.currentTime);
+      if (durationEl) durationEl.textContent = formatTime(video.duration);
+      
+      // Progress bar
+      if (range && !isScrubbing && video.duration && !isNaN(video.duration) && video.duration > 0) {
+        const progressValue = (video.currentTime / video.duration) * 1000;
+        range.value = progressValue;
       }
     };
 
     const showControls = () => {
-      console.log("Showing controls");
       player.classList.add("us-controls-show");
       clearTimeout(hideTimer);
+      
       if (!video.paused) {
         hideTimer = setTimeout(() => {
           if (!isScrubbing) {
@@ -590,85 +593,51 @@ class PostPage {
     };
 
     const togglePlay = async () => {
-      console.log("=== TOGGLE PLAY CALLED ===");
-      console.log("Video state:", video.paused ? "PAUSED" : "PLAYING");
-      console.log("Video readyState:", video.readyState);
-      console.log("Video src:", video.src);
-      
       try {
-        // Pause all other videos
-        document.querySelectorAll("video.us-video").forEach((v) => {
+        // Pause all other videos on page
+        document.querySelectorAll("video.us-video").forEach(v => {
           if (v !== video && !v.paused) {
-            console.log("Pausing other video:", v);
             v.pause();
           }
         });
 
         if (video.paused) {
-          console.log("Attempting to PLAY video...");
+          console.log("Attempting to play video...");
           const playPromise = video.play();
           
-          // Handle the promise
-          playPromise.then(() => {
-            console.log("Video PLAY successful!");
+          if (playPromise !== undefined) {
+            await playPromise;
+            console.log("Video play successful");
             hasPlayed = true;
-            showControls();
-            setIcons();
-          }).catch(err => {
-            console.error("Video PLAY failed:", err);
-            console.error("Error name:", err.name);
-            console.error("Error message:", err.message);
-            // Show controls so user can try manually
-            player.classList.add("us-controls-show");
-          });
+          }
         } else {
-          console.log("PAUSING video...");
           video.pause();
-          showControls();
-          setIcons();
         }
-      } catch (err) {
-        console.error("Toggle play ERROR:", err);
+        
+        updateUI();
+        showControls();
+      } catch (error) {
+        console.error("Error toggling play:", error);
+        showControls(); // Ensure controls are visible if play fails
       }
+    };
+
+    const toggleMute = () => {
+      video.muted = !video.muted;
+      updateUI();
+      showControls();
     };
 
     const skipForward10 = () => {
       if (video.duration && !isNaN(video.duration)) {
         video.currentTime = Math.min(video.duration, video.currentTime + 10);
         showControls();
-        
-        // Show feedback animation
-        const feedback = document.createElement("div");
-        feedback.className = "skip-feedback forward";
-        feedback.innerHTML = '<i class="fa-solid fa-forward"></i>';
-        player.appendChild(feedback);
-        setTimeout(() => feedback.remove(), 500);
       }
     };
 
     const skipBackward10 = () => {
       video.currentTime = Math.max(0, video.currentTime - 10);
       showControls();
-      
-      // Show feedback animation
-      const feedback = document.createElement("div");
-      feedback.className = "skip-feedback backward";
-      feedback.innerHTML = '<i class="fa-solid fa-backward"></i>';
-      player.appendChild(feedback);
-      setTimeout(() => feedback.remove(), 500);
-    };
-
-    const syncProgress = () => {
-      const dur = video.duration || 0;
-      const cur = video.currentTime || 0;
-
-      if (!isScrubbing && range) {
-        range.value = dur > 0 ? Math.round((cur / dur) * 1000) : 0;
-      }
-
-      if (currentEl) currentEl.textContent = fmt(cur);
-      if (durationEl) durationEl.textContent = fmt(dur);
-      setIcons();
     };
 
     const openFullscreenOverlay = () => {
@@ -713,12 +682,11 @@ class PostPage {
         overlayFollowBtn.classList.add("hidden");
       }
       
-      // Set video source - IMPORTANT: Use the same source as original video
+      // Set video source
       console.log("Setting overlay video source:", video.src);
       overlayVideo.src = video.src;
       overlayVideo.currentTime = video.currentTime || 0;
       overlayVideo.muted = video.muted || false;
-      overlayVideo.loop = video.loop || true;
       
       // Show overlay
       overlay.classList.remove("hidden");
@@ -735,7 +703,7 @@ class PostPage {
       
       // Auto-play if original video was playing
       setTimeout(() => {
-        if (!video.paused && overlayVideo.readyState >= 2) {
+        if (!video.paused) {
           console.log("Auto-playing video in overlay...");
           overlayVideo.play().then(() => {
             console.log("Overlay video auto-play successful!");
@@ -744,7 +712,7 @@ class PostPage {
             overlay.classList.add("controls-visible");
           });
         } else {
-          console.log("Showing controls (video paused or not ready)");
+          console.log("Showing controls (video paused)");
           overlay.classList.add("controls-visible");
         }
       }, 300);
@@ -781,7 +749,10 @@ class PostPage {
       });
     };
 
-    // Setup double tap areas
+    // Setup double tap areas if they exist
+    const doubleTapLeft = player.querySelector(".us-video-double-tap-left");
+    const doubleTapRight = player.querySelector(".us-video-double-tap-right");
+    
     if (doubleTapLeft) {
       console.log("Setting up left double tap area");
       setupDoubleTap(doubleTapLeft, 'left');
@@ -800,7 +771,7 @@ class PostPage {
       togglePlay();
     });
 
-    // Center button click - FIXED with better event handling
+    // Center button click
     if (centerBtn) {
       centerBtn.addEventListener("click", (e) => {
         console.log("Center button clicked");
@@ -810,7 +781,7 @@ class PostPage {
       });
     }
 
-    // Play button - FIXED
+    // Play button
     if (btnPlay) {
       btnPlay.addEventListener("click", (e) => {
         console.log("Play button clicked");
@@ -824,13 +795,11 @@ class PostPage {
     if (btnMute) {
       btnMute.addEventListener("click", (e) => {
         e.stopPropagation();
-        video.muted = !video.muted;
-        setIcons();
-        showControls();
+        toggleMute();
       });
     }
 
-    // Fullscreen button - FIXED
+    // Fullscreen button
     if (btnFs) {
       btnFs.addEventListener("click", (e) => {
         console.log("Fullscreen button clicked");
@@ -839,27 +808,77 @@ class PostPage {
         openFullscreenOverlay();
       });
     }
-
+    
     // Progress bar
     if (range) {
-      range.addEventListener("input", () => {
+      range.addEventListener("input", (e) => {
         isScrubbing = true;
-        const dur = video.duration || 0;
-        const pct = (parseInt(range.value || "0", 10) / 1000) || 0;
-        const target = dur * pct;
-        if (currentEl) currentEl.textContent = fmt(target);
+        const value = parseInt(e.target.value) / 1000;
+        if (video.duration && !isNaN(value)) {
+          const newTime = video.duration * value;
+          if (currentEl) currentEl.textContent = formatTime(newTime);
+        }
         showControls();
       });
-
-      range.addEventListener("change", () => {
-        const dur = video.duration || 0;
-        const pct = (parseInt(range.value || "0", 10) / 1000) || 0;
-        video.currentTime = dur * pct;
+      
+      range.addEventListener("change", (e) => {
+        const value = parseInt(e.target.value) / 1000;
+        if (video.duration && !isNaN(value)) {
+          video.currentTime = video.duration * value;
+        }
         isScrubbing = false;
         showControls();
       });
     }
-
+    
+    // Video events
+    video.addEventListener("loadedmetadata", () => {
+      console.log("Video metadata loaded, duration:", video.duration);
+      updateUI();
+      
+      // Try autoplay
+      setTimeout(() => {
+        if (!hasPlayed) {
+          video.play().then(() => {
+            hasPlayed = true;
+            setTimeout(() => {
+              if (!video.paused) player.classList.remove("us-controls-show");
+            }, 1000);
+          }).catch(() => {
+            player.classList.add("us-controls-show");
+          });
+        }
+      }, 200);
+    });
+    
+    video.addEventListener("timeupdate", updateUI);
+    video.addEventListener("play", () => {
+      console.log("Video play event");
+      updateUI();
+      showControls();
+    });
+    
+    video.addEventListener("pause", () => {
+      console.log("Video pause event");
+      updateUI();
+      showControls();
+    });
+    
+    video.addEventListener("ended", () => {
+      video.currentTime = 0;
+      updateUI();
+      showControls();
+    });
+    
+    video.addEventListener("error", (e) => {
+      console.error("Video ERROR event:", e);
+      console.error("Video error details:", video.error);
+    });
+    
+    // Show controls on interaction
+    player.addEventListener("mousemove", showControls);
+    player.addEventListener("touchstart", showControls);
+    
     // Keyboard accessibility
     player.addEventListener("keydown", (e) => {
       if (e.key === " " || e.key === "Enter") {
@@ -867,62 +886,14 @@ class PostPage {
         togglePlay();
       } else if (e.key === "m" || e.key === "M") {
         e.preventDefault();
-        video.muted = !video.muted;
-        setIcons();
+        toggleMute();
       } else if (e.key === "Escape" && this.isOverlayOpen) {
         this.closeFullscreenOverlay();
       }
     });
-
-    // Video events
-    video.addEventListener("loadedmetadata", () => {
-      console.log("Video metadata loaded, duration:", video.duration);
-      syncProgress();
-      setTimeout(() => {
-        if (!hasPlayed && video.readyState >= 2) {
-          console.log("Attempting autoplay...");
-          video.play().then(() => {
-            console.log("Autoplay successful");
-            hasPlayed = true;
-            setTimeout(() => {
-              if (!video.paused) player.classList.remove("us-controls-show");
-            }, 900);
-          }).catch((err) => {
-            console.error("Autoplay failed:", err);
-            player.classList.add("us-controls-show");
-          });
-        }
-      }, 120);
-    });
-
-    video.addEventListener("timeupdate", syncProgress);
-    video.addEventListener("play", () => {
-      console.log("Video PLAY event fired");
-      hasPlayed = true;
-      player.dataset.state = "playing";
-      setIcons();
-      showControls();
-    });
-
-    video.addEventListener("pause", () => {
-      console.log("Video PAUSE event fired");
-      player.dataset.state = "paused";
-      setIcons();
-      showControls();
-    });
-
-    video.addEventListener("error", (e) => {
-      console.error("Video ERROR event:", e);
-      console.error("Video error details:", video.error);
-    });
-
-    // Show controls on mouse move
-    player.addEventListener("mousemove", showControls);
-    player.addEventListener("touchmove", showControls);
-
+    
     // Initialize
-    setIcons();
-    syncProgress();
+    updateUI();
     
     // Auto-hide controls after load
     setTimeout(() => {
@@ -932,7 +903,7 @@ class PostPage {
     }, 700);
   }
 
-  // Bind overlay events - COMPLETELY REVISED
+  // Bind overlay events - FIXED VERSION
   bindOverlayEvents(overlay, originalVideo) {
     console.log("PostPage: Binding overlay events");
     
@@ -942,8 +913,6 @@ class PostPage {
     const playBtn = overlay.querySelector(".overlay-play-btn");
     const centerPlayBtn = overlay.querySelector(".overlay-center-play-btn");
     const muteBtn = overlay.querySelector(".overlay-mute-btn");
-    const doubleTapLeft = overlay.querySelector(".overlay-double-tap-left");
-    const doubleTapRight = overlay.querySelector(".overlay-double-tap-right");
     const progress = overlay.querySelector(".overlay-progress");
     const currentTimeEl = overlay.querySelector(".overlay-current-time");
     const durationEl = overlay.querySelector(".overlay-duration");
@@ -956,47 +925,50 @@ class PostPage {
     let hideControlsTimer = null;
     let isScrubbing = false;
 
-    const fmt = (secs) => {
-      secs = Math.max(0, secs || 0);
-      const m = Math.floor(secs / 60);
-      const s = Math.floor(secs % 60);
-      return `${m}:${String(s).padStart(2, "0")}`;
+    const formatTime = (seconds) => {
+      if (isNaN(seconds)) return "0:00";
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    const syncOverlayProgress = () => {
-      const dur = overlayVideo.duration || 0;
-      const cur = overlayVideo.currentTime || 0;
-
-      if (!isScrubbing && progress) {
-        progress.value = dur > 0 ? Math.round((cur / dur) * 1000) : 0;
-      }
-
-      if (currentTimeEl) currentTimeEl.textContent = fmt(cur);
-      if (durationEl) durationEl.textContent = fmt(dur);
+    const updateOverlayUI = () => {
+      // Update play/pause icons
+      const isPaused = overlayVideo.paused;
       
-      // Update play button icon
+      // Play button icon
       if (playBtn) {
-        const icon = playBtn.querySelector("i");
-        if (icon) {
-          icon.className = overlayVideo.paused ? "fa-solid fa-play" : "fa-solid fa-pause";
+        const playIcon = playBtn.querySelector("i");
+        if (playIcon) {
+          playIcon.className = isPaused ? "fa-solid fa-play" : "fa-solid fa-pause";
         }
       }
       
-      // Update center play button
+      // Center play button
       if (centerPlayBtn) {
         const centerIcon = centerPlayBtn.querySelector("i");
         if (centerIcon) {
-          centerIcon.className = overlayVideo.paused ? "fa-solid fa-play" : "fa-solid fa-pause";
+          centerIcon.className = isPaused ? "fa-solid fa-play" : "fa-solid fa-pause";
         }
-        centerPlayBtn.style.display = overlayVideo.paused ? "flex" : "none";
+        centerPlayBtn.style.display = isPaused ? "flex" : "none";
       }
       
-      // Update mute button
+      // Mute button icon
       if (muteBtn) {
         const muteIcon = muteBtn.querySelector("i");
         if (muteIcon) {
           muteIcon.className = overlayVideo.muted ? "fa-solid fa-volume-xmark" : "fa-solid fa-volume-high";
         }
+      }
+      
+      // Time display
+      if (currentTimeEl) currentTimeEl.textContent = formatTime(overlayVideo.currentTime);
+      if (durationEl) durationEl.textContent = formatTime(overlayVideo.duration);
+      
+      // Progress bar
+      if (progress && !isScrubbing && overlayVideo.duration && !isNaN(overlayVideo.duration) && overlayVideo.duration > 0) {
+        const progressValue = (overlayVideo.currentTime / overlayVideo.duration) * 1000;
+        progress.value = progressValue;
       }
     };
 
@@ -1012,14 +984,11 @@ class PostPage {
 
     const toggleOverlayPlay = () => {
       console.log("=== TOGGLE OVERLAY PLAY ===");
-      console.log("Overlay video state:", overlayVideo.paused ? "PAUSED" : "PLAYING");
-      console.log("Overlay video readyState:", overlayVideo.readyState);
       
       if (overlayVideo.paused) {
         overlayVideo.play().then(() => {
           console.log("Overlay video PLAY successful!");
           showOverlayControls();
-          if (centerPlayBtn) centerPlayBtn.style.display = "none";
         }).catch(err => {
           console.error("Overlay video PLAY failed:", err);
           overlay.classList.add("controls-visible");
@@ -1027,69 +996,28 @@ class PostPage {
       } else {
         overlayVideo.pause();
         showOverlayControls();
-        if (centerPlayBtn) centerPlayBtn.style.display = "flex";
       }
-    };
-
-    const skipOverlayForward10 = () => {
-      if (overlayVideo.duration && !isNaN(overlayVideo.duration)) {
-        overlayVideo.currentTime = Math.min(overlayVideo.duration, overlayVideo.currentTime + 10);
-        showOverlayControls();
-      }
-    };
-
-    const skipOverlayBackward10 = () => {
-      overlayVideo.currentTime = Math.max(0, overlayVideo.currentTime - 10);
-      showOverlayControls();
-    };
-
-    // Setup overlay double tap
-    const setupOverlayDoubleTap = (element, side) => {
-      let tapCount = 0;
-      let tapTimer = null;
-      
-      element.addEventListener('click', (e) => {
-        e.stopPropagation();
-        tapCount++;
-        
-        if (tapCount === 1) {
-          tapTimer = setTimeout(() => {
-            // Single tap
-            toggleOverlayPlay();
-            tapCount = 0;
-          }, 300);
-        } else if (tapCount === 2) {
-          // Double tap
-          clearTimeout(tapTimer);
-          if (side === 'left') {
-            skipOverlayBackward10();
-          } else {
-            skipOverlayForward10();
-          }
-          tapCount = 0;
-        }
-      });
     };
 
     // Initialize overlay video
     overlayVideo.addEventListener('loadedmetadata', () => {
       console.log("Overlay video metadata loaded, duration:", overlayVideo.duration);
-      syncOverlayProgress();
+      updateOverlayUI();
       showOverlayControls();
     });
     
     // Video events
-    overlayVideo.addEventListener("timeupdate", syncOverlayProgress);
+    overlayVideo.addEventListener("timeupdate", updateOverlayUI);
     overlayVideo.addEventListener("play", () => {
       console.log("Overlay video PLAY event");
+      updateOverlayUI();
       showOverlayControls();
-      if (centerPlayBtn) centerPlayBtn.style.display = "none";
     });
     
     overlayVideo.addEventListener("pause", () => {
       console.log("Overlay video PAUSE event");
+      updateOverlayUI();
       showOverlayControls();
-      if (centerPlayBtn) centerPlayBtn.style.display = "flex";
     });
 
     overlayVideo.addEventListener("error", (e) => {
@@ -1104,15 +1032,6 @@ class PostPage {
       e.preventDefault();
       toggleOverlayPlay();
     });
-
-    // Setup overlay double tap areas
-    if (doubleTapLeft) {
-      setupOverlayDoubleTap(doubleTapLeft, 'left');
-    }
-    
-    if (doubleTapRight) {
-      setupOverlayDoubleTap(doubleTapRight, 'right');
-    }
 
     // Center play button
     if (centerPlayBtn) {
@@ -1149,7 +1068,7 @@ class PostPage {
         const dur = overlayVideo.duration || 0;
         const pct = (parseInt(progress.value || "0", 10) / 1000) || 0;
         const target = dur * pct;
-        if (currentTimeEl) currentTimeEl.textContent = fmt(target);
+        if (currentTimeEl) currentTimeEl.textContent = formatTime(target);
         showOverlayControls();
       });
 
