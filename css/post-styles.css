@@ -2684,3 +2684,116 @@
   0%, 100% { border-color: rgba(255,255,255,0.07); }
   50% { border-color: var(--primary-color, #1DA1F2); box-shadow: 0 0 20px rgba(29, 161, 242, 0.3); }
 }
+
+/* ===================================================== */
+/* ✅ DOUBLE TAP AREAS AND SKIP FEEDBACK                 */
+/* ===================================================== */
+
+.us-video-double-tap-left,
+.us-video-double-tap-right,
+.overlay-double-tap-left,
+.overlay-double-tap-right {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 50%;
+  z-index: 6;
+  cursor: pointer;
+}
+
+.us-video-double-tap-left,
+.overlay-double-tap-left {
+  left: 0;
+}
+
+.us-video-double-tap-right,
+.overlay-double-tap-right {
+  right: 0;
+}
+
+/* Skip feedback animation */
+.skip-feedback {
+  position: absolute;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  animation: fadeInOut 0.5s ease;
+  color: white;
+  font-size: 24px;
+}
+
+.skip-feedback.forward {
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.skip-feedback.backward {
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateY(-50%) scale(0.5); }
+  50% { opacity: 1; transform: translateY(-50%) scale(1); }
+  100% { opacity: 0; transform: translateY(-50%) scale(0.5); }
+}
+
+/* Make sure video container is positioned relative */
+.post-wrapper .post-media .us-video-player,
+.video-fullscreen-overlay .overlay-video-container {
+  position: relative !important;
+}
+
+/* Fix overlay controls visibility */
+.video-fullscreen-overlay.controls-visible .overlay-bottom-controls,
+.video-fullscreen-overlay.controls-visible .overlay-top-bar,
+.video-fullscreen-overlay.controls-visible .overlay-engagement-row {
+  opacity: 1 !important;
+  pointer-events: all !important;
+}
+
+.video-fullscreen-overlay:not(.controls-visible) .overlay-bottom-controls,
+.video-fullscreen-overlay:not(.controls-visible) .overlay-top-bar,
+.video-fullscreen-overlay:not(.controls-visible) .overlay-engagement-row {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.3s ease !important;
+}
+
+/* Make overlay engagement buttons always visible initially */
+.video-fullscreen-overlay .overlay-engagement-row {
+  opacity: 1 !important;
+  pointer-events: all !important;
+}
+
+/* Add hover effect to show controls */
+.video-fullscreen-overlay:hover .overlay-bottom-controls,
+.video-fullscreen-overlay:hover .overlay-top-bar {
+  opacity: 1 !important;
+  pointer-events: all !important;
+}
+
+/* Fix fullscreen button cursor */
+.us-video-btn.us-fullscreen {
+  cursor: pointer !important;
+}
+
+/* Ensure play button works */
+.us-video-btn.us-play,
+.overlay-control-btn.overlay-play-btn {
+  cursor: pointer !important;
+}
+
+/* Fix center play button visibility */
+.us-video-center-btn,
+.overlay-center-play-btn {
+  cursor: pointer !important;
+  z-index: 10 !important;
+}
