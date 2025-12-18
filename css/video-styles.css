@@ -1,0 +1,347 @@
+/* ===== VIDEO MODAL STYLES ===== */
+.video-modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.95);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(10px);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.video-modal-overlay.active {
+    display: flex;
+    opacity: 1;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Video Modal Container */
+.video-modal-container {
+    width: 95%;
+    height: 95%;
+    background-color: #000;
+    border-radius: 20px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 1px solid #333;
+    transform: scale(0.95);
+    transition: transform 0.3s ease;
+}
+
+.video-modal-overlay.active .video-modal-container {
+    transform: scale(1);
+}
+
+/* Modal Header */
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 30px;
+    background-color: #111;
+    border-bottom: 1px solid #222;
+    flex-shrink: 0;
+}
+
+.modal-back-btn {
+    background-color: #222;
+    color: #fff;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+}
+
+.modal-back-btn:hover {
+    background-color: #333;
+    transform: translateX(-3px);
+}
+
+.modal-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.modal-comments-btn {
+    background-color: #1a73e8;
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+}
+
+.modal-comments-btn:hover {
+    background-color: #0d62d9;
+    transform: translateY(-2px);
+}
+
+.modal-close-btn {
+    background-color: #222;
+    color: #fff;
+    border: none;
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.modal-close-btn:hover {
+    background-color: #ff4757;
+    transform: rotate(90deg);
+}
+
+/* Modal Video Player */
+.modal-video-player {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #000;
+    padding: 20px;
+    min-height: 0;
+}
+
+.modal-video-player video {
+    width: 100%;
+    height: 100%;
+    max-height: calc(95vh - 200px);
+    object-fit: contain;
+    border-radius: 10px;
+}
+
+/* Modal Footer */
+.modal-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 30px;
+    background-color: #111;
+    border-top: 1px solid #222;
+    flex-shrink: 0;
+}
+
+.modal-post-preview {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex: 1;
+}
+
+.modal-profile-pic {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #1a73e8;
+}
+
+.modal-post-info {
+    flex: 1;
+}
+
+.modal-post-info h4 {
+    font-size: 1.1rem;
+    margin-bottom: 5px;
+    color: white;
+}
+
+.modal-post-info p {
+    color: #aaa;
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+    max-width: 400px;
+}
+
+.modal-stats {
+    display: flex;
+    gap: 15px;
+    color: #777;
+    font-size: 0.9rem;
+}
+
+.modal-stats i {
+    margin-right: 5px;
+}
+
+/* Modal Actions */
+.modal-actions {
+    display: flex;
+    gap: 15px;
+    margin-left: 20px;
+}
+
+.modal-action-btn {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 10px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    min-width: 60px;
+}
+
+.modal-action-btn:hover {
+    background-color: #222;
+}
+
+.modal-action-btn.liked {
+    color: #ff4757;
+}
+
+.modal-action-btn.saved {
+    color: #ffd700;
+}
+
+.modal-action-btn span {
+    font-size: 0.8rem;
+    color: #aaa;
+}
+
+/* Video Container Styles (for the small video on post) */
+.video-container {
+    position: relative;
+    margin: 20px 0;
+    border-radius: 15px;
+    overflow: hidden;
+    background-color: #000;
+    border: 1px solid #333;
+}
+
+.video-container video {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 15px;
+    cursor: pointer;
+}
+
+.fullscreen-toggle {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 10;
+}
+
+.fullscreen-toggle:hover {
+    background-color: #1a73e8;
+    transform: scale(1.1);
+}
+
+/* Post Actions (on main post) */
+.post-actions {
+    display: flex;
+    gap: 20px;
+    margin: 20px 0;
+    padding: 15px 0;
+    border-top: 1px solid #333;
+    border-bottom: 1px solid #333;
+}
+
+.action-btn {
+    background: none;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 15px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    font-size: 1rem;
+}
+
+.action-btn:hover {
+    background-color: #222;
+}
+
+.action-btn.liked {
+    color: #ff4757;
+}
+
+.action-btn.saved {
+    color: #ffd700;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .video-modal-container {
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+    }
+    
+    .modal-header {
+        padding: 15px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    .modal-footer {
+        padding: 15px;
+        flex-direction: column;
+        gap: 15px;
+        align-items: flex-start;
+    }
+    
+    .modal-actions {
+        margin-left: 0;
+        width: 100%;
+        justify-content: space-around;
+    }
+    
+    .modal-video-player {
+        padding: 10px;
+    }
+    
+    .modal-video-player video {
+        max-height: calc(100vh - 250px);
+    }
+}
