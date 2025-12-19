@@ -9,10 +9,10 @@
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/feed-styles.css" />
   <link rel="stylesheet" href="css/icons.css" />
-  
-  <!-- POST SPECIFIC STYLES - ADDED THIS LINE -->
+
+  <!-- POST SPECIFIC STYLES -->
   <link rel="stylesheet" href="css/post-styles.css" />
-  
+
   <!-- VIDEO MODAL STYLES -->
   <link rel="stylesheet" href="css/video-styles.css" />
 
@@ -345,63 +345,58 @@
     </main>
   </div>
 
-  <!-- Video Modal (Hidden by default) -->
-  <div class="video-modal-overlay" id="videoModal">
-    <div class="video-modal-container">
-      <!-- Modal Header -->
-      <div class="modal-header">
-        <button class="modal-back-btn" id="backToPostBtn">
-          <i class="fas fa-arrow-left"></i> Back to Post
+  <!-- ✅ NEW VIDEO MODAL (Hidden by default) -->
+  <div id="videoModal" class="us-video-modal hidden" aria-hidden="true">
+    <div class="us-video-modal-inner">
+      <!-- Top-left ONLY close button -->
+      <button id="videoModalClose" class="us-video-modal-close" aria-label="Close video">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <!-- Video stage -->
+      <div class="us-video-stage">
+        <video
+          id="videoModalVideo"
+          class="us-video-modal-video"
+          playsinline
+          webkit-playsinline
+          preload="metadata"
+        ></video>
+
+        <!-- Tap layer + double-tap halves -->
+        <div class="us-video-tap-layer" id="videoTapLayer" aria-hidden="true"></div>
+        <div class="us-video-double-left" id="videoDoubleLeft" aria-hidden="true"></div>
+        <div class="us-video-double-right" id="videoDoubleRight" aria-hidden="true"></div>
+
+        <!-- Center play/pause button -->
+        <button id="videoCenterBtn" class="us-video-modal-center" aria-label="Play/Pause">
+          <i class="fa-solid fa-play"></i>
         </button>
-        
-        <div class="modal-header-actions">
-          <button class="modal-comments-btn" id="modalCommentsBtn">
-            <i class="fas fa-comments"></i> Comments
-          </button>
-          <button class="modal-close-btn" id="closeModalBtn">
-            <i class="fas fa-times"></i>
-          </button>
-        </div>
+
+        <!-- Skip feedback -->
+        <div id="skipFeedback" class="us-skip-feedback" aria-hidden="true"></div>
       </div>
 
-      <!-- Modal Video Player -->
-      <div class="modal-video-player">
-        <video id="modalVideo" controls autoplay>
-          Your browser does not support the video tag.
-        </video>
-      </div>
+      <!-- Bottom actions row (ONLY comments button lives here) -->
+      <div class="us-video-modal-actions">
+        <button class="us-action-btn" id="vmLikeBtn" aria-label="Like">
+          <i class="fa-regular fa-heart"></i>
+          <span class="us-action-count" id="vmLikeCount">0</span>
+        </button>
 
-      <!-- Modal Footer -->
-      <div class="modal-footer">
-        <div class="modal-post-preview" id="modalPostInfo">
-          <!-- Will be populated dynamically -->
-          <img src="default-profile.PNG" alt="User" class="modal-profile-pic">
-          <div class="modal-post-info">
-            <h4>Loading...</h4>
-            <p></p>
-            <div class="modal-stats">
-              <span><i class="far fa-heart"></i> 0</span>
-              <span><i class="far fa-comment"></i> 0</span>
-            </div>
-          </div>
-        </div>
-        
-        <div class="modal-actions">
-          <button class="modal-action-btn modal-like-btn" data-action="like">
-            <i class="far fa-heart"></i>
-            <span class="like-count">0</span>
-          </button>
-          <button class="modal-action-btn modal-comment-btn" data-action="comment">
-            <i class="far fa-comment"></i>
-            <span class="comment-count">0</span>
-          </button>
-          <button class="modal-action-btn modal-save-btn" data-action="save">
-            <i class="far fa-bookmark"></i>
-          </button>
-          <button class="modal-action-btn modal-share-btn" data-action="share">
-            <i class="fas fa-share"></i>
-          </button>
-        </div>
+        <button class="us-action-btn" id="vmCommentBtn" aria-label="Comments">
+          <i class="fa-regular fa-comment"></i>
+          <span class="us-action-count" id="vmCommentCount">0</span>
+        </button>
+
+        <button class="us-action-btn" id="vmSaveBtn" aria-label="Save">
+          <i class="fa-regular fa-bookmark"></i>
+          <span class="us-action-count" id="vmSaveCount">0</span>
+        </button>
+
+        <button class="us-action-btn" id="vmShareBtn" aria-label="Share">
+          <i class="fa-solid fa-arrow-up-from-bracket"></i>
+        </button>
       </div>
     </div>
   </div>
