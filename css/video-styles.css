@@ -457,3 +457,93 @@
 .modal-video-player {
   line-height: 0; /* ✅ prevents tiny “bottom bar gap” */
 }
+
+/* ✅ INLINE POST VIDEO: disable iOS native overlay + keep our own controls only */
+.us-video-player {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #000;
+}
+
+/* ✅ critical: Safari can't show center overlay if the video itself never gets taps */
+.us-video-player video {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: #000;
+  pointer-events: none !important;
+}
+
+/* ✅ hard-hide any Safari control UI if it tries */
+.us-video-player video::-webkit-media-controls,
+.us-video-player video::-webkit-media-controls-panel,
+.us-video-player video::-webkit-media-controls-enclosure,
+.us-video-player video::-webkit-media-controls-overlay-play-button,
+.us-video-player video::-webkit-media-controls-start-playback-button {
+  display: none !important;
+  -webkit-appearance: none !important;
+  opacity: 0 !important;
+}
+
+/* Tap layer (captures taps instead of the video) */
+.us-inline-tap {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+}
+
+/* Bottom controls (your ONLY play/pause button) */
+.us-inline-controls {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  z-index: 10;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 10px 12px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(255,255,255,0.12);
+  backdrop-filter: blur(12px);
+}
+
+.us-inline-btn {
+  border: 0;
+  background: transparent;
+  color: #fff;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.us-inline-time {
+  color: rgba(255,255,255,0.85);
+  font-size: 13px;
+  min-width: 80px;
+  text-align: center;
+}
+
+.us-inline-progress {
+  flex: 1;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.20);
+  outline: none;
+}
+
+.us-inline-progress::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #fff;
+}
