@@ -15,6 +15,9 @@ class PostPage {
     this.currentUser = null;
     this.currentOverlayVideo = null;
     this.isOverlayOpen = false;
+
+    // prevent duplicate overlay bindings
+    this._overlayBound = false;
   }
 
   async init() {
@@ -26,7 +29,10 @@ class PostPage {
     try {
       this.currentUser =
         typeof getCurrentUser === "function" ? getCurrentUser() : null;
-      console.log("PostPage: Current user:", this.currentUser ? "Logged in" : "Not logged in");
+      console.log(
+        "PostPage: Current user:",
+        this.currentUser ? "Logged in" : "Not logged in"
+      );
     } catch {
       this.currentUser = null;
     }
@@ -67,7 +73,6 @@ class PostPage {
     this.commentCharCounter = document.getElementById("commentCharCounter");
 
     this.guestMessage = document.getElementById("guestCommentMessage");
-
     this.backButton = document.getElementById("backButton");
 
     // Overlay container
@@ -93,19 +98,19 @@ class PostPage {
             <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
-        
+
         <div class="overlay-video-container">
           <video class="overlay-video" playsinline webkit-playsinline preload="metadata" muted loop></video>
-          <button class="overlay-center-play-btn" type="button" aria-label="Play">
-            <i class="fa-solid fa-play"></i>
-          </button>
-          
+
+          <!-- ✅ tap layer (so taps do NOT hit the video element) -->
+          <button class="overlay-tap-layer" type="button" aria-label="Toggle play/pause"></button>
+
           <!-- Double tap areas -->
           <div class="overlay-double-tap-left"></div>
           <div class="overlay-double-tap-right"></div>
         </div>
-        
-        <!-- Video controls at top -->
+
+        <!-- Video controls -->
         <div class="overlay-main-controls">
           <div class="overlay-controls-row">
             <button class="overlay-control-btn overlay-play-btn" type="button" aria-label="Play/Pause">
@@ -125,11 +130,11 @@ class PostPage {
             </button>
           </div>
         </div>
-        
+
         <!-- Separator line -->
         <div class="overlay-separator-line"></div>
-        
-        <!-- Engagement buttons at VERY bottom -->
+
+        <!-- Engagement buttons -->
         <div class="overlay-engagement-container">
           <div class="overlay-engagement-row">
             <button class="overlay-engagement-btn overlay-like-btn" type="button">
@@ -157,7 +162,7 @@ class PostPage {
 
   bindEvents() {
     console.log("PostPage: Binding events");
-    
+
     if (this.backButton) {
       this.backButton.addEventListener("click", () => {
         if (window.history.length > 1) window.history.back();
@@ -174,25 +179,18 @@ class PostPage {
           "warning",
           len > this.maxCommentChars - 40 && len <= this.maxCommentChars
         );
-        this.commentCharCounter.classList.toggle(
-          "error",
-          len > this.maxCommentChars
-        );
+        this.commentCharCounter.classList.toggle("error", len > this.maxCommentChars);
       });
     }
 
     // submit on form submit
     if (this.commentForm) {
-      this.commentForm.addEventListener("submit", (e) =>
-        this.handleCommentSubmit(e)
-      );
+      this.commentForm.addEventListener("submit", (e) => this.handleCommentSubmit(e));
     }
 
     // ALSO submit when the button is clicked
     if (this.commentSubmitBtn) {
-      this.commentSubmitBtn.addEventListener("click", (e) =>
-        this.handleCommentSubmit(e)
-      );
+      this.commentSubmitBtn.addEventListener("click", (e) => this.handleCommentSubmit(e));
     }
 
     // comment delete via event delegation
@@ -250,7 +248,7 @@ class PostPage {
 
   async loadPost() {
     console.log("PostPage: Loading post with ID:", this.postId);
-    
+
     if (!this.postContainer) return;
 
     this.postContainer.innerHTML = "";
@@ -285,7 +283,7 @@ class PostPage {
       setTimeout(() => {
         console.log("PostPage: Initializing video players");
         this.initCustomVideoPlayers(article);
-      }, 100);
+      }, 50);
     } catch (err) {
       console.error("loadPost exception:", err);
       this.showError("Failed to load post.");
@@ -311,16 +309,10 @@ class PostPage {
     const saved = !!post.saved_by_me;
 
     let likeCount = typeof post.likes === "number" ? post.likes : 0;
-    let commentCount =
-      typeof post.comments_count === "number" ? post.comments_count : 0;
+    let commentCount = typeof post.comments_count === "number" ? post.comments_count : 0;
     let saveCount = typeof post.saves_count === "number" ? post.saves_count : 0;
 
-    const mediaUrl =
-      post.media_url ||
-      post.media ||
-      post.image_url ||
-      post.video_url ||
-      null;
+    const mediaUrl = post.media_url || post.media || post.image_url || post.video_url || null;
     const mediaType = post.media_type || "";
     const mediaHtml = mediaUrl ? this.renderMediaHtml(mediaUrl, mediaType) : "";
 
@@ -401,8 +393,7 @@ class PostPage {
       userEl.addEventListener("click", (e) => {
         e.stopPropagation();
         const uname = userEl.dataset.username;
-        const me =
-          typeof getCurrentUser === "function" ? getCurrentUser() : null;
+        const me = typeof getCurrentUser === "function" ? getCurrentUser() : null;
 
         if (me && me.username === uname) {
           window.location.href = "profile.html";
@@ -426,32 +417,34 @@ class PostPage {
       lower.endsWith(".mov");
 
     if (isVideo) {
+      // ✅ IMPORTANT:
+      // - NO video click handlers
+      // - NO center play button
+      // - Use .us-video-tap layer to receive taps (prevents iOS middle overlay)
       return `
         <div class="post-media">
-          <div class="us-video-player" 
-               tabindex="0" 
+          <div class="us-video-player"
+               tabindex="0"
                aria-label="Video player. Press Space or Enter to play or pause."
-               data-state="paused" 
+               data-state="paused"
                data-fullscreen="false">
+
             <video class="us-video"
                    playsinline
                    webkit-playsinline
                    preload="metadata"
                    muted
-                   loop
-                   style="width: 100%; height: 100%; object-fit: contain; display: block; background: #000;">
+                   loop>
               <source src="${url}" type="${type || "video/mp4"}">
               Your browser does not support video.
             </video>
 
+            <!-- ✅ tap layer (captures taps, not the video) -->
+            <button class="us-video-tap" type="button" aria-label="Play/Pause"></button>
+
             <!-- Double tap areas for 10-second skip -->
             <div class="us-video-double-tap-left"></div>
             <div class="us-video-double-tap-right"></div>
-
-            <!-- Center play button -->
-            <button class="us-video-center-btn" type="button" aria-label="Play/Pause">
-              <i class="fa-solid fa-play"></i>
-            </button>
 
             <!-- Bottom control bar -->
             <div class="us-video-controls">
@@ -496,19 +489,19 @@ class PostPage {
     console.log("PostPage: initCustomVideoPlayers called");
     const players = rootEl.querySelectorAll(".us-video-player");
     console.log(`Found ${players.length} video players to initialize`);
-    
+
     players.forEach((player, index) => {
       console.log(`Initializing video player ${index + 1}`);
       this.bindCustomVideoPlayer(player);
     });
   }
 
-  // Bind custom video player - UPDATED FIXED VERSION
+  // Bind custom video player - UPDATED: NO center overlay, NO video clicks
   bindCustomVideoPlayer(player) {
     console.log("PostPage: bindCustomVideoPlayer called");
-    
+
     const video = player.querySelector(".us-video");
-    const centerBtn = player.querySelector(".us-video-center-btn");
+    const tapLayer = player.querySelector(".us-video-tap");
     const btnPlay = player.querySelector(".us-play");
     const btnMute = player.querySelector(".us-mute");
     const btnFs = player.querySelector(".us-fullscreen");
@@ -520,12 +513,12 @@ class PostPage {
       console.error("ERROR: No video element found in player!");
       return;
     }
-    
-    console.log("Video element found:", video.src);
 
     // Prevent native controls
     video.controls = false;
     video.removeAttribute("controls");
+    video.disablePictureInPicture = true;
+    video.setAttribute("controlslist", "nodownload noplaybackrate noremoteplayback");
 
     let hideTimer = null;
     let isScrubbing = false;
@@ -535,112 +528,63 @@ class PostPage {
       if (isNaN(seconds)) return "0:00";
       const mins = Math.floor(seconds / 60);
       const secs = Math.floor(seconds % 60);
-      return `${mins}:${secs.toString().padStart(2, '0')}`;
+      return `${mins}:${secs.toString().padStart(2, "0")}`;
     };
 
     const updateUI = () => {
-      // Update play/pause icons
       const isPaused = video.paused;
       player.dataset.state = isPaused ? "paused" : "playing";
-      
-      // Center button - ONLY show when video is paused
-      if (centerBtn) {
-        const centerIcon = centerBtn.querySelector("i");
-        if (centerIcon) {
-          centerIcon.className = isPaused ? "fa-solid fa-play" : "fa-solid fa-pause";
-        }
-        // FIX: Only show center button when paused, hide when playing
-        centerBtn.style.opacity = isPaused ? "1" : "0";
-        centerBtn.style.pointerEvents = isPaused ? "auto" : "none";
-        centerBtn.style.display = isPaused ? "flex" : "none";
-      }
-      
-      // Play button icon
+
       if (btnPlay) {
         const playIcon = btnPlay.querySelector("i");
-        if (playIcon) {
-          playIcon.className = isPaused ? "fa-solid fa-play" : "fa-solid fa-pause";
-        }
+        if (playIcon) playIcon.className = isPaused ? "fa-solid fa-play" : "fa-solid fa-pause";
       }
-      
-      // Mute button icon
+
       if (btnMute) {
         const muteIcon = btnMute.querySelector("i");
         if (muteIcon) {
           muteIcon.className = video.muted ? "fa-solid fa-volume-xmark" : "fa-solid fa-volume-high";
         }
       }
-      
-      // Time display
+
       if (currentEl) currentEl.textContent = formatTime(video.currentTime);
       if (durationEl) durationEl.textContent = formatTime(video.duration);
-      
-      // Progress bar
+
       if (range && !isScrubbing && video.duration && !isNaN(video.duration) && video.duration > 0) {
-        const progressValue = (video.currentTime / video.duration) * 1000;
-        range.value = progressValue;
+        range.value = String((video.currentTime / video.duration) * 1000);
       }
     };
 
     const showControls = () => {
       player.classList.add("us-controls-show");
       clearTimeout(hideTimer);
-      
+
       if (!video.paused) {
         hideTimer = setTimeout(() => {
-          if (!isScrubbing) {
-            player.classList.remove("us-controls-show");
-          }
+          if (!isScrubbing) player.classList.remove("us-controls-show");
         }, 2000);
       }
     };
 
     const togglePlay = async () => {
       try {
-        // Pause all other videos on page
-        document.querySelectorAll("video.us-video").forEach(v => {
-          if (v !== video && !v.paused) {
-            v.pause();
-          }
+        // Pause all other inline videos
+        document.querySelectorAll("video.us-video").forEach((v) => {
+          if (v !== video && !v.paused) v.pause();
         });
 
         if (video.paused) {
-          console.log("Attempting to play video...");
-          
-          // FIX: Hide center button immediately before playing
-          if (centerBtn) {
-            centerBtn.style.opacity = "0";
-            centerBtn.style.pointerEvents = "none";
-            centerBtn.style.display = "none";
-          }
-          
           const playPromise = video.play();
-          
-          if (playPromise !== undefined) {
-            await playPromise;
-            console.log("Video play successful");
-            hasPlayed = true;
-          }
+          if (playPromise !== undefined) await playPromise;
+          hasPlayed = true;
         } else {
           video.pause();
-          // FIX: Show center button when paused
-          if (centerBtn) {
-            centerBtn.style.opacity = "1";
-            centerBtn.style.pointerEvents = "auto";
-            centerBtn.style.display = "flex";
-          }
         }
-        
+
         updateUI();
         showControls();
       } catch (error) {
         console.error("Error toggling play:", error);
-        // If play fails, ensure center button is visible if still paused
-        if (centerBtn && video.paused) {
-          centerBtn.style.opacity = "1";
-          centerBtn.style.pointerEvents = "auto";
-          centerBtn.style.display = "flex";
-        }
         showControls();
       }
     };
@@ -665,37 +609,31 @@ class PostPage {
 
     const openFullscreenOverlay = () => {
       console.log("=== OPENING FULLSCREEN OVERLAY ===");
-      if (!this.post) {
-        console.error("No post data available");
-        return;
-      }
-      
+      if (!this.post) return;
+
       this.isOverlayOpen = true;
+
       const overlay = this.videoOverlayContainer;
       const overlayVideo = overlay.querySelector(".overlay-video");
+      const overlayTap = overlay.querySelector(".overlay-tap-layer");
       const overlayAvatar = overlay.querySelector(".overlay-user-avatar");
       const overlayName = overlay.querySelector(".overlay-user-name");
       const overlayHandle = overlay.querySelector(".overlay-user-handle");
       const overlayFollowBtn = overlay.querySelector(".overlay-follow-btn");
-      
-      // Store reference to original video
+
       this.currentOverlayVideo = video;
-      
-      // Set overlay content
+
       const author = this.post.user || {};
-      console.log("Setting overlay user info:", author);
       overlayAvatar.src = author.avatar_url || "default-profile.PNG";
-      overlayAvatar.onerror = function() { 
-        console.log("Avatar failed to load, using default");
-        this.src = 'default-profile.PNG'; 
+      overlayAvatar.onerror = function () {
+        this.src = "default-profile.PNG";
       };
       overlayName.textContent = author.display_name || author.username || "User";
       overlayHandle.textContent = `@${author.username || "user"}`;
-      
-      // Set follow button state
+
       const isCurrentUser = this.currentUser && this.currentUser.username === author.username;
       const isFollowing = author.followed_by_me || false;
-      
+
       if (!isCurrentUser && this.currentUser) {
         overlayFollowBtn.classList.remove("hidden");
         overlayFollowBtn.textContent = isFollowing ? "Following" : "Follow";
@@ -704,100 +642,74 @@ class PostPage {
       } else {
         overlayFollowBtn.classList.add("hidden");
       }
-      
-      // Set video source
-      console.log("Setting overlay video source:", video.src);
-      overlayVideo.src = video.src;
+
+      overlayVideo.controls = false;
+      overlayVideo.removeAttribute("controls");
+      overlayVideo.disablePictureInPicture = true;
+      overlayVideo.setAttribute("controlslist", "nodownload noplaybackrate noremoteplayback");
+
+      overlayVideo.src = video.currentSrc || video.src;
       overlayVideo.currentTime = video.currentTime || 0;
       overlayVideo.muted = video.muted || false;
-      
-      // Show overlay
+      overlayVideo.load();
+
       overlay.classList.remove("hidden");
       document.body.style.overflow = "hidden";
-      
-      // Force video to load
-      overlayVideo.load();
-      
-      // Show controls initially
       overlay.classList.add("controls-visible");
-      
-      // Bind overlay events
+
       this.bindOverlayEvents(overlay, video);
-      
-      // Auto-play if original video was playing
+
+      // Autoplay if original was playing
       setTimeout(() => {
         if (!video.paused) {
-          console.log("Auto-playing video in overlay...");
-          overlayVideo.play().then(() => {
-            console.log("Overlay video auto-play successful!");
-          }).catch(err => {
-            console.error("Overlay video auto-play failed:", err);
+          overlayVideo.play().catch(() => {
             overlay.classList.add("controls-visible");
           });
         } else {
-          console.log("Showing controls (video paused)");
           overlay.classList.add("controls-visible");
         }
-      }, 300);
+      }, 200);
+
+      // ✅ Make sure tap layer exists
+      if (overlayTap) {
+        overlayTap.blur?.();
+      }
     };
 
-    // Setup double tap detection
+    // Setup double tap detection on the left/right overlays (NOT on video)
     const setupDoubleTap = (element, side) => {
       let tapCount = 0;
       let tapTimer = null;
-      
-      element.addEventListener('click', (e) => {
+
+      element.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
         tapCount++;
-        
+
         if (tapCount === 1) {
           tapTimer = setTimeout(() => {
-            // Single tap - toggle play/pause
-            console.log("Single tap detected");
+            // Single tap => toggle play
             togglePlay();
             tapCount = 0;
-          }, 300);
+          }, 280);
         } else if (tapCount === 2) {
-          // Double tap
-          console.log("Double tap detected");
           clearTimeout(tapTimer);
-          if (side === 'left') {
-            skipBackward10();
-          } else {
-            skipForward10();
-          }
+          if (side === "left") skipBackward10();
+          else skipForward10();
           tapCount = 0;
         }
       });
     };
 
-    // Setup double tap areas if they exist
     const doubleTapLeft = player.querySelector(".us-video-double-tap-left");
     const doubleTapRight = player.querySelector(".us-video-double-tap-right");
-    
-    if (doubleTapLeft) {
-      console.log("Setting up left double tap area");
-      setupDoubleTap(doubleTapLeft, 'left');
-    }
-    
-    if (doubleTapRight) {
-      console.log("Setting up right double tap area");
-      setupDoubleTap(doubleTapRight, 'right');
-    }
 
-    // Video click to toggle play/pause
-    video.addEventListener('click', (e) => {
-      console.log("Video clicked directly");
-      e.stopPropagation();
-      e.preventDefault();
-      togglePlay();
-    });
+    if (doubleTapLeft) setupDoubleTap(doubleTapLeft, "left");
+    if (doubleTapRight) setupDoubleTap(doubleTapRight, "right");
 
-    // Center button click
-    if (centerBtn) {
-      centerBtn.addEventListener("click", (e) => {
-        console.log("Center button clicked");
+    // ✅ tap layer (single tap)
+    if (tapLayer) {
+      tapLayer.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
         togglePlay();
@@ -807,7 +719,6 @@ class PostPage {
     // Play button
     if (btnPlay) {
       btnPlay.addEventListener("click", (e) => {
-        console.log("Play button clicked");
         e.stopPropagation();
         e.preventDefault();
         togglePlay();
@@ -825,27 +736,26 @@ class PostPage {
     // Fullscreen button
     if (btnFs) {
       btnFs.addEventListener("click", (e) => {
-        console.log("Fullscreen button clicked");
         e.stopPropagation();
         e.preventDefault();
         openFullscreenOverlay();
       });
     }
-    
+
     // Progress bar
     if (range) {
       range.addEventListener("input", (e) => {
         isScrubbing = true;
-        const value = parseInt(e.target.value) / 1000;
+        const value = parseInt(e.target.value, 10) / 1000;
         if (video.duration && !isNaN(value)) {
           const newTime = video.duration * value;
           if (currentEl) currentEl.textContent = formatTime(newTime);
         }
         showControls();
       });
-      
+
       range.addEventListener("change", (e) => {
-        const value = parseInt(e.target.value) / 1000;
+        const value = parseInt(e.target.value, 10) / 1000;
         if (video.duration && !isNaN(value)) {
           video.currentTime = video.duration * value;
         }
@@ -853,55 +763,45 @@ class PostPage {
         showControls();
       });
     }
-    
+
     // Video events
     video.addEventListener("loadedmetadata", () => {
-      console.log("Video metadata loaded, duration:", video.duration);
       updateUI();
-      
-      // Try autoplay
+
+      // optional autoplay attempt
       setTimeout(() => {
         if (!hasPlayed) {
           video.play().then(() => {
             hasPlayed = true;
             setTimeout(() => {
               if (!video.paused) player.classList.remove("us-controls-show");
-            }, 1000);
+            }, 800);
           }).catch(() => {
             player.classList.add("us-controls-show");
           });
         }
-      }, 200);
+      }, 150);
     });
-    
+
     video.addEventListener("timeupdate", updateUI);
     video.addEventListener("play", () => {
-      console.log("Video play event");
       updateUI();
       showControls();
     });
-    
     video.addEventListener("pause", () => {
-      console.log("Video pause event");
       updateUI();
       showControls();
     });
-    
     video.addEventListener("ended", () => {
       video.currentTime = 0;
       updateUI();
       showControls();
     });
-    
-    video.addEventListener("error", (e) => {
-      console.error("Video ERROR event:", e);
-      console.error("Video error details:", video.error);
-    });
-    
-    // Show controls on interaction
+
+    // Show controls on interaction (player area, not video)
     player.addEventListener("mousemove", showControls);
     player.addEventListener("touchstart", showControls);
-    
+
     // Keyboard accessibility
     player.addEventListener("keydown", (e) => {
       if (e.key === " " || e.key === "Enter") {
@@ -914,27 +814,28 @@ class PostPage {
         this.closeFullscreenOverlay();
       }
     });
-    
-    // Initialize
+
     updateUI();
-    
-    // Auto-hide controls after load
     setTimeout(() => {
-      if (!video.paused && hasPlayed) {
-        player.classList.remove("us-controls-show");
-      }
+      if (!video.paused && hasPlayed) player.classList.remove("us-controls-show");
     }, 700);
   }
 
-  // Bind overlay events - UPDATED FIXED VERSION
+  // Bind overlay events
   bindOverlayEvents(overlay, originalVideo) {
+    if (!overlay || !originalVideo) return;
+
+    // prevent double-binding
+    if (this._overlayBound) return;
+    this._overlayBound = true;
+
     console.log("PostPage: Binding overlay events");
-    
+
     const overlayVideo = overlay.querySelector(".overlay-video");
+    const tapLayer = overlay.querySelector(".overlay-tap-layer");
     const closeBtn = overlay.querySelector(".overlay-close-btn");
     const exitBtn = overlay.querySelector(".overlay-exit-btn");
     const playBtn = overlay.querySelector(".overlay-play-btn");
-    const centerPlayBtn = overlay.querySelector(".overlay-center-play-btn");
     const muteBtn = overlay.querySelector(".overlay-mute-btn");
     const progress = overlay.querySelector(".overlay-progress");
     const currentTimeEl = overlay.querySelector(".overlay-current-time");
@@ -952,54 +853,36 @@ class PostPage {
       if (isNaN(seconds)) return "0:00";
       const mins = Math.floor(seconds / 60);
       const secs = Math.floor(seconds % 60);
-      return `${mins}:${secs.toString().padStart(2, '0')}`;
+      return `${mins}:${secs.toString().padStart(2, "0")}`;
     };
 
     const updateOverlayUI = () => {
-      // Update play/pause icons
       const isPaused = overlayVideo.paused;
-      
-      // Play button icon
+
       if (playBtn) {
         const playIcon = playBtn.querySelector("i");
-        if (playIcon) {
-          playIcon.className = isPaused ? "fa-solid fa-play" : "fa-solid fa-pause";
-        }
+        if (playIcon) playIcon.className = isPaused ? "fa-solid fa-play" : "fa-solid fa-pause";
       }
-      
-      // Center play button - ONLY show when paused
-      if (centerPlayBtn) {
-        const centerIcon = centerPlayBtn.querySelector("i");
-        if (centerIcon) {
-          centerIcon.className = isPaused ? "fa-solid fa-play" : "fa-solid fa-pause";
-        }
-        centerPlayBtn.style.display = isPaused ? "flex" : "none";
-        centerPlayBtn.style.opacity = isPaused ? "1" : "0";
-        centerPlayBtn.style.pointerEvents = isPaused ? "auto" : "none";
-      }
-      
-      // Mute button icon
+
       if (muteBtn) {
         const muteIcon = muteBtn.querySelector("i");
         if (muteIcon) {
           muteIcon.className = overlayVideo.muted ? "fa-solid fa-volume-xmark" : "fa-solid fa-volume-high";
         }
       }
-      
-      // Time display
+
       if (currentTimeEl) currentTimeEl.textContent = formatTime(overlayVideo.currentTime);
       if (durationEl) durationEl.textContent = formatTime(overlayVideo.duration);
-      
-      // Progress bar
-      if (progress && !isScrubbing && overlayVideo.duration && !isNaN(overlayVideo.duration) && overlayVideo.duration > 0) {
-        const progressValue = (overlayVideo.currentTime / overlayVideo.duration) * 1000;
-        progress.value = progressValue;
+
+      if (progress && !isScrubbing && overlayVideo.duration && overlayVideo.duration > 0) {
+        progress.value = String((overlayVideo.currentTime / overlayVideo.duration) * 1000);
       }
     };
 
     const showOverlayControls = () => {
       overlay.classList.add("controls-visible");
       clearTimeout(hideControlsTimer);
+
       if (!overlayVideo.paused) {
         hideControlsTimer = setTimeout(() => {
           overlay.classList.remove("controls-visible");
@@ -1008,79 +891,52 @@ class PostPage {
     };
 
     const toggleOverlayPlay = () => {
-      console.log("=== TOGGLE OVERLAY PLAY ===");
-      
       if (overlayVideo.paused) {
-        // FIX: Hide center button immediately before playing
-        if (centerPlayBtn) {
-          centerPlayBtn.style.display = "none";
-          centerPlayBtn.style.opacity = "0";
-          centerPlayBtn.style.pointerEvents = "none";
-        }
-        
-        overlayVideo.play().then(() => {
-          console.log("Overlay video PLAY successful!");
-          showOverlayControls();
-        }).catch(err => {
-          console.error("Overlay video PLAY failed:", err);
-          // If play fails, show center button
-          if (centerPlayBtn) {
-            centerPlayBtn.style.display = "flex";
-            centerPlayBtn.style.opacity = "1";
-            centerPlayBtn.style.pointerEvents = "auto";
-          }
+        overlayVideo.play().catch(() => {
           overlay.classList.add("controls-visible");
         });
       } else {
         overlayVideo.pause();
-        // FIX: Show center button when paused
-        if (centerPlayBtn) {
-          centerPlayBtn.style.display = "flex";
-          centerPlayBtn.style.opacity = "1";
-          centerPlayBtn.style.pointerEvents = "auto";
-        }
-        showOverlayControls();
       }
+      showOverlayControls();
     };
 
-    // Initialize overlay video
-    overlayVideo.addEventListener('loadedmetadata', () => {
-      console.log("Overlay video metadata loaded, duration:", overlayVideo.duration);
+    const closeOverlay = () => {
+      console.log("Closing overlay");
+      this.isOverlayOpen = false;
+      this._overlayBound = false;
+
+      // Sync state back to original video
+      if (originalVideo && overlayVideo) {
+        originalVideo.currentTime = overlayVideo.currentTime || 0;
+        originalVideo.muted = overlayVideo.muted;
+        if (!overlayVideo.paused) originalVideo.play().catch(() => {});
+        else originalVideo.pause();
+      }
+
+      overlay.classList.add("hidden");
+      document.body.style.overflow = "";
+      this.currentOverlayVideo = null;
+    };
+
+    // Video events
+    overlayVideo.addEventListener("loadedmetadata", () => {
       updateOverlayUI();
       showOverlayControls();
     });
-    
-    // Video events
     overlayVideo.addEventListener("timeupdate", updateOverlayUI);
     overlayVideo.addEventListener("play", () => {
-      console.log("Overlay video PLAY event");
       updateOverlayUI();
       showOverlayControls();
     });
-    
     overlayVideo.addEventListener("pause", () => {
-      console.log("Overlay video PAUSE event");
       updateOverlayUI();
       showOverlayControls();
     });
 
-    overlayVideo.addEventListener("error", (e) => {
-      console.error("Overlay video ERROR:", e);
-      console.error("Overlay video error details:", overlayVideo.error);
-    });
-
-    // Single tap on video toggles play
-    overlayVideo.addEventListener('click', (e) => {
-      console.log("Overlay video clicked");
-      e.stopPropagation();
-      e.preventDefault();
-      toggleOverlayPlay();
-    });
-
-    // Center play button
-    if (centerPlayBtn) {
-      centerPlayBtn.addEventListener("click", (e) => {
-        console.log("Overlay center play button clicked");
+    // ✅ Tap layer only (NOT the video)
+    if (tapLayer) {
+      tapLayer.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
         toggleOverlayPlay();
@@ -1090,7 +946,6 @@ class PostPage {
     // Control buttons
     if (playBtn) {
       playBtn.addEventListener("click", (e) => {
-        console.log("Overlay play button clicked");
         e.stopPropagation();
         e.preventDefault();
         toggleOverlayPlay();
@@ -1102,10 +957,11 @@ class PostPage {
         e.stopPropagation();
         overlayVideo.muted = !overlayVideo.muted;
         showOverlayControls();
+        updateOverlayUI();
       });
     }
 
-    // Progress bar
+    // Progress
     if (progress) {
       progress.addEventListener("input", () => {
         isScrubbing = true;
@@ -1126,33 +982,12 @@ class PostPage {
     }
 
     // Close buttons
-    const closeOverlay = () => {
-      console.log("Closing overlay");
-      this.isOverlayOpen = false;
-      
-      // Sync state back to original video
-      if (originalVideo && overlayVideo) {
-        originalVideo.currentTime = overlayVideo.currentTime;
-        originalVideo.muted = overlayVideo.muted;
-        if (!overlayVideo.paused) {
-          originalVideo.play().catch(() => {});
-        } else {
-          originalVideo.pause();
-        }
-      }
-      
-      overlay.classList.add("hidden");
-      document.body.style.overflow = "";
-      this.currentOverlayVideo = null;
-    };
-
     if (closeBtn) {
       closeBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         closeOverlay();
       });
     }
-    
     if (exitBtn) {
       exitBtn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -1160,52 +995,44 @@ class PostPage {
       });
     }
 
-    // Follow button
+    // Follow
     if (followBtn) {
       followBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
         const author = this.post?.user;
         if (!author) return;
-        
+
         const token = typeof getAuthToken === "function" ? getAuthToken() : null;
         if (!token) {
           alert("Please log in to follow users.");
           return;
         }
-        
+
         const isCurrentlyFollowing = followBtn.classList.contains("following");
         const newFollowingState = !isCurrentlyFollowing;
-        
-        // Optimistic update
+
         followBtn.textContent = newFollowingState ? "Following" : "Follow";
         followBtn.classList.toggle("following", newFollowingState);
         followBtn.setAttribute("aria-pressed", newFollowingState);
-        
+
         try {
           const method = newFollowingState ? "POST" : "DELETE";
           const res = await fetch(
             `${POST_API_BASE_URL}/users/${encodeURIComponent(author.username)}/follow`,
             {
               method,
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
+              headers: { Authorization: `Bearer ${token}` },
             }
           );
-          
+
           if (!res.ok) {
-            // Revert on error
             followBtn.textContent = isCurrentlyFollowing ? "Following" : "Follow";
             followBtn.classList.toggle("following", isCurrentlyFollowing);
             followBtn.setAttribute("aria-pressed", isCurrentlyFollowing);
             throw new Error("Failed to update follow status");
           }
-          
-          // Update post data
-          if (this.post.user) {
-            this.post.user.followed_by_me = newFollowingState;
-          }
-          
+
+          if (this.post.user) this.post.user.followed_by_me = newFollowingState;
         } catch (err) {
           console.error("Follow error:", err);
         }
@@ -1222,7 +1049,7 @@ class PostPage {
           const isLiked = likeBtnInPost.classList.contains("liked");
           const icon = likeBtn.querySelector("i");
           const count = likeBtn.querySelector(".overlay-count");
-          
+
           likeBtn.classList.toggle("liked", isLiked);
           if (icon) icon.className = isLiked ? "fa-solid fa-heart" : "fa-regular fa-heart";
           if (count) count.textContent = likeBtnInPost.querySelector(".like-count")?.textContent || "0";
@@ -1234,9 +1061,7 @@ class PostPage {
       commentBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         closeOverlay();
-        setTimeout(() => {
-          this.scrollToCommentsSection();
-        }, 100);
+        setTimeout(() => this.scrollToCommentsSection(), 100);
       });
     }
 
@@ -1255,40 +1080,34 @@ class PostPage {
           saveBtnInPost.click();
           const isSaved = saveBtnInPost.classList.contains("saved");
           const icon = saveBtn.querySelector("i");
-          
+
           saveBtn.classList.toggle("saved", isSaved);
           if (icon) icon.className = isSaved ? "fa-solid fa-bookmark" : "fa-regular fa-bookmark";
         }
       });
     }
 
-    // Show controls on mouse move/touch
+    // Show controls on movement
     overlay.addEventListener("mousemove", showOverlayControls);
     overlay.addEventListener("touchmove", showOverlayControls);
 
-    // Click on overlay toggles play
-    overlay.addEventListener("click", (e) => {
-      if (e.target === overlay || e.target === overlay.querySelector(".overlay-video-container") || e.target === overlayVideo) {
-        toggleOverlayPlay();
-      }
-    });
-
-    // Keyboard support
+    // Keyboard
     overlay.addEventListener("keydown", (e) => {
       if (e.key === " " || e.key === "Enter") {
         e.preventDefault();
         toggleOverlayPlay();
       } else if (e.key === "m" || e.key === "M") {
         e.preventDefault();
-        if (overlayVideo) overlayVideo.muted = !overlayVideo.muted;
+        overlayVideo.muted = !overlayVideo.muted;
         showOverlayControls();
+        updateOverlayUI();
       } else if (e.key === "Escape") {
         e.preventDefault();
         closeOverlay();
       }
     });
 
-    // Set initial counts from post data
+    // Set initial counts/states
     if (this.post) {
       if (likeBtn && likeBtn.querySelector(".overlay-count")) {
         likeBtn.querySelector(".overlay-count").textContent = this.post.likes || "0";
@@ -1296,31 +1115,19 @@ class PostPage {
       if (commentBtn && commentBtn.querySelector(".overlay-count")) {
         commentBtn.querySelector(".overlay-count").textContent = this.post.comments_count || "0";
       }
-      
-      // Set initial like/save states
+
       if (likeBtn) {
         likeBtn.classList.toggle("liked", this.post.liked_by_me);
         const likeIcon = likeBtn.querySelector("i");
         if (likeIcon) likeIcon.className = this.post.liked_by_me ? "fa-solid fa-heart" : "fa-regular fa-heart";
       }
-      
+
       if (saveBtn) {
         saveBtn.classList.toggle("saved", this.post.saved_by_me);
         const saveIcon = saveBtn.querySelector("i");
         if (saveIcon) saveIcon.className = this.post.saved_by_me ? "fa-solid fa-bookmark" : "fa-regular fa-bookmark";
       }
     }
-
-    // Auto-play when overlay opens
-    setTimeout(() => {
-      if (overlayVideo && overlayVideo.readyState >= 2 && !originalVideo.paused) {
-        console.log("Auto-playing video in overlay");
-        overlayVideo.play().catch(err => {
-          console.error("Auto-play on overlay open failed:", err);
-          overlay.classList.add("controls-visible");
-        });
-      }
-    }, 500);
   }
 
   closeFullscreenOverlay() {
@@ -1330,25 +1137,19 @@ class PostPage {
     document.body.style.overflow = "";
     this.currentOverlayVideo = null;
     this.isOverlayOpen = false;
+    this._overlayBound = false;
   }
 
   // Scroll to comments section
   scrollToCommentsSection() {
     if (this.commentsSection) {
-      // Highlight effect
       this.commentsSection.classList.add("highlighted");
-      
-      // Scroll to comments
       this.commentsSection.scrollIntoView({ behavior: "smooth" });
-      
-      // Focus on comment input
+
       if (this.commentInput) {
-        setTimeout(() => {
-          this.commentInput.focus();
-        }, 300);
+        setTimeout(() => this.commentInput.focus(), 300);
       }
-      
-      // Remove highlight after animation
+
       setTimeout(() => {
         this.commentsSection.classList.remove("highlighted");
       }, 2000);
@@ -1404,8 +1205,7 @@ class PostPage {
         const displayName = user.display_name || username;
         const time = c.created_at ? this.formatTime(c.created_at) : "";
 
-        const canDelete =
-          this.currentUser && user.id && user.id === this.currentUser.id;
+        const canDelete = this.currentUser && user.id && user.id === this.currentUser.id;
 
         return `
           <article class="comment" data-comment-id="${c.id}">
@@ -1414,23 +1214,15 @@ class PostPage {
                  onerror="this.src='default-profile.PNG'">
             <div class="comment-body">
               <div class="comment-header">
-                <span class="comment-display-name">${this.escape(
-                  displayName
-                )}</span>
-                <span class="comment-username">@${this.escape(
-                  username
-                )}</span>
+                <span class="comment-display-name">${this.escape(displayName)}</span>
+                <span class="comment-username">@${this.escape(username)}</span>
                 <span class="comment-time">${this.escape(time)}</span>
               </div>
-              <div class="comment-text">${this.formatContent(
-                c.content || ""
-              )}</div>
+              <div class="comment-text">${this.formatContent(c.content || "")}</div>
               ${
                 canDelete
                   ? `<div class="comment-actions-row">
-                       <button class="comment-delete-btn" 
-                               type="button"
-                               data-comment-id="${c.id}">
+                       <button class="comment-delete-btn" type="button" data-comment-id="${c.id}">
                          Delete
                        </button>
                      </div>`
@@ -1442,28 +1234,23 @@ class PostPage {
       })
       .join("");
 
-    // avatar / name -> profile
     this.commentsList
       .querySelectorAll(".comment-avatar, .comment-display-name, .comment-username")
       .forEach((el) => {
         el.addEventListener("click", (e) => {
           const article = e.target.closest(".comment");
           if (!article) return;
+
           const commentId = article.dataset.commentId;
           const comment = this.comments.find((c) => c.id === commentId);
           if (!comment || !comment.user) return;
+
           const uname = comment.user.username;
           if (!uname) return;
 
-          const me =
-            typeof getCurrentUser === "function" ? getCurrentUser() : null;
-          if (me && me.username === uname) {
-            window.location.href = "profile.html";
-          } else {
-            window.location.href = `user.html?user=${encodeURIComponent(
-              uname
-            )}`;
-          }
+          const me = typeof getCurrentUser === "function" ? getCurrentUser() : null;
+          if (me && me.username === uname) window.location.href = "profile.html";
+          else window.location.href = `user.html?user=${encodeURIComponent(uname)}`;
         });
       });
   }
@@ -1471,9 +1258,7 @@ class PostPage {
   // ========= COMMENT SUBMIT =========
 
   async handleCommentSubmit(e) {
-    if (e && typeof e.preventDefault === "function") {
-      e.preventDefault();
-    }
+    if (e && typeof e.preventDefault === "function") e.preventDefault();
     if (!this.commentInput || !this.commentSubmitBtn) return;
 
     const token = typeof getAuthToken === "function" ? getAuthToken() : null;
@@ -1506,20 +1291,15 @@ class PostPage {
       );
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to post comment");
-      }
+      if (!res.ok) throw new Error(data.error || "Failed to post comment");
 
-      // add new comment and re-render
       this.comments.push(data);
       this.renderComments();
 
-      // clear input
       this.commentInput.value = "";
       if (this.commentCharCounter)
         this.commentCharCounter.textContent = `0/${this.maxCommentChars}`;
 
-      // bump comment count on header card
       const card = this.postContainer?.querySelector(".post");
       const countEl = card?.querySelector(".comment-count");
       if (countEl) {
@@ -1527,9 +1307,10 @@ class PostPage {
         if (Number.isNaN(current)) current = 0;
         countEl.textContent = String(current + 1);
       }
-      
-      // Update overlay count if visible
-      const overlayCommentBtn = this.videoOverlayContainer.querySelector(".overlay-comment-btn .overlay-count");
+
+      const overlayCommentBtn = this.videoOverlayContainer.querySelector(
+        ".overlay-comment-btn .overlay-count"
+      );
       if (overlayCommentBtn) {
         let overlayCount = parseInt(overlayCommentBtn.textContent || "0", 10);
         overlayCommentBtn.textContent = String(overlayCount + 1);
@@ -1562,9 +1343,7 @@ class PostPage {
         `${POST_API_BASE_URL}/comments/${encodeURIComponent(commentId)}`,
         {
           method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
 
@@ -1573,11 +1352,9 @@ class PostPage {
         throw new Error(data.error || "Failed to delete comment");
       }
 
-      // remove from array
       this.comments = this.comments.filter((c) => c.id !== commentId);
       this.renderComments();
 
-      // update count on header card
       const card = this.postContainer?.querySelector(".post");
       const countEl = card?.querySelector(".comment-count");
       if (countEl) {
@@ -1586,9 +1363,10 @@ class PostPage {
         if (current > 0) current -= 1;
         countEl.textContent = String(current);
       }
-      
-      // Update overlay count if visible
-      const overlayCommentBtn = this.videoOverlayContainer.querySelector(".overlay-comment-btn .overlay-count");
+
+      const overlayCommentBtn = this.videoOverlayContainer.querySelector(
+        ".overlay-comment-btn .overlay-count"
+      );
       if (overlayCommentBtn) {
         let overlayCount = parseInt(overlayCommentBtn.textContent || "0", 10);
         if (overlayCount > 0) overlayCount -= 1;
@@ -1617,10 +1395,8 @@ class PostPage {
     let currentCount = parseInt(countEl?.textContent || "0", 10);
     if (Number.isNaN(currentCount)) currentCount = 0;
 
-    const wasLiked =
-      btn.classList.contains("liked") || post.liked_by_me === true;
+    const wasLiked = btn.classList.contains("liked") || post.liked_by_me === true;
 
-    // optimistic update
     let newCount = currentCount + (wasLiked ? -1 : 1);
     if (newCount < 0) newCount = 0;
 
@@ -1636,9 +1412,7 @@ class PostPage {
         `${POST_API_BASE_URL}/posts/${encodeURIComponent(post.id)}/like`,
         {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
 
@@ -1648,21 +1422,18 @@ class PostPage {
       const serverLikes = typeof data.likes === "number" ? data.likes : null;
       const nowLiked = data.liked === true ? true : !wasLiked;
 
-      if (serverLikes !== null && countEl) {
-        countEl.textContent = String(serverLikes);
-      }
+      if (serverLikes !== null && countEl) countEl.textContent = String(serverLikes);
 
       this.post = {
         ...this.post,
         liked_by_me: nowLiked,
         likes: serverLikes !== null ? serverLikes : newCount,
       };
-      
-      // Update overlay like button if visible
+
       const overlayLikeBtn = this.videoOverlayContainer.querySelector(".overlay-like-btn");
       const overlayLikeCount = overlayLikeBtn?.querySelector(".overlay-count");
       const overlayLikeIcon = overlayLikeBtn?.querySelector("i");
-      
+
       if (overlayLikeBtn && overlayLikeCount && overlayLikeIcon) {
         overlayLikeBtn.classList.toggle("liked", nowLiked);
         overlayLikeIcon.className = nowLiked ? "fa-solid fa-heart" : "fa-regular fa-heart";
@@ -1670,7 +1441,6 @@ class PostPage {
       }
     } catch (err) {
       console.error("handleLike error:", err);
-      // revert UI silently (no popup)
       btn.classList.toggle("liked", wasLiked);
       if (icon) {
         icon.classList.remove(wasLiked ? "fa-regular" : "fa-solid");
@@ -1692,7 +1462,6 @@ class PostPage {
     const icon = btn.querySelector("i");
     const wasSaved = btn.classList.contains("saved") || post.saved_by_me === true;
 
-    // optimistic
     btn.classList.toggle("saved", !wasSaved);
     if (icon) {
       icon.classList.remove(wasSaved ? "fa-solid" : "fa-regular");
@@ -1704,9 +1473,7 @@ class PostPage {
         `${POST_API_BASE_URL}/posts/${encodeURIComponent(post.id)}/save`,
         {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
 
@@ -1714,22 +1481,17 @@ class PostPage {
       if (!res.ok) throw new Error(data.error || "Failed to update save");
 
       const nowSaved = data.saved === true ? true : !wasSaved;
-      this.post = {
-        ...this.post,
-        saved_by_me: nowSaved,
-      };
-      
-      // Update overlay save button if visible
+      this.post = { ...this.post, saved_by_me: nowSaved };
+
       const overlaySaveBtn = this.videoOverlayContainer.querySelector(".overlay-save-btn");
       const overlaySaveIcon = overlaySaveBtn?.querySelector("i");
-      
+
       if (overlaySaveBtn && overlaySaveIcon) {
         overlaySaveBtn.classList.toggle("saved", nowSaved);
         overlaySaveIcon.className = nowSaved ? "fa-solid fa-bookmark" : "fa-regular fa-bookmark";
       }
     } catch (err) {
       console.error("handleSave error:", err);
-      // revert UI silently
       btn.classList.toggle("saved", wasSaved);
       if (icon) {
         icon.classList.remove(wasSaved ? "fa-regular" : "fa-solid");
@@ -1741,17 +1503,10 @@ class PostPage {
   handleSharePostClick(post) {
     if (!post || !post.id) return;
 
-    const url = `${window.location.origin}/post.html?id=${encodeURIComponent(
-      post.id
-    )}`;
+    const url = `${window.location.origin}/post.html?id=${encodeURIComponent(post.id)}`;
 
     if (navigator.share) {
-      navigator
-        .share({
-          title: "Check out this post",
-          url,
-        })
-        .catch(() => {});
+      navigator.share({ title: "Check out this post", url }).catch(() => {});
     } else if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard
         .writeText(url)
