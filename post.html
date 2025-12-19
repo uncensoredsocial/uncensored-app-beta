@@ -349,7 +349,7 @@
     .us-vm-video {
       width: 100%;
       height: 100%;
-      object-fit: cover; /* fills screen, less black space */
+      object-fit: cover;
       background: #000;
       display: block;
     }
@@ -444,7 +444,6 @@
 
     .us-vm-action-btn.liked i,
     .us-vm-action-btn.liked .us-vm-count { color: #f91880; }
-
     .us-vm-action-btn.saved i { color: #1d9bf0; }
 
     /* bottom controls row (play/time/settings) */
@@ -546,7 +545,7 @@
 </head>
 
 <body>
-  <!-- Header with back arrow + "Post" title -->
+  <!-- Header with back arrow -->
   <header class="header">
     <div class="header-left">
       <button class="btn btn-icon" id="backButton" aria-label="Back">
@@ -559,7 +558,6 @@
 
   <div class="content-wrapper">
     <main class="main-content post-main">
-      <!-- Single post -->
       <section id="postWrapper" class="post-wrapper">
         <div id="postLoading" class="loading-indicator">
           <div class="loading-spinner"></div>
@@ -569,7 +567,6 @@
         <div id="postContainer"></div>
       </section>
 
-      <!-- Comments -->
       <section id="commentsSection" class="comments-section">
         <h2 class="comments-title">Comments</h2>
 
@@ -597,11 +594,7 @@
           </div>
           <div class="comment-form-footer">
             <span id="commentCharCounter" class="char-counter">0/280</span>
-            <button
-              id="commentSubmitBtn"
-              type="submit"
-              class="btn btn-primary btn-sm"
-            >
+            <button id="commentSubmitBtn" type="submit" class="btn btn-primary btn-sm">
               Comment
             </button>
           </div>
@@ -622,12 +615,9 @@
     </main>
   </div>
 
-  <!-- ===================================================== -->
-  <!-- ✅ UPDATED VIDEO MODAL (single X, no top comments btn) -->
-  <!-- ===================================================== -->
+  <!-- ================= VIDEO MODAL ================= -->
   <div class="video-modal-overlay" id="videoModal" aria-hidden="true">
     <div class="video-modal-container" id="videoModalContainer" data-state="paused">
-      <!-- Top bar -->
       <div class="us-vm-topbar">
         <button class="us-vm-close" id="closeModalBtn" aria-label="Close video">
           <i class="fa-solid fa-xmark"></i>
@@ -644,7 +634,6 @@
         <button class="us-vm-follow" id="vmFollowBtn" type="button">Follow</button>
       </div>
 
-      <!-- Video -->
       <div class="us-vm-video-wrap">
         <video
           id="modalVideo"
@@ -654,26 +643,26 @@
           preload="metadata"
         ></video>
 
-        </video>
+        <!-- ✅ NEW: backdrop to close settings by tapping outside -->
+        <div class="us-vm-settings-backdrop" id="vmSettingsBackdrop"></div>
 
-<!-- ✅ NEW: backdrop so users can tap outside settings to close -->
-<div class="us-vm-settings-backdrop" id="vmSettingsBackdrop"></div>
+        <button class="us-vm-tap" id="vmTap" aria-label="Toggle video UI"></button>
 
-<!-- tap to show/hide controls (and toggle play/pause) -->
-<button class="us-vm-tap" id="vmTap" aria-label="Toggle video UI"></button>
-
-        <!-- double-tap skip zones -->
         <div class="us-vm-dbl-left" id="vmDblLeft"></div>
         <div class="us-vm-dbl-right" id="vmDblRight"></div>
 
-        <!-- center play/pause icon -->
         <button class="us-vm-center" id="vmCenterBtn" aria-label="Play/Pause">
           <i class="fa-solid fa-play"></i>
         </button>
 
-        <!-- settings panel -->
         <div class="us-vm-settings" id="vmSettings">
-          <h4>Video settings</h4>
+          <!-- ✅ NEW: back arrow header so users know how to close -->
+          <div class="us-vm-settings-header">
+            <button class="us-vm-settings-back" id="vmSettingsBack" type="button" aria-label="Back">
+              <i class="fa-solid fa-arrow-left"></i>
+            </button>
+            <h4>Video settings</h4>
+          </div>
 
           <div class="us-vm-setting-row">
             <span>Speed</span>
@@ -700,9 +689,7 @@
           </button>
         </div>
 
-        <!-- Bottom overlay -->
         <div class="us-vm-bottombar" id="vmBottomBar">
-          <!-- engagement (Like, Comment, Share, Save) -->
           <div class="us-vm-actions">
             <button class="us-vm-action-btn" id="vmLikeBtn" data-action="like" aria-label="Like">
               <i class="fa-regular fa-heart"></i>
@@ -715,7 +702,7 @@
             </button>
 
             <button class="us-vm-action-btn" id="vmShareBtn" data-action="share" aria-label="Share">
-           <i class="fa-solid fa-arrow-up-from-bracket"></i>
+              <i class="fa-solid fa-arrow-up-from-bracket"></i>
             </button>
 
             <button class="us-vm-action-btn" id="vmSaveBtn" data-action="save" aria-label="Save">
@@ -724,7 +711,6 @@
             </button>
           </div>
 
-          <!-- playback controls -->
           <div class="us-vm-controls">
             <button class="us-vm-chip" id="vmPlayBtn" aria-label="Play/Pause">
               <i class="fa-solid fa-play"></i>
