@@ -654,8 +654,13 @@
           preload="metadata"
         ></video>
 
-        <!-- tap to show/hide controls (and toggle play/pause) -->
-        <button class="us-vm-tap" id="vmTap" aria-label="Toggle video UI"></button>
+        </video>
+
+<!-- ✅ NEW: backdrop so users can tap outside settings to close -->
+<div class="us-vm-settings-backdrop" id="vmSettingsBackdrop"></div>
+
+<!-- tap to show/hide controls (and toggle play/pause) -->
+<button class="us-vm-tap" id="vmTap" aria-label="Toggle video UI"></button>
 
         <!-- double-tap skip zones -->
         <div class="us-vm-dbl-left" id="vmDblLeft"></div>
