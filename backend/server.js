@@ -1031,6 +1031,93 @@ app.delete('/api/posts/:id', authMiddleware, async (req, res) => {
 });
 
 // ======================================================
+//                  POST VIDEO DOWNLOAD
+// ======================================================
+
+app.get('/api/posts/:id/download', async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const wantWatermark = String(req.query.watermark || '0') === '1';
+
+    // 1) Lookup the post paths from DB
+    // NOTE: you said you already added SQL — so these columns should exist
+    const { data: post, error: postErr } = await supabase
+      .from('posts')
+      .select('id, video_path, video_watermarked_path, video_mime')
+      .eq('id', postId)
+      .single();
+
+    if (postErr || !post) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    const objectPath =
+      wantWatermark && post.video_watermarked_path
+        ? post.video_watermarked_path
+        : post.video_path;
+
+    if (!objectPath) {
+      return res.status(404).json({ error: 'No video available for download' });
+    }
+
+    // 2) Create a signed URL for the private file in the PRIVATE bucket
+    const { data: signed, error: signErr } = await supabase.storage
+      .from(POST_DOWNLOADS_BUCKET)
+      .createSignedUrl(objectPath, 60);
+
+    if (signErr || !signed?.signedUrl) {
+      console.error('Signed URL error:', signErr);
+      return res.status(500).json({ error: 'Could not create download URL' });
+    }
+
+    const signedUrl = signed.signedUrl;
+
+    // 3) Proxy stream with download headers so it ACTUALLY downloads
+    const range = req.headers.range;
+
+    const upstream = await fetch(signedUrl, {
+      headers: range ? { Range: range } : {},
+    });
+
+    if (!upstream.ok && upstream.status !== 206) {
+      return res.status(502).json({ error: 'Upstream download failed' });
+    }
+
+    const contentType =
+      upstream.headers.get('content-type') ||
+      post.video_mime ||
+      'video/mp4';
+
+    const filename = wantWatermark
+      ? `uncensored-${postId}-watermarked.mp4`
+      : `uncensored-${postId}.mp4`;
+
+    res.setHeader('Content-Type', contentType);
+
+    // ✅ This forces Save-As download instead of inline playback
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    // Forward useful headers (helps iOS + large files)
+    const contentLength = upstream.headers.get('content-length');
+    const contentRange = upstream.headers.get('content-range');
+    const acceptRanges = upstream.headers.get('accept-ranges');
+
+    if (acceptRanges) res.setHeader('Accept-Ranges', acceptRanges);
+    if (contentRange) res.setHeader('Content-Range', contentRange);
+    if (contentLength) res.setHeader('Content-Length', contentLength);
+
+    res.status(upstream.status);
+
+    if (!upstream.body) return res.status(500).end();
+
+    upstream.body.pipe(res);
+  } catch (err) {
+    console.error('download error:', err);
+    res.status(500).json({ error: 'Download failed' });
+  }
+});
+
+// ======================================================
 //            FOLLOWERS / FOLLOWING LIST ENDPOINTS
 // ======================================================
 
