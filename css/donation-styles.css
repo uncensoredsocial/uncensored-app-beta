@@ -1,7 +1,6 @@
 :root {
   --bg: #000000;
   --panel: #0b0b0b;
-  --panel2: #070707;
   --border: #1f1f1f;
   --text: #ffffff;
   --muted: #b0b0b0;
@@ -12,19 +11,16 @@
 }
 
 * { box-sizing: border-box; }
-
 html, body { height: 100%; }
 
 body {
   margin: 0;
-  background: radial-gradient(1200px 800px at 50% -20%, rgba(29,161,242,0.18), rgba(0,0,0,0)),
-              var(--bg);
+  background: var(--bg); /* ✅ no overlay */
   color: var(--text);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
 }
 
 img { display: block; }
-
 .muted { color: var(--muted); }
 
 .section {
@@ -38,7 +34,7 @@ img { display: block; }
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(0,0,0,0.78);
+  background: rgba(0,0,0,0.86);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(255,255,255,0.08);
 }
@@ -65,7 +61,6 @@ img { display: block; }
 }
 
 .brand-text { display: flex; flex-direction: column; line-height: 1.1; }
-
 .brand-name { font-weight: 800; letter-spacing: 0.3px; }
 .brand-tagline { font-size: 0.85rem; color: var(--muted2); margin-top: 2px; }
 
@@ -101,15 +96,16 @@ img { display: block; }
   font-size: 2.2rem;
 }
 
-.hero-card p {
+.hero-sub {
   margin: 0 0 18px 0;
-  max-width: 70ch;
+  max-width: 75ch;
 }
 
 .hero-stats {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  margin-bottom: 14px;
 }
 
 .stat {
@@ -121,11 +117,31 @@ img { display: block; }
   border: 1px solid rgba(255,255,255,0.10);
   background: rgba(0,0,0,0.35);
   color: rgba(255,255,255,0.92);
-  font-weight: 700;
+  font-weight: 800;
   font-size: 0.95rem;
 }
 
 .stat i { color: var(--accent); }
+
+.hero-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.03);
+  font-weight: 800;
+  color: rgba(255,255,255,0.92);
+}
+
+.pill i { color: var(--accent); }
 
 /* Funding */
 .funding-section h2 { margin: 0 0 14px 0; }
@@ -158,8 +174,18 @@ img { display: block; }
   text-align: center;
 }
 
+.tor-icon {
+  margin-top: 2px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+}
+
+.tor-svg { fill: var(--accent); }
+
 .funding-title { font-weight: 800; }
-.funding-sub { margin-top: 3px; }
+.funding-sub { margin-top: 3px; color: rgba(255,255,255,0.72); }
 
 /* Donate card */
 .donate-card {
@@ -287,7 +313,7 @@ img { display: block; }
   font-weight: 800;
 }
 
-/* Wallet section */
+/* Wallet */
 .wallet-section {
   display: none;
   margin-top: 18px;
@@ -344,12 +370,7 @@ img { display: block; }
 }
 
 .crypto-price { margin-top: 10px; }
-
-.qr-panel {
-  margin-top: 12px;
-  display: flex;
-  justify-content: center;
-}
+.qr-panel { margin-top: 12px; display: flex; justify-content: center; }
 
 /* Summary */
 .donation-summary {
@@ -377,10 +398,8 @@ img { display: block; }
 }
 
 .summary-line:last-child { border-bottom: none; }
-
 .summary-label { color: rgba(255,255,255,0.80); font-weight: 800; }
 .summary-value { font-weight: 950; }
-
 .summary-line.total .summary-value { color: var(--accent); }
 
 .conversion-note {
