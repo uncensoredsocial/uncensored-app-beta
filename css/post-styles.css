@@ -3869,3 +3869,15 @@
 .overlay-video::-webkit-media-controls {
   display: none !important;
 }
+
+/* ✅ REMOVE DEBUG BORDERS / OUTLINES */
+.post-page-card .post-media,
+.post-page-card .post-media .us-video-player,
+.post-page-card .post-media .us-video-player .us-video,
+.post-wrapper .post-media,
+.post-wrapper .post-media .us-video-player,
+.post-wrapper .post-media .us-video-player .us-video {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
