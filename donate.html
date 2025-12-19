@@ -12,7 +12,8 @@
     referrerpolicy="no-referrer"
   />
 
-  <link rel="stylesheet" href="css/donation-styles.css" />
+  <!-- ✅ UPDATED CSS FILENAME -->
+  <link rel="stylesheet" href="css/donation-styles.CSS" />
 </head>
 
 <body class="donation-page">
@@ -24,7 +25,7 @@
         <img src="uncensored-logo.PNG" alt="Uncensored Social" class="logo" />
         <div class="brand-text">
           <div class="brand-name">Uncensored Social</div>
-          <div class="brand-tagline">Privacy-first social infrastructure</div>
+          <div class="brand-tagline">A platform built for free speech, privacy, and reach</div>
         </div>
       </div>
 
@@ -39,21 +40,46 @@
   <section class="section hero-section">
     <div class="hero-card">
       <h1>Support the infrastructure</h1>
-      <p class="muted">
-        Donations directly fund privacy, censorship resistance, and the systems that keep the platform online.
+      <p class="muted hero-sub">
+        This is the only platform built to protect your voice — no shadowbans, no silent reach-killing,
+        no censorship games. If you’re tired of being controlled, this is what you support.
       </p>
-      <div class="hero-stats">
+
+      <div class="hero-stats" aria-label="Platform benefits">
         <div class="stat">
           <i class="fa-solid fa-shield-halved"></i>
-          <span>censorship-resistant</span>
+          <span>Censorship Resistance</span>
         </div>
         <div class="stat">
           <i class="fa-solid fa-lock"></i>
-          <span>privacy focused</span>
+          <span>Privacy Focused</span>
         </div>
         <div class="stat">
           <i class="fa-solid fa-server"></i>
-          <span>redundant infrastructure</span>
+          <span>Redundant Infrastructure</span>
+        </div>
+      </div>
+
+      <div class="hero-bottom">
+        <div class="pill">
+          <i class="fa-solid fa-server"></i>
+          <span>Servers that keep the platform online</span>
+        </div>
+        <div class="pill">
+          <i class="fa-solid fa-bullhorn"></i>
+          <span>Marketing to bring in more users</span>
+        </div>
+        <div class="pill">
+          <i class="fa-solid fa-comments"></i>
+          <span>End-to-end encrypted messaging</span>
+        </div>
+        <div class="pill">
+          <i class="fa-solid fa-wrench"></i>
+          <span>Future updates and feature upgrades</span>
+        </div>
+        <div class="pill">
+          <i class="fa-solid fa-mobile-screen"></i>
+          <span>iOS and Android apps</span>
         </div>
       </div>
     </div>
@@ -62,36 +88,60 @@
   <!-- What donations fund -->
   <section class="section funding-section">
     <h2>What donations fund</h2>
+
     <div class="funding-grid">
       <div class="funding-item">
-        <i class="fa-solid fa-route"></i>
+        <!-- Tor onion logo (SVG) tinted with --accent -->
+        <div class="tor-icon" aria-hidden="true">
+          <svg viewBox="0 0 64 64" width="22" height="22" class="tor-svg">
+            <path d="M32 6c-7 7-18 13-18 25 0 12 8 25 18 27 10-2 18-15 18-27C50 19 39 13 32 6z" />
+            <path d="M32 14c-4 5-10 9-10 17 0 9 4 17 10 19 6-2 10-10 10-19 0-8-6-12-10-17z" opacity="0.55"/>
+            <path d="M32 20c-2 3-5 5-5 10 0 6 2 10 5 11 3-1 5-5 5-11 0-5-3-7-5-10z" opacity="0.55"/>
+          </svg>
+        </div>
         <div>
           <div class="funding-title">Tor integration</div>
-          <div class="funding-sub muted">privacy routing and access hardening</div>
+          <div class="funding-sub muted">privacy routing, access hardening, safer usage</div>
         </div>
       </div>
 
       <div class="funding-item">
         <i class="fa-solid fa-comment-dots"></i>
         <div>
-          <div class="funding-title">End-to-end encrypted messaging servers</div>
-          <div class="funding-sub muted">secure communication infrastructure</div>
+          <div class="funding-title">End-to-end encrypted messaging</div>
+          <div class="funding-sub muted">secure communication infrastructure we are building</div>
         </div>
       </div>
 
       <div class="funding-item">
         <i class="fa-solid fa-database"></i>
         <div>
-          <div class="funding-title">Bulletproof servers</div>
-          <div class="funding-sub muted">offshore + redundancy + uptime</div>
+          <div class="funding-title">Servers and uptime</div>
+          <div class="funding-sub muted">bulletproof hosting, redundancy, backups, scaling</div>
+        </div>
+      </div>
+
+      <div class="funding-item">
+        <i class="fa-solid fa-bullhorn"></i>
+        <div>
+          <div class="funding-title">Marketing and growth</div>
+          <div class="funding-sub muted">more users, more creators, stronger network effect</div>
         </div>
       </div>
 
       <div class="funding-item">
         <i class="fa-solid fa-mobile-screen"></i>
         <div>
-          <div class="funding-title">iOS & Android apps</div>
-          <div class="funding-sub muted">native builds + performance + security</div>
+          <div class="funding-title">iOS and Android apps</div>
+          <div class="funding-sub muted">native performance, better UX, better security</div>
+        </div>
+      </div>
+
+      <div class="funding-item">
+        <i class="fa-solid fa-wrench"></i>
+        <div>
+          <div class="funding-title">Future updates</div>
+          <div class="funding-sub muted">new features, improvements, and long-term stability</div>
         </div>
       </div>
     </div>
@@ -168,7 +218,7 @@
             <img src="usdt.PNG" alt="USDT icon" />
             <div class="crypto-meta">
               <div class="crypto-name">USDT</div>
-              <div class="crypto-sub muted">tether</div>
+              <div class="crypto-sub muted">Tether</div>
             </div>
           </button>
 
@@ -176,7 +226,7 @@
             <img src="usdc.PNG" alt="USDC icon" />
             <div class="crypto-meta">
               <div class="crypto-name">USDC</div>
-              <div class="crypto-sub muted">usd coin</div>
+              <div class="crypto-sub muted">USD Coin</div>
             </div>
           </button>
 
