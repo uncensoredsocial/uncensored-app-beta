@@ -643,8 +643,8 @@
           preload="metadata"
         ></video>
 
-        <!-- ✅ NEW: backdrop to close settings by tapping outside -->
-        <div class="us-vm-settings-backdrop" id="vmSettingsBackdrop"></div>
+        <!-- ✅ ADDED: settings backdrop (for JS to show/hide) -->
+        <div class="us-vm-settings-backdrop" id="vmSettingsBackdrop" aria-hidden="true"></div>
 
         <button class="us-vm-tap" id="vmTap" aria-label="Toggle video UI"></button>
 
@@ -656,9 +656,9 @@
         </button>
 
         <div class="us-vm-settings" id="vmSettings">
-          <!-- ✅ NEW: back arrow header so users know how to close -->
+          <!-- ✅ CHANGED: settings header with BACK button (this is what JS will use) -->
           <div class="us-vm-settings-header">
-            <button class="us-vm-settings-back" id="vmSettingsBack" type="button" aria-label="Back">
+            <button class="us-vm-settings-back" id="vmSettingsBackBtn" type="button" aria-label="Back">
               <i class="fa-solid fa-arrow-left"></i>
             </button>
             <h4>Video settings</h4>
