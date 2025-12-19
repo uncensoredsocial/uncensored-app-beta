@@ -7,7 +7,6 @@
   background: rgba(0,0,0,0.92);
   z-index: 9999;
 
-  /* for centering container */
   align-items: center;
   justify-content: center;
 
@@ -113,7 +112,6 @@
   object-fit: contain;
   border-radius: 12px;
   background: #000;
-  display: block; /* ✅ removes baseline gap */
 }
 
 /* Footer */
@@ -229,321 +227,241 @@
 }
 
 /* ===================================================== */
-/* ✅ VIDEO MODAL (NO NATIVE BROWSER CONTROLS)           */
+/* ✅ INLINE CUSTOM PLAYER (POST CARD)                    */
 /* ===================================================== */
 
-.us-video-modal.hidden { display: none !important; }
-
-.us-video-modal {
-  position: fixed;
-  inset: 0;
-  background: #000;
-  z-index: 99999;
-  display: block;
-}
-
-.us-video-modal-inner {
-  width: 100%;
-  height: 100%;
-  position: relative;
-}
-
-/* ✅ Single close button top-left */
-.us-video-modal-close {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  width: 44px;
-  height: 44px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.18);
-  background: rgba(0,0,0,0.55);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  z-index: 30;
-  cursor: pointer;
-}
-
-/* Video stage area */
-.us-video-stage {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #000;
-}
-
-/* ✅ The video itself must NOT receive taps */
-.us-video-modal-video {
-  width: 100vw;
-  height: 100vh;
-  object-fit: contain;
-  background: #000;
-
-  /* critical: Safari UI triggers on direct interaction */
-  pointer-events: none !important;
-  display: block; /* ✅ remove baseline gap */
-}
-
-/* ✅ Hard-hide iOS/Safari native UI if it tries */
-.us-video-modal-video::-webkit-media-controls,
-.us-video-modal-video::-webkit-media-controls-panel,
-.us-video-modal-video::-webkit-media-controls-enclosure,
-.us-video-modal-video::-webkit-media-controls-overlay-play-button,
-.us-video-modal-video::-webkit-media-controls-start-playback-button {
-  display: none !important;
-  -webkit-appearance: none !important;
-  opacity: 0 !important;
-}
-
-/* Tap layer that receives all touches */
-.us-video-tap-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 15;
-}
-
-/* Double tap zones */
-.us-video-double-left,
-.us-video-double-right {
-  position: absolute;
-  top: 0;
-  width: 50%;
-  height: 100%;
-  z-index: 16;
-}
-
-.us-video-double-left { left: 0; }
-.us-video-double-right { right: 0; }
-
-/* Center play (kept, but your JS hides it; CSS makes it safe) */
-.us-video-modal-center {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 72px;
-  height: 72px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.22);
-  background: rgba(0,0,0,0.60);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  z-index: 25;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.us-video-modal[data-state="paused"] .us-video-modal-center {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.us-video-modal-actions {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 10px;
-  z-index: 40;
-
-  display: flex;
-  justify-content: center;
-  gap: 24px;
-
-  padding: 12px 14px;
-  margin: 0 12px;
-
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(0,0,0,0.55);
-  backdrop-filter: blur(14px);
-}
-
-.us-action-btn {
-  border: 0;
-  background: transparent;
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  padding: 8px 10px;
-  border-radius: 999px;
-}
-
-.us-action-btn i { font-size: 18px; }
-.us-action-count { font-size: 13px; opacity: 0.95; }
-
-/* ✅ match feed-style filled icons */
-.us-action-btn.liked,
-.modal-action-btn.liked {
-  color: #ff4757;
-}
-.us-action-btn.saved,
-.modal-action-btn.saved {
-  color: #ffd700;
-}
-
-/* skip feedback */
-.us-skip-feedback {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 82px;
-  height: 82px;
-  border-radius: 999px;
-  background: rgba(0,0,0,0.70);
-  border: 1px solid rgba(255,255,255,0.18);
-  color: #fff;
-  display: none;
-  place-items: center;
-  z-index: 50;
-  font-size: 22px;
-  backdrop-filter: blur(12px);
-}
-
-.us-skip-feedback.show { display: grid; }
-
-.us-skip-feedback.forward { right: 18px; }
-.us-skip-feedback.backward { left: 18px; }
-
-/* ===================================================== */
-/* ✅ NEW: VM TOP BAR + VIDEO LAYOUT (for your Dash modal) */
-/* ===================================================== */
-
-/* ✅ Keep a permanent black header area above the video */
-.vm-topbar {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  background: #000;
-  border-bottom: 1px solid rgba(255,255,255,0.12);
-}
-
-/* ✅ Put video underneath top bar */
-#videoModalContainer {
-  display: flex;
-  flex-direction: column;
-  background: #000;
-}
-
-/* ✅ Video area fills remaining space and NEVER creates bottom black “gap” */
-#videoModalContainer .us-video-stage,
-#videoModalContainer .modal-video-player,
-#videoModalContainer .vm-stage {
-  flex: 1;
-  min-height: 0;
-}
-
-/* ✅ Make sure the modal video behaves properly */
-#modalVideo {
-  flex: 1;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  background: #000;
-  display: block;
-}
-
-/* ✅ Kill baseline/line-height spacing that can create phantom bars */
-#videoModalContainer,
-#videoModalContainer * {
-  line-height: normal;
-}
-
-.modal-video-player {
-  line-height: 0; /* ✅ prevents tiny “bottom bar gap” */
-}
-
-/* ✅ INLINE POST VIDEO: disable iOS native overlay + keep our own controls only */
 .us-video-player {
   position: relative;
-  border-radius: 16px;
+  width: 100%;
+  border-radius: 14px;
   overflow: hidden;
   background: #000;
 }
 
-/* ✅ critical: Safari can't show center overlay if the video itself never gets taps */
-.us-video-player video {
+/* ✅ CRITICAL: make sure iOS can't “grab” the <video> and show native UI */
+.us-video-player .us-video {
   width: 100%;
   height: auto;
   display: block;
   background: #000;
+
   pointer-events: none !important;
+  -webkit-user-select: none;
+  user-select: none;
+
+  /* extra iOS safety */
+  -webkit-touch-callout: none;
 }
 
-/* ✅ hard-hide any Safari control UI if it tries */
-.us-video-player video::-webkit-media-controls,
-.us-video-player video::-webkit-media-controls-panel,
-.us-video-player video::-webkit-media-controls-enclosure,
-.us-video-player video::-webkit-media-controls-overlay-play-button,
-.us-video-player video::-webkit-media-controls-start-playback-button {
+/* ✅ Hard-hide native iOS/Safari controls if they try */
+.us-video-player .us-video::-webkit-media-controls,
+.us-video-player .us-video::-webkit-media-controls-panel,
+.us-video-player .us-video::-webkit-media-controls-enclosure,
+.us-video-player .us-video::-webkit-media-controls-overlay-play-button,
+.us-video-player .us-video::-webkit-media-controls-start-playback-button,
+.us-video-player .us-video::-webkit-media-controls-play-button,
+.us-video-player .us-video::-webkit-media-controls-timeline,
+.us-video-player .us-video::-webkit-media-controls-current-time-display,
+.us-video-player .us-video::-webkit-media-controls-time-remaining-display,
+.us-video-player .us-video::-webkit-media-controls-fullscreen-button {
   display: none !important;
   -webkit-appearance: none !important;
   opacity: 0 !important;
 }
 
-/* Tap layer (captures taps instead of the video) */
-.us-inline-tap {
+/* Double tap zones */
+.us-video-double-tap-left,
+.us-video-double-tap-right {
   position: absolute;
-  inset: 0;
-  z-index: 5;
+  top: 0;
+  width: 50%;
+  height: 100%;
+  z-index: 10;
+}
+.us-video-double-tap-left { left: 0; }
+.us-video-double-tap-right { right: 0; }
+
+/* ✅ NO center play button on inline player */
+.us-video-center-btn {
+  display: none !important;
 }
 
-/* Bottom controls (your ONLY play/pause button) */
-.us-inline-controls {
+/* bottom control bar */
+.us-video-controls {
   position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 10px;
-  z-index: 10;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 10px 10px 8px;
+  background: linear-gradient(to top, rgba(0,0,0,0.70), rgba(0,0,0,0));
+  z-index: 20;
+}
 
+.us-video-controls-row {
   display: flex;
   align-items: center;
   gap: 10px;
-
-  padding: 10px 12px;
-  border-radius: 999px;
-  background: rgba(0,0,0,0.55);
-  border: 1px solid rgba(255,255,255,0.12);
-  backdrop-filter: blur(12px);
 }
 
-.us-inline-btn {
+.us-video-btn {
   border: 0;
-  background: transparent;
+  background: rgba(0,0,0,0.35);
   color: #fff;
-  width: 36px;
   height: 36px;
+  min-width: 36px;
+  padding: 0 12px;
   border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.us-video-time {
+  margin-left: auto;
+  font-size: 13px;
+  color: rgba(255,255,255,0.92);
+  white-space: nowrap;
+}
+
+.us-video-progress {
+  width: 100%;
+  height: 4px;
+  margin-top: 8px;
+  accent-color: var(--primary-color, #1DA1F2);
+}
+
+/* ===================================================== */
+/* ✅ FULLSCREEN VIDEO MODAL (post.html vm-*)             */
+/* ===================================================== */
+
+/* IMPORTANT:
+   Your modal uses overlays for taps.
+   So the video itself must NOT receive taps,
+   or iOS shows the native pause/play UI. */
+#modalVideo.us-vm-video {
+  pointer-events: none !important;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* kill native controls in modal too */
+#modalVideo.us-vm-video::-webkit-media-controls,
+#modalVideo.us-vm-video::-webkit-media-controls-panel,
+#modalVideo.us-vm-video::-webkit-media-controls-enclosure,
+#modalVideo.us-vm-video::-webkit-media-controls-overlay-play-button,
+#modalVideo.us-vm-video::-webkit-media-controls-start-playback-button,
+#modalVideo.us-vm-video::-webkit-media-controls-play-button,
+#modalVideo.us-vm-video::-webkit-media-controls-timeline,
+#modalVideo.us-vm-video::-webkit-media-controls-current-time-display,
+#modalVideo.us-vm-video::-webkit-media-controls-time-remaining-display,
+#modalVideo.us-vm-video::-webkit-media-controls-fullscreen-button {
+  display: none !important;
+  -webkit-appearance: none !important;
+  opacity: 0 !important;
+}
+
+/* ===================================================== */
+/* ✅ SETTINGS UX: centered card + backdrop + back arrow  */
+/* ===================================================== */
+
+/* Backdrop overlay (add element in HTML for best UX) */
+.us-vm-settings-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  z-index: 79;
+  display: none;
+}
+
+.us-vm-settings-backdrop.visible {
+  display: block;
+}
+
+/* Centered settings card (over video, not full width) */
+.us-vm-settings {
+  left: 50% !important;
+  top: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translate(-50%, -50%) !important;
+
+  width: min(92vw, 320px) !important;
+  border-radius: 18px !important;
+
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(10,10,10,0.92);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+
+  padding: 12px;
+  z-index: 80 !important;
+  display: none;
+}
+
+.us-vm-settings.visible {
+  display: block;
+}
+
+/* Header row inside settings (if you add it in HTML) */
+.us-vm-settings-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.us-vm-settings-back {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  color: #fff;
   display: grid;
   place-items: center;
   cursor: pointer;
 }
 
-.us-inline-time {
+.us-vm-settings h4 {
+  margin: 0 0 10px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.us-vm-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 10px 0;
+}
+.us-vm-setting-row span {
   color: rgba(255,255,255,0.85);
   font-size: 13px;
-  min-width: 80px;
-  text-align: center;
 }
-
-.us-inline-progress {
-  flex: 1;
-  appearance: none;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.20);
-  outline: none;
+.us-vm-select {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 13px;
 }
-
-.us-inline-progress::-webkit-slider-thumb {
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 999px;
-  background: #fff;
+.us-vm-download {
+  width: 100%;
+  margin-top: 8px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
 }
