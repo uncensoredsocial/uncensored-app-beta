@@ -37,6 +37,7 @@
         document.getElementById("vmTopBar") ||
         this.modal?.querySelector(".vm-top") ||
         this.modal?.querySelector(".vm-topbar") ||
+        this.modal?.querySelector(".us-vm-topbar") ||
         null;
 
       // Overlays
@@ -67,6 +68,10 @@
       this.speedSel = document.getElementById("vmSpeedSelect");
       this.qualitySel = document.getElementById("vmQualitySelect");
       this.downloadBtn = document.getElementById("vmDownloadBtn");
+
+      // ✅ NEW (from your updated post.html)
+      this.settingsBackdrop = document.getElementById("vmSettingsBackdrop");
+      this.settingsBackBtn = document.getElementById("vmSettingsBackBtn");
 
       // State
       this.post = null;
@@ -119,8 +124,7 @@
       // 2) If UI is visible -> toggle play
       const handleTap = () => {
         this.showUI(true); // always bring it back
-        const isHidden =
-          String(this.bottomBar?.style?.opacity || "1") === "0";
+        const isHidden = String(this.bottomBar?.style?.opacity || "1") === "0";
         if (isHidden) return;
         this.togglePlay();
       };
@@ -144,10 +148,31 @@
         this.showUI(true);
       };
 
+      // ✅ CHANGED: settings open ONLY from gear; close ONLY from back arrow (and optional backdrop tap)
       this.settingsBtn.onclick = () => {
-        this.settings.classList.toggle("visible");
-        this.showUI(5000);
+        this.openSettings();
+        this.showUI(true);
       };
+
+      // ✅ Back arrow closes settings (this is what you wanted)
+      if (this.settingsBackBtn) {
+        this.settingsBackBtn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.closeSettings();
+          this.showUI(true);
+        };
+      }
+
+      // ✅ Optional: tapping outside closes settings (nice UX). Remove if you don't want this.
+      if (this.settingsBackdrop) {
+        this.settingsBackdrop.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.closeSettings();
+          this.showUI(true);
+        };
+      }
 
       this.likeBtn.onclick = () => this.toggleLike();
       this.commentBtn.onclick = () => this.goToComments();
@@ -162,12 +187,12 @@
 
       this.qualitySel.onchange = () => this.changeQuality();
 
+      // ✅ CHANGED: download to device via fetch->blob->a[download]
       this.downloadBtn.onclick = () => this.download();
 
       this.progress.oninput = () => {
         if (!this.video.duration) return;
-        this.video.currentTime =
-          (this.progress.value / 100) * this.video.duration;
+        this.video.currentTime = (this.progress.value / 100) * this.video.duration;
         this.showUI(true);
       };
 
@@ -177,8 +202,7 @@
       this.video.onended = () => this.onPause();
 
       // Double tap skip
-      let lt = 0,
-        rt = 0;
+      let lt = 0, rt = 0;
       this.leftZone.ontouchend = () => {
         const n = Date.now();
         if (n - lt < 300) this.skip(-10);
@@ -191,7 +215,8 @@
       };
 
       document.addEventListener("keydown", (e) => {
-        if (this.isOpen && e.key === "Escape") this.close();
+        if (!this.isOpen) return;
+        if (e.key === "Escape") this.close();
       });
     }
 
@@ -237,6 +262,9 @@
       document.body.style.overflow = "hidden";
       this.isOpen = true;
 
+      // ensure settings is closed on open
+      this.closeSettings(true);
+
       await this.loadPost();
       this.setupQualities();
 
@@ -249,6 +277,8 @@
     close() {
       // Sync state back to the post UI before closing
       this.syncBackToPostUI();
+
+      this.closeSettings(true);
 
       this.video.pause();
       this.video.removeAttribute("src");
@@ -286,23 +316,17 @@
     updatePlayIcon(paused) {
       const cls = paused ? "play" : "pause";
       this.playBtn.querySelector("i").className = `fa-solid fa-${cls}`;
-      // centerBtn intentionally not used
     }
 
     updateMute() {
       this.muteBtn.querySelector("i").className =
-        this.video.muted
-          ? "fa-solid fa-volume-xmark"
-          : "fa-solid fa-volume-high";
+        this.video.muted ? "fa-solid fa-volume-xmark" : "fa-solid fa-volume-high";
     }
 
     updateTime() {
       if (!this.video.duration) return;
-      this.timeEl.textContent = `${fmt(this.video.currentTime)} / ${fmt(
-        this.video.duration
-      )}`;
-      this.progress.value =
-        (this.video.currentTime / this.video.duration) * 100;
+      this.timeEl.textContent = `${fmt(this.video.currentTime)} / ${fmt(this.video.duration)}`;
+      this.progress.value = (this.video.currentTime / this.video.duration) * 100;
     }
 
     // Keep TOP always visible; only auto-hide BOTTOM
@@ -317,16 +341,22 @@
       }
 
       // bottom on
-      this.bottomBar.style.opacity = "1";
-      this.bottomBar.style.pointerEvents = "auto";
+      if (this.bottomBar) {
+        this.bottomBar.style.opacity = "1";
+        this.bottomBar.style.pointerEvents = "auto";
+      }
 
-      if (!force && !this.video.paused) {
+      // DO NOT auto-hide bottom while settings is open
+      const settingsOpen = this.settings?.classList?.contains("visible");
+
+      if (!force && !settingsOpen && !this.video.paused) {
         this.hideTimer = setTimeout(() => {
           // hide bottom only
-          this.bottomBar.style.opacity = "0";
-          this.bottomBar.style.pointerEvents = "none";
-          this.settings.classList.remove("visible");
-          // tap overlay still works to bring it back
+          if (this.bottomBar) {
+            this.bottomBar.style.opacity = "0";
+            this.bottomBar.style.pointerEvents = "none";
+          }
+          // DO NOT close settings here anymore (back button handles it)
         }, 2200);
       }
     }
@@ -338,6 +368,26 @@
         this.video.duration || 9999
       );
       this.showUI();
+    }
+
+    /* ---------------- settings helpers ---------------- */
+
+    openSettings() {
+      if (!this.settings) return;
+      this.settings.classList.add("visible");
+      if (this.settingsBackdrop) {
+        this.settingsBackdrop.style.display = "block";
+        this.settingsBackdrop.style.pointerEvents = "auto";
+      }
+    }
+
+    closeSettings(silent = false) {
+      if (this.settings) this.settings.classList.remove("visible");
+      if (this.settingsBackdrop) {
+        this.settingsBackdrop.style.display = "none";
+        this.settingsBackdrop.style.pointerEvents = "none";
+      }
+      if (!silent) this.showUI(true);
     }
 
     /* ---------------- data ---------------- */
@@ -364,15 +414,12 @@
         this.followBtn.style.display = "none";
       } else {
         this.followBtn.style.display = "";
-        this.followBtn.textContent = this.post.following_user
-          ? "Following"
-          : "Follow";
+        this.followBtn.textContent = this.post.following_user ? "Following" : "Follow";
         this.followBtn.classList.toggle("following", !!this.post.following_user);
       }
 
       const likes = this.post.likes ?? this.post.likes_count ?? 0;
-      const comments =
-        this.post.comments_count ?? this.post.comment_count ?? 0;
+      const comments = this.post.comments_count ?? this.post.comment_count ?? 0;
       const saves = this.post.saves ?? this.post.saves_count ?? 0;
 
       this.likeCount.textContent = likes;
@@ -399,7 +446,6 @@
 
       const liked = !this.post.liked_by_me;
 
-      // Optimistic like count
       const current = Number(this.post.likes ?? this.post.likes_count ?? 0) || 0;
       const next = Math.max(current + (liked ? 1 : -1), 0);
 
@@ -419,7 +465,6 @@
 
       const saved = !this.post.saved_by_me;
 
-      // If you track save counts, keep it in sync too
       const current = Number(this.post.saves ?? this.post.saves_count ?? 0) || 0;
       const next = Math.max(current + (saved ? 1 : -1), 0);
 
@@ -445,17 +490,13 @@
     }
 
     share() {
-      navigator.share
-        ? navigator.share({ url: location.href })
-        : navigator.clipboard.writeText(location.href);
+      navigator.share ? navigator.share({ url: location.href }) : navigator.clipboard.writeText(location.href);
     }
 
     goToComments() {
       this.close();
       setTimeout(() => {
-        document
-          .getElementById("commentsSection")
-          ?.scrollIntoView({ behavior: "smooth" });
+        document.getElementById("commentsSection")?.scrollIntoView({ behavior: "smooth" });
       }, 200);
     }
 
@@ -482,11 +523,47 @@
       };
     }
 
-    download() {
-      window.open(
-        `${API_BASE}/posts/${this.postId}/download?watermark=1`,
-        "_blank"
-      );
+    /* ---------------- download (device) ---------------- */
+
+    async download() {
+      try {
+        // (optional) require login for downloads:
+        // if (!getToken()) return alert("Log in to download");
+
+        // Ask backend for a download response that includes proper headers:
+        // Content-Type: video/mp4
+        // Content-Disposition: attachment; filename="....mp4"
+        const url = `${API_BASE}/posts/${this.postId}/download?watermark=1`;
+
+        const headers = {};
+        const token = getToken();
+        if (token) headers.Authorization = `Bearer ${token}`;
+
+        const res = await fetch(url, { headers });
+        if (!res.ok) throw new Error("Download failed");
+
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+
+        // filename fallback
+        const cd = res.headers.get("content-disposition") || "";
+        const match = cd.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
+        const safeName = (match?.[1] || `uncensored-video-${this.postId}.mp4`)
+          .replace(/['"]/g, "")
+          .trim();
+
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = safeName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      } catch (e) {
+        // Fallback (some iOS Safari cases)
+        window.open(`${API_BASE}/posts/${this.postId}/download?watermark=1`, "_blank");
+      }
     }
 
     /* ---------------- sync back to post UI ---------------- */
@@ -494,7 +571,6 @@
     syncBackToPostUI() {
       if (!this.postId || !this.post) return;
 
-      // Find the post element on the page (post.html or feed-like layout)
       const postEl =
         document.querySelector(`[data-post-id="${this.postId}"]`) ||
         this.origVideo?.closest(`[data-post-id]`) ||
@@ -505,13 +581,11 @@
       const likes = Number(this.post.likes ?? this.post.likes_count ?? 0) || 0;
 
       if (postEl) {
-        // Like button sync
         const likeBtn = postEl.querySelector(".like-btn");
         if (likeBtn) {
           likeBtn.classList.toggle("liked", liked);
           const icon = likeBtn.querySelector("i");
           if (icon) {
-            // match feed.js
             if (liked) {
               icon.classList.remove("fa-regular");
               icon.classList.add("fa-solid");
@@ -524,7 +598,6 @@
           if (countEl) countEl.textContent = String(likes);
         }
 
-        // Save button sync
         const saveBtn = postEl.querySelector(".save-btn");
         if (saveBtn) {
           saveBtn.classList.toggle("saved", saved);
@@ -541,7 +614,6 @@
         }
       }
 
-      // Optional: fire an event for any other page code to react
       window.dispatchEvent(
         new CustomEvent("post:updated", {
           detail: {
