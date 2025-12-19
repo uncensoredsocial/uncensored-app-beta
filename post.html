@@ -10,10 +10,10 @@
   <link rel="stylesheet" href="css/feed-styles.css" />
   <link rel="stylesheet" href="css/icons.css" />
 
-  <!-- POST SPECIFIC STYLES -->
+  <!-- Post styles -->
   <link rel="stylesheet" href="css/post-styles.css" />
 
-  <!-- VIDEO MODAL STYLES -->
+  <!-- Video modal styles -->
   <link rel="stylesheet" href="css/video-styles.css" />
 
   <!-- Font Awesome -->
@@ -25,7 +25,6 @@
     referrerpolicy="no-referrer"
   />
 
-  <!-- Page-specific layout tweaks + bottom nav same as home -->
   <style>
     @media (min-width: 900px) {
       .content-wrapper {
@@ -39,14 +38,12 @@
       }
     }
 
-    /* Force bottom nav visible on desktop, like home */
     @media (min-width: 768px) {
       .bottom-nav {
         display: flex !important;
       }
     }
 
-    /* Font Awesome icons above labels in bottom nav */
     .bottom-nav .nav-item {
       display: flex;
       flex-direction: column;
@@ -60,7 +57,6 @@
       line-height: 1;
     }
 
-    /* Post page specific */
     .post-wrapper {
       padding: var(--space-4);
       border-bottom: 1px solid var(--border-light);
@@ -74,7 +70,6 @@
       padding: var(--space-4);
     }
 
-    /* Comments section */
     .comments-section {
       padding: var(--space-4);
     }
@@ -205,48 +200,6 @@
       font-size: var(--font-size-sm);
     }
 
-    /* Video container styles for posts */
-    .post-video-container {
-      position: relative;
-      margin: 20px 0;
-      border-radius: 15px;
-      overflow: hidden;
-      background-color: #000;
-      border: 1px solid var(--border-light);
-    }
-
-    .post-video-container video {
-      width: 100%;
-      height: auto;
-      display: block;
-      border-radius: 15px;
-      cursor: pointer;
-    }
-
-    .video-fullscreen-btn {
-      position: absolute;
-      bottom: 15px;
-      right: 15px;
-      background-color: rgba(0, 0, 0, 0.7);
-      color: white;
-      border: none;
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      z-index: 10;
-    }
-
-    .video-fullscreen-btn:hover {
-      background-color: #1a73e8;
-      transform: scale(1.1);
-    }
-
-    /* Guest message styling */
     .guest-message {
       background-color: var(--bg-secondary);
       border-radius: var(--radius-lg);
@@ -264,6 +217,330 @@
     .guest-content p {
       color: var(--text-muted);
       margin-bottom: var(--space-3);
+    }
+
+    /* ===================================================== */
+    /* ✅ HARD OVERRIDES to kill green/blue borders anywhere  */
+    /* ===================================================== */
+    .post-wrapper .post-media,
+    .post-wrapper .post-media * ,
+    .us-video-player,
+    .us-video,
+    .video-modal-overlay,
+    .video-modal-container,
+    .video-modal-container * {
+      border-color: transparent !important;
+      outline: none !important;
+      box-shadow: none !important;
+    }
+
+    /* ===================================================== */
+    /* ✅ VIDEO MODAL LAYOUT (so video shows MORE)            */
+    /* ===================================================== */
+    .video-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.92);
+      z-index: 9999;
+      display: none;
+    }
+    .video-modal-overlay.active { display: block; }
+
+    .video-modal-container {
+      width: 100%;
+      height: 100%;
+      background: #000;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* top bar */
+    .us-vm-topbar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 14px;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.75), rgba(0,0,0,0));
+      pointer-events: none;
+    }
+    .us-vm-topbar .us-vm-close,
+    .us-vm-topbar .us-vm-follow {
+      pointer-events: auto;
+    }
+
+    .us-vm-close {
+      width: 44px;
+      height: 44px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+    }
+    .us-vm-close i { font-size: 18px; }
+
+    .us-vm-user {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      flex: 1;
+      pointer-events: auto;
+    }
+    .us-vm-avatar {
+      width: 42px; height: 42px;
+      border-radius: 999px;
+      object-fit: cover;
+      border: 1px solid rgba(255,255,255,0.18);
+      flex-shrink: 0;
+    }
+    .us-vm-user-meta { min-width: 0; }
+    .us-vm-name {
+      font-weight: 700;
+      color: #fff;
+      font-size: 15px;
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .us-vm-handle {
+      color: rgba(255,255,255,0.7);
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .us-vm-follow {
+      height: 38px;
+      padding: 0 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.20);
+      background: rgba(255,255,255,0.92);
+      color: #000;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .us-vm-follow.following {
+      background: rgba(0,0,0,0.25);
+      color: #fff;
+      border-color: rgba(255,255,255,0.28);
+      backdrop-filter: blur(10px);
+    }
+
+    /* video area */
+    .us-vm-video-wrap {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+    }
+
+    .us-vm-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover; /* fills screen, less black space */
+      background: #000;
+      display: block;
+    }
+
+    /* tap layers */
+    .us-vm-tap {
+      position: absolute;
+      inset: 0;
+      z-index: 20;
+      background: transparent;
+      border: 0;
+      padding: 0;
+      margin: 0;
+    }
+    .us-vm-dbl-left,
+    .us-vm-dbl-right {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      width: 50%;
+      z-index: 25;
+    }
+    .us-vm-dbl-left { left: 0; }
+    .us-vm-dbl-right { right: 0; }
+
+    /* center play */
+    .us-vm-center {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 76px;
+      height: 76px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.22);
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      z-index: 40;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 140ms ease, transform 140ms ease;
+      backdrop-filter: blur(10px);
+    }
+    .video-modal-container[data-state="paused"] .us-vm-center {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .us-vm-center i { font-size: 22px; }
+
+    /* bottom bar (actions + progress) */
+    .us-vm-bottombar {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      z-index: 60;
+      padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+      background: linear-gradient(to top, rgba(0,0,0,0.82), rgba(0,0,0,0));
+      opacity: 1;
+      transition: opacity 180ms ease;
+      pointer-events: auto;
+    }
+
+    .us-vm-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 22px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.40);
+      border: 1px solid rgba(255,255,255,0.10);
+      backdrop-filter: blur(12px);
+      width: fit-content;
+      margin: 0 auto 10px;
+    }
+
+    .us-vm-action-btn {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      padding: 8px 10px;
+      border-radius: 999px;
+    }
+    .us-vm-action-btn i { font-size: 20px; }
+    .us-vm-count { font-weight: 700; font-size: 14px; opacity: 0.95; }
+
+    .us-vm-action-btn.liked i,
+    .us-vm-action-btn.liked .us-vm-count { color: #f91880; }
+
+    .us-vm-action-btn.saved i { color: #1d9bf0; }
+
+    /* bottom controls row (play/time/settings) */
+    .us-vm-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 2px 10px;
+    }
+    .us-vm-chip {
+      height: 40px;
+      min-width: 40px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(0,0,0,0.42);
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+    }
+    .us-vm-chip i { font-size: 16px; }
+
+    .us-vm-time {
+      margin-left: auto;
+      font-size: 13px;
+      color: rgba(255,255,255,0.9);
+      white-space: nowrap;
+      padding: 0 8px;
+    }
+
+    .us-vm-progress {
+      width: 100%;
+      height: 4px;
+      accent-color: var(--primary-color, #1DA1F2);
+      cursor: pointer;
+    }
+
+    /* settings panel */
+    .us-vm-settings {
+      position: absolute;
+      right: 14px;
+      bottom: 92px;
+      width: 240px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(10,10,10,0.92);
+      backdrop-filter: blur(18px);
+      padding: 12px;
+      z-index: 80;
+      display: none;
+    }
+    .us-vm-settings.visible { display: block; }
+
+    .us-vm-settings h4 {
+      margin: 0 0 10px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 800;
+    }
+    .us-vm-setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 10px 0;
+    }
+    .us-vm-setting-row span {
+      color: rgba(255,255,255,0.85);
+      font-size: 13px;
+    }
+    .us-vm-select {
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-size: 13px;
+    }
+    .us-vm-download {
+      width: 100%;
+      margin-top: 8px;
+      height: 40px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      cursor: pointer;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
     }
   </style>
 </head>
@@ -345,63 +622,127 @@
     </main>
   </div>
 
-  <!-- ✅ NEW VIDEO MODAL (Hidden by default) -->
-  <div id="videoModal" class="us-video-modal hidden" aria-hidden="true">
-    <div class="us-video-modal-inner">
-      <!-- Top-left ONLY close button -->
-      <button id="videoModalClose" class="us-video-modal-close" aria-label="Close video">
-        <i class="fa-solid fa-xmark"></i>
-      </button>
+  <!-- ===================================================== -->
+  <!-- ✅ UPDATED VIDEO MODAL (single X, no top comments btn) -->
+  <!-- ===================================================== -->
+  <div class="video-modal-overlay" id="videoModal" aria-hidden="true">
+    <div class="video-modal-container" id="videoModalContainer" data-state="paused">
+      <!-- Top bar -->
+      <div class="us-vm-topbar">
+        <button class="us-vm-close" id="closeModalBtn" aria-label="Close video">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
 
-      <!-- Video stage -->
-      <div class="us-video-stage">
+        <div class="us-vm-user" id="vmUserBlock">
+          <img class="us-vm-avatar" id="vmAvatar" src="default-profile.PNG" alt="User" />
+          <div class="us-vm-user-meta">
+            <div class="us-vm-name" id="vmName">Loading...</div>
+            <div class="us-vm-handle" id="vmHandle">@...</div>
+          </div>
+        </div>
+
+        <button class="us-vm-follow" id="vmFollowBtn" type="button">Follow</button>
+      </div>
+
+      <!-- Video -->
+      <div class="us-vm-video-wrap">
         <video
-          id="videoModalVideo"
-          class="us-video-modal-video"
+          id="modalVideo"
+          class="us-vm-video"
           playsinline
           webkit-playsinline
           preload="metadata"
         ></video>
 
-        <!-- Tap layer + double-tap halves -->
-        <div class="us-video-tap-layer" id="videoTapLayer" aria-hidden="true"></div>
-        <div class="us-video-double-left" id="videoDoubleLeft" aria-hidden="true"></div>
-        <div class="us-video-double-right" id="videoDoubleRight" aria-hidden="true"></div>
+        <!-- tap to show/hide controls (and toggle play/pause) -->
+        <button class="us-vm-tap" id="vmTap" aria-label="Toggle video UI"></button>
 
-        <!-- Center play/pause button -->
-        <button id="videoCenterBtn" class="us-video-modal-center" aria-label="Play/Pause">
+        <!-- double-tap skip zones -->
+        <div class="us-vm-dbl-left" id="vmDblLeft"></div>
+        <div class="us-vm-dbl-right" id="vmDblRight"></div>
+
+        <!-- center play/pause icon -->
+        <button class="us-vm-center" id="vmCenterBtn" aria-label="Play/Pause">
           <i class="fa-solid fa-play"></i>
         </button>
 
-        <!-- Skip feedback -->
-        <div id="skipFeedback" class="us-skip-feedback" aria-hidden="true"></div>
-      </div>
+        <!-- settings panel -->
+        <div class="us-vm-settings" id="vmSettings">
+          <h4>Video settings</h4>
 
-      <!-- Bottom actions row (ONLY comments button lives here) -->
-      <div class="us-video-modal-actions">
-        <button class="us-action-btn" id="vmLikeBtn" aria-label="Like">
-          <i class="fa-regular fa-heart"></i>
-          <span class="us-action-count" id="vmLikeCount">0</span>
-        </button>
+          <div class="us-vm-setting-row">
+            <span>Speed</span>
+            <select class="us-vm-select" id="vmSpeedSelect">
+              <option value="0.5">0.5x</option>
+              <option value="0.75">0.75x</option>
+              <option value="1" selected>1x</option>
+              <option value="1.25">1.25x</option>
+              <option value="1.5">1.5x</option>
+              <option value="2">2x</option>
+            </select>
+          </div>
 
-        <button class="us-action-btn" id="vmCommentBtn" aria-label="Comments">
-          <i class="fa-regular fa-comment"></i>
-          <span class="us-action-count" id="vmCommentCount">0</span>
-        </button>
+          <div class="us-vm-setting-row">
+            <span>Quality</span>
+            <select class="us-vm-select" id="vmQualitySelect">
+              <option value="auto" selected>Auto</option>
+            </select>
+          </div>
 
-        <button class="us-action-btn" id="vmSaveBtn" aria-label="Save">
-          <i class="fa-regular fa-bookmark"></i>
-          <span class="us-action-count" id="vmSaveCount">0</span>
-        </button>
+          <button class="us-vm-download" id="vmDownloadBtn" type="button">
+            <i class="fa-solid fa-download"></i>
+            Download (watermarked)
+          </button>
+        </div>
 
-        <button class="us-action-btn" id="vmShareBtn" aria-label="Share">
-          <i class="fa-solid fa-arrow-up-from-bracket"></i>
-        </button>
+        <!-- Bottom overlay -->
+        <div class="us-vm-bottombar" id="vmBottomBar">
+          <!-- engagement (Like, Comment, Share, Save) -->
+          <div class="us-vm-actions">
+            <button class="us-vm-action-btn" id="vmLikeBtn" data-action="like" aria-label="Like">
+              <i class="fa-regular fa-heart"></i>
+              <span class="us-vm-count" id="vmLikeCount">0</span>
+            </button>
+
+            <button class="us-vm-action-btn" id="vmCommentBtn" data-action="comment" aria-label="Comments">
+              <i class="fa-regular fa-comment"></i>
+              <span class="us-vm-count" id="vmCommentCount">0</span>
+            </button>
+
+            <button class="us-vm-action-btn" id="vmShareBtn" data-action="share" aria-label="Share">
+              <i class="fa-solid fa-share"></i>
+            </button>
+
+            <button class="us-vm-action-btn" id="vmSaveBtn" data-action="save" aria-label="Save">
+              <i class="fa-regular fa-bookmark"></i>
+              <span class="us-vm-count" id="vmSaveCount">0</span>
+            </button>
+          </div>
+
+          <!-- playback controls -->
+          <div class="us-vm-controls">
+            <button class="us-vm-chip" id="vmPlayBtn" aria-label="Play/Pause">
+              <i class="fa-solid fa-play"></i>
+            </button>
+
+            <button class="us-vm-chip" id="vmMuteBtn" aria-label="Mute/Unmute">
+              <i class="fa-solid fa-volume-xmark"></i>
+            </button>
+
+            <button class="us-vm-chip" id="vmSettingsBtn" aria-label="Settings">
+              <i class="fa-solid fa-gear"></i>
+            </button>
+
+            <div class="us-vm-time" id="vmTime">0:00 / 0:00</div>
+          </div>
+
+          <input id="vmProgress" class="us-vm-progress" type="range" min="0" max="100" value="0" />
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Bottom nav: SAME layout as other pages -->
+  <!-- Bottom nav -->
   <nav class="bottom-nav" id="bottomNav">
     <a href="index.html" class="nav-item">
       <i class="fa-solid fa-house nav-icon"></i>
@@ -426,7 +767,6 @@
   <script src="js/auth.js"></script>
   <script src="js/app.js"></script>
   <script src="js/post.js"></script>
-  <!-- VIDEO MODAL SCRIPT -->
   <script src="js/video-modal.js"></script>
 </body>
 </html>
