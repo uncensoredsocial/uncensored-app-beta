@@ -29,6 +29,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 // Buckets
 const USER_MEDIA_BUCKET = 'user-media';
 const POST_MEDIA_BUCKET = 'post-media';
+const POST_DOWNLOADS_BUCKET = 'post-downloads'; // ✅ NEW private bucket for downloads
 
 // Admin emails (hard-coded plus optional env override)
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'ssssss@gmail.com')
