@@ -32,6 +32,13 @@
       this.handle = document.getElementById("vmHandle");
       this.followBtn = document.getElementById("vmFollowBtn");
 
+      // Try to find a "top bar" wrapper so we can keep it visible always
+      this.topBar =
+        document.getElementById("vmTopBar") ||
+        (this.closeBtn ? this.closeBtn.closest(".vm-topbar") : null) ||
+        (this.avatar ? this.avatar.closest(".vm-topbar") : null) ||
+        (this.modal ? this.modal.querySelector(".vm-topbar") : null);
+
       // Overlays
       this.tap = document.getElementById("vmTap");
       this.centerBtn = document.getElementById("vmCenterBtn");
@@ -73,6 +80,13 @@
       this.video.disablePictureInPicture = true;
       this.video.playsInline = true;
 
+      // ✅ make sure it behaves like a contained player (no weird stretching)
+      this.video.style.objectFit = "contain";
+      this.video.style.background = "#000";
+
+      // ✅ kill center button completely (we still keep it in DOM safely)
+      if (this.centerBtn) this.centerBtn.style.display = "none";
+
       this.bind();
       this.bindFullscreenButtons();
     }
@@ -82,19 +96,45 @@
     bind() {
       this.closeBtn.onclick = () => this.close();
 
-      this.tap.onclick = () => this.togglePlay();
-      this.centerBtn.onclick = () => this.togglePlay();
-      this.playBtn.onclick = () => this.togglePlay();
+      // ✅ IMPORTANT:
+      // - Tapping should ALWAYS bring UI back
+      // - AND still toggle play/pause like before
+      if (this.tap) {
+        this.tap.onclick = () => {
+          this.showUI(true);
+          this.togglePlay();
+        };
+        // On touchstart/mousedown, show UI instantly even if click doesn’t fire right away
+        this.tap.addEventListener(
+          "touchstart",
+          () => this.showUI(true),
+          { passive: true }
+        );
+        this.tap.addEventListener("mousedown", () => this.showUI(true));
+      }
+
+      // Center button disabled visually; keep handler harmless
+      if (this.centerBtn) {
+        this.centerBtn.onclick = () => {
+          this.showUI(true);
+          this.togglePlay();
+        };
+      }
+
+      this.playBtn.onclick = () => {
+        this.showUI(true);
+        this.togglePlay();
+      };
 
       this.muteBtn.onclick = () => {
         this.video.muted = !this.video.muted;
         this.updateMute();
-        this.showUI();
+        this.showUI(true);
       };
 
       this.settingsBtn.onclick = () => {
         this.settings.classList.toggle("visible");
-        this.showUI(5000);
+        this.showUI(true);
       };
 
       this.likeBtn.onclick = () => this.toggleLike();
@@ -116,6 +156,7 @@
         if (!this.video.duration) return;
         this.video.currentTime =
           (this.progress.value / 100) * this.video.duration;
+        this.showUI(true);
       };
 
       this.video.onplay = () => this.onPlay();
@@ -123,8 +164,14 @@
       this.video.ontimeupdate = () => this.updateTime();
       this.video.onended = () => this.onPause();
 
+      // ✅ ASPECT RATIO SYNC (removes weird blank space / wrong sizing)
+      this.video.onloadedmetadata = () => {
+        this.syncAspectRatio();
+      };
+
       // Double tap skip
-      let lt = 0, rt = 0;
+      let lt = 0,
+        rt = 0;
       this.leftZone.ontouchend = () => {
         const n = Date.now();
         if (n - lt < 300) this.skip(-10);
@@ -135,6 +182,17 @@
         if (n - rt < 300) this.skip(10);
         rt = n;
       };
+
+      // ✅ If user touches anywhere in modal, bring UI back
+      if (this.container) {
+        this.container.addEventListener(
+          "touchstart",
+          () => this.showUI(true),
+          { passive: true }
+        );
+        this.container.addEventListener("mousemove", () => this.showUI(false));
+        this.container.addEventListener("mousedown", () => this.showUI(true));
+      }
 
       document.addEventListener("keydown", (e) => {
         if (this.isOpen && e.key === "Escape") this.close();
@@ -168,10 +226,20 @@
       this.postId = postId;
 
       const src =
-        videoEl.currentSrc || videoEl.src || videoEl.querySelector("source")?.src;
+        videoEl.currentSrc ||
+        videoEl.src ||
+        videoEl.querySelector("source")?.src;
       if (!src) return;
 
       videoEl.pause();
+
+      // reset UI
+      if (this.settings) this.settings.classList.remove("visible");
+      if (this.bottomBar) this.bottomBar.style.opacity = "1";
+      if (this.topBar) {
+        this.topBar.style.opacity = "1";
+        this.topBar.style.pointerEvents = "auto";
+      }
 
       this.video.src = src;
       this.video.currentTime = videoEl.currentTime || 0;
@@ -185,6 +253,7 @@
       this.setupQualities();
 
       this.video.play().catch(() => {});
+      this.showUI(true);
     }
 
     close() {
@@ -207,7 +276,7 @@
     onPlay() {
       this.container.dataset.state = "playing";
       this.updatePlayIcon(false);
-      this.showUI();
+      this.showUI(false);
     }
 
     onPause() {
@@ -220,17 +289,23 @@
       this.video.paused ? this.video.play() : this.video.pause();
     }
 
+    // ✅ Like feed.js: solid icon when active
     updatePlayIcon(paused) {
       const cls = paused ? "play" : "pause";
-      this.playBtn.querySelector("i").className = `fa-solid fa-${cls}`;
-      this.centerBtn.querySelector("i").className = `fa-solid fa-${cls}`;
+      const icon = this.playBtn?.querySelector("i");
+      if (icon) icon.className = `fa-solid fa-${cls}`;
+
+      // center button intentionally hidden, but keep safe if it exists
+      const c = this.centerBtn?.querySelector("i");
+      if (c) c.className = `fa-solid fa-${cls}`;
     }
 
     updateMute() {
-      this.muteBtn.querySelector("i").className =
-        this.video.muted
-          ? "fa-solid fa-volume-xmark"
-          : "fa-solid fa-volume-high";
+      const icon = this.muteBtn?.querySelector("i");
+      if (!icon) return;
+      icon.className = this.video.muted
+        ? "fa-solid fa-volume-xmark"
+        : "fa-solid fa-volume-high";
     }
 
     updateTime() {
@@ -242,13 +317,23 @@
         (this.video.currentTime / this.video.duration) * 100;
     }
 
+    // ✅ Keep TOP bar always visible, only fade bottom bar
     showUI(force = false) {
       clearTimeout(this.hideTimer);
-      this.bottomBar.style.opacity = "1";
+
+      // TOP ALWAYS VISIBLE
+      if (this.topBar) {
+        this.topBar.style.opacity = "1";
+        this.topBar.style.pointerEvents = "auto";
+      }
+
+      // BOTTOM BAR
+      if (this.bottomBar) this.bottomBar.style.opacity = "1";
+
       if (!force && !this.video.paused) {
         this.hideTimer = setTimeout(() => {
-          this.bottomBar.style.opacity = "0";
-          this.settings.classList.remove("visible");
+          if (this.bottomBar) this.bottomBar.style.opacity = "0";
+          if (this.settings) this.settings.classList.remove("visible");
         }, 2200);
       }
     }
@@ -259,7 +344,19 @@
         0,
         this.video.duration || 9999
       );
-      this.showUI();
+      this.showUI(true);
+    }
+
+    // ✅ NEW: aspect ratio sync (loadedmetadata)
+    syncAspectRatio() {
+      const w = this.video.videoWidth || 16;
+      const h = this.video.videoHeight || 9;
+
+      // This helps the modal layout understand the video's true shape
+      // (and reduces "random black space" behavior on some devices)
+      if (this.container) {
+        this.container.style.setProperty("--vm-video-ar", `${w} / ${h}`);
+      }
     }
 
     /* ---------------- data ---------------- */
@@ -292,24 +389,54 @@
         this.followBtn.classList.toggle("following", !!this.post.following_user);
       }
 
-      this.likeCount.textContent = this.post.likes ?? this.post.likes_count ?? 0;
-      this.commentCount.textContent =
-        this.post.comments_count ?? this.post.comment_count ?? 0;
-      this.saveCount.textContent =
-        this.post.saves ?? this.post.saves_count ?? 0;
+      const likes = this.post.likes ?? this.post.likes_count ?? 0;
+      const comments = this.post.comments_count ?? this.post.comment_count ?? 0;
+      const saves = this.post.saves ?? this.post.saves_count ?? 0;
 
+      this.likeCount.textContent = likes;
+      this.commentCount.textContent = comments;
+      this.saveCount.textContent = saves;
+
+      // ✅ Sync active states
       this.likeBtn.classList.toggle("liked", !!this.post.liked_by_me);
       this.saveBtn.classList.toggle("saved", !!this.post.saved_by_me);
+
+      // ✅ Make icons solid/regular like feed.js
+      this.syncActionIcons();
+    }
+
+    syncActionIcons() {
+      const likeIcon = this.likeBtn?.querySelector("i");
+      const saveIcon = this.saveBtn?.querySelector("i");
+
+      const liked = !!this.post?.liked_by_me;
+      const saved = !!this.post?.saved_by_me;
+
+      if (likeIcon) {
+        likeIcon.classList.remove("fa-solid", "fa-regular", "fa-heart");
+        likeIcon.classList.add(liked ? "fa-solid" : "fa-regular", "fa-heart");
+      }
+      if (saveIcon) {
+        saveIcon.classList.remove("fa-solid", "fa-regular", "fa-bookmark");
+        saveIcon.classList.add(saved ? "fa-solid" : "fa-regular", "fa-bookmark");
+      }
     }
 
     /* ---------------- actions ---------------- */
 
     async toggleLike() {
       if (!getToken()) return alert("Log in to like");
+
       const liked = !this.post.liked_by_me;
       this.post.liked_by_me = liked;
-      this.post.likes = (this.post.likes || 0) + (liked ? 1 : -1);
+
+      // optimistic count
+      const cur = typeof this.post.likes === "number" ? this.post.likes : 0;
+      this.post.likes = cur + (liked ? 1 : -1);
+
       this.renderPost();
+      this.showUI(true);
+
       await fetch(`${API_BASE}/posts/${this.postId}/like`, {
         method: "POST",
         headers: { Authorization: `Bearer ${getToken()}` },
@@ -318,10 +445,17 @@
 
     async toggleSave() {
       if (!getToken()) return alert("Log in to save");
+
       const saved = !this.post.saved_by_me;
       this.post.saved_by_me = saved;
-      this.post.saves = (this.post.saves || 0) + (saved ? 1 : -1);
+
+      // optimistic count
+      const cur = typeof this.post.saves === "number" ? this.post.saves : 0;
+      this.post.saves = cur + (saved ? 1 : -1);
+
       this.renderPost();
+      this.showUI(true);
+
       await fetch(`${API_BASE}/posts/${this.postId}/save`, {
         method: "POST",
         headers: { Authorization: `Bearer ${getToken()}` },
@@ -332,19 +466,19 @@
       if (!getToken()) return alert("Log in to follow");
       this.post.following_user = !this.post.following_user;
       this.renderPost();
-      await fetch(
-        `${API_BASE}/users/${this.post.user.username}/follow`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${getToken()}` },
-        }
-      );
+      this.showUI(true);
+
+      await fetch(`${API_BASE}/users/${this.post.user.username}/follow`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
     }
 
     share() {
       navigator.share
         ? navigator.share({ url: location.href })
         : navigator.clipboard.writeText(location.href);
+      this.showUI(true);
     }
 
     goToComments() {
@@ -374,6 +508,7 @@
       const t = this.video.currentTime;
       this.video.src = this.qualitySel.value;
       this.video.onloadedmetadata = () => {
+        this.syncAspectRatio();
         this.video.currentTime = t;
         this.video.play().catch(() => {});
       };
