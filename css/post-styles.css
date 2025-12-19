@@ -3666,3 +3666,31 @@
   outline: none !important;
   box-shadow: none !important;
 }
+
+/* ✅ FIX: stop forcing a 16:9 box that creates black space on portrait videos */
+.post-wrapper .post-media {
+  aspect-ratio: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  height: auto !important;
+  background: #000 !important;
+}
+
+.post-wrapper .post-media .us-video-player {
+  aspect-ratio: auto !important;     /* JS will set the real ratio */
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  background: #000 !important;
+}
+
+/* ✅ Let the video decide the height naturally */
+.post-wrapper .post-media .us-video-player .us-video {
+  position: relative !important;
+  width: 100% !important;
+  height: auto !important;
+  max-height: 70vh !important;       /* prevents insane tall videos */
+  object-fit: contain !important;    /* no cropping */
+  display: block !important;
+  background: #000 !important;
+}
