@@ -226,3 +226,174 @@
     font-size: 0.9rem;
   }
 }
+
+/* ===================================================== */
+/* ✅ VIDEO MODAL (NO NATIVE BROWSER CONTROLS)           */
+/* ===================================================== */
+
+.us-video-modal.hidden { display: none !important; }
+
+.us-video-modal {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 99999;
+  display: block;
+}
+
+.us-video-modal-inner {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* ✅ Single close button top-left */
+.us-video-modal-close {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  z-index: 30;
+  cursor: pointer;
+}
+
+/* Video stage area */
+.us-video-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+
+/* ✅ The video itself must NOT receive taps */
+.us-video-modal-video {
+  width: 100vw;
+  height: 100vh;
+  object-fit: contain;
+  background: #000;
+
+  /* critical: Safari UI triggers on direct interaction */
+  pointer-events: none !important;
+}
+
+/* ✅ Hard-hide iOS/Safari native UI if it tries */
+.us-video-modal-video::-webkit-media-controls,
+.us-video-modal-video::-webkit-media-controls-panel,
+.us-video-modal-video::-webkit-media-controls-enclosure,
+.us-video-modal-video::-webkit-media-controls-overlay-play-button,
+.us-video-modal-video::-webkit-media-controls-start-playback-button {
+  display: none !important;
+  -webkit-appearance: none !important;
+  opacity: 0 !important;
+}
+
+/* Tap layer that receives all touches */
+.us-video-tap-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+}
+
+/* Double tap zones */
+.us-video-double-left,
+.us-video-double-right {
+  position: absolute;
+  top: 0;
+  width: 50%;
+  height: 100%;
+  z-index: 16;
+}
+
+.us-video-double-left { left: 0; }
+.us-video-double-right { right: 0; }
+
+/* Center play */
+.us-video-modal-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.22);
+  background: rgba(0,0,0,0.60);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  z-index: 25;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.us-video-modal[data-state="paused"] .us-video-modal-center {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.us-video-modal-actions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 10px;
+  z-index: 40;
+
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+
+  padding: 12px 14px;
+  margin: 0 12px;
+
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(14px);
+}
+
+.us-action-btn {
+  border: 0;
+  background: transparent;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 8px 10px;
+  border-radius: 999px;
+}
+
+.us-action-btn i { font-size: 18px; }
+.us-action-count { font-size: 13px; opacity: 0.95; }
+
+/* skip feedback */
+.us-skip-feedback {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 82px;
+  height: 82px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.70);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: #fff;
+  display: none;
+  place-items: center;
+  z-index: 50;
+  font-size: 22px;
+  backdrop-filter: blur(12px);
+}
+
+.us-skip-feedback.show { display: grid; }
+
+.us-skip-feedback.forward { right: 18px; }
+.us-skip-feedback.backward { left: 18px; }
