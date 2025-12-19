@@ -1,6 +1,5 @@
-// donations.js — Uncensored Social Donation Page
+// donations.js — Uncensored Social Donation Page (NO confetti)
 
-// ======== INITIALIZATION =========
 document.addEventListener("DOMContentLoaded", () => {
   initializeApp();
 });
@@ -11,7 +10,6 @@ function initializeApp() {
   setupRealTimeRates();
   setupScrollEffects();
   setupBackToTop();
-  setupConfetti();
   setupLocalStorage();
 }
 
@@ -58,7 +56,6 @@ function setupAmountSelection() {
     }
   });
 
-  // Keyboard shortcut: Alt+1..6 to pick preset/custom
   document.addEventListener("keydown", (e) => {
     if (e.altKey && e.key >= "1" && e.key <= "6") {
       e.preventDefault();
@@ -76,7 +73,6 @@ function setupCryptoSelection() {
   const copyBtn = document.querySelector(".copy-btn");
   const cryptoPrice = document.querySelector(".crypto-price");
 
-  // YOUR REAL WALLET ADDRESSES (copied from your provided code)
   const wallets = {
     BTC: {
       address: "bc1qc78ztftkxzehx3veuar3fstse2vcvd4nslzqvy",
@@ -110,11 +106,9 @@ function setupCryptoSelection() {
       item.classList.add("active");
 
       selectedCrypto = item.dataset.symbol;
-
       showEnhancedWallet(selectedCrypto);
       updateSummary();
       triggerHapticFeedback();
-      showConfetti(40);
     });
   });
 
@@ -125,48 +119,42 @@ function setupCryptoSelection() {
     walletAddress.textContent = wallets[symbol].address;
 
     generateQRCode(wallets[symbol].address, symbol);
-    showNetworkOptions(symbol, wallets[symbol].networks);
+    showNetworkOptions(wallets[symbol].networks);
     updateCryptoPriceInfo(symbol);
   }
 
-  function showNetworkOptions(symbol, networks) {
-    const existingNetworkSelector = document.querySelector(".network-selector");
-    if (existingNetworkSelector) existingNetworkSelector.remove();
+  function showNetworkOptions(networks) {
+    const existing = document.querySelector(".network-selector");
+    if (existing) existing.remove();
 
     if (!networks || networks.length === 0) return;
 
-    const networkSelector = document.createElement("div");
-    networkSelector.className = "network-selector";
-    networkSelector.innerHTML = `
+    const selector = document.createElement("div");
+    selector.className = "network-selector";
+    selector.innerHTML = `
       <div style="margin-top:12px;">
         <div class="muted" style="font-weight:900; margin-bottom:8px;">
           <i class="fa-solid fa-network-wired" style="color: var(--accent); margin-right:8px;"></i>
           Network
         </div>
-        <div class="network-options" style="display:flex; gap:8px; flex-wrap:wrap;">
-          ${networks
-            .map(
-              (network) => `
-                <button class="network-btn active" type="button"
-                  style="
-                    padding:10px 12px;
-                    border-radius:14px;
-                    border:1px solid rgba(255,255,255,0.12);
-                    background: rgba(0,0,0,0.45);
-                    color:#fff;
-                    font-weight:900;
-                    cursor:pointer;
-                  "
-                >${network}</button>
-              `
-            )
-            .join("")}
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          ${networks.map(n => `
+            <button type="button"
+              style="
+                padding:10px 12px;
+                border-radius:14px;
+                border:1px solid rgba(255,255,255,0.12);
+                background: rgba(0,0,0,0.45);
+                color:#fff;
+                font-weight:900;
+              "
+            >${n}</button>
+          `).join("")}
         </div>
       </div>
     `;
 
-    // Insert after wallet address block
-    walletAddress.insertAdjacentElement("afterend", networkSelector);
+    walletAddress.insertAdjacentElement("afterend", selector);
   }
 
   function updateCryptoPriceInfo(symbol) {
@@ -181,43 +169,31 @@ function setupCryptoSelection() {
     }
   }
 
-  // Copy
   if (copyBtn) {
     copyBtn.addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(walletAddress.textContent);
-
         copyBtn.innerHTML = `<i class="fa-solid fa-check"></i><span>Copied</span>`;
         copyBtn.style.background = "rgba(16,185,129,0.18)";
         copyBtn.style.borderColor = "rgba(16,185,129,0.45)";
-
         showToast("Wallet address copied");
         triggerHapticFeedback();
-
         setTimeout(() => {
           copyBtn.innerHTML = `<i class="fa-solid fa-copy"></i><span>Copy address</span>`;
           copyBtn.style.background = "";
           copyBtn.style.borderColor = "";
         }, 1800);
-      } catch (err) {
+      } catch {
         showToast("Failed to copy address");
       }
     });
   }
 
-  // Expose for summary updates
   window.__updateCryptoPriceInfo = updateCryptoPriceInfo;
 }
 
-// ======== REAL-TIME EXCHANGE RATES =========
-let rates = {
-  BTC: 0,
-  ETH: 0,
-  SOL: 0,
-  USDT: 0,
-  USDC: 0,
-  XMR: 0
-};
+// ======== RATES =========
+let rates = { BTC: 0, ETH: 0, SOL: 0, USDT: 0, USDC: 0, XMR: 0 };
 
 function setupRealTimeRates() {
   fetchRates();
@@ -230,12 +206,10 @@ async function fetchRates() {
     const response = await fetch(
       "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,tether,usd-coin,monero&vs_currencies=usd"
     );
-
     if (!response.ok) throw new Error("API response not OK");
-
     const data = await response.json();
 
-    const newRates = {
+    rates = {
       BTC: data.bitcoin?.usd || rates.BTC,
       ETH: data.ethereum?.usd || rates.ETH,
       SOL: data.solana?.usd || rates.SOL,
@@ -244,16 +218,13 @@ async function fetchRates() {
       XMR: data.monero?.usd || rates.XMR
     };
 
-    rates = newRates;
-
     updateLivePricesDisplay();
     updateSummary();
 
-    // Update wallet price line if crypto selected
     if (selectedCrypto && window.__updateCryptoPriceInfo) {
       window.__updateCryptoPriceInfo(selectedCrypto);
     }
-  } catch (err) {
+  } catch {
     console.warn("Failed to fetch live rates. Using cached rates.");
   }
 }
@@ -263,157 +234,146 @@ function updateLivePricesDisplay() {
     const symbol = item.dataset.symbol;
     const currentRate = rates[symbol];
 
-    // remove old
-    const existingPrice = item.querySelector(".live-price");
-    if (existingPrice) existingPrice.remove();
+    const existing = item.querySelector(".live-price");
+    if (existing) existing.remove();
 
     if (currentRate && currentRate > 0) {
-      const priceElement = document.createElement("div");
-      priceElement.className = "live-price";
+      const price = document.createElement("div");
+      price.className = "live-price";
 
-      let formattedPrice;
-      if (currentRate >= 1000) formattedPrice = `$${currentRate.toLocaleString()}`;
-      else if (currentRate >= 1) formattedPrice = `$${currentRate.toFixed(2)}`;
-      else formattedPrice = `$${currentRate.toFixed(4)}`;
+      let formatted;
+      if (currentRate >= 1000) formatted = `$${currentRate.toLocaleString()}`;
+      else if (currentRate >= 1) formatted = `$${currentRate.toFixed(2)}`;
+      else formatted = `$${currentRate.toFixed(4)}`;
 
-      priceElement.textContent = formattedPrice;
+      price.textContent = formatted;
 
-      // append under crypto-sub
       const meta = item.querySelector(".crypto-meta");
-      if (meta) meta.appendChild(priceElement);
-      else item.appendChild(priceElement);
+      if (meta) meta.appendChild(price);
+      else item.appendChild(price);
     }
   });
 }
 
-// ======== QR CODE GENERATION =========
+// ======== QR =========
 function generateQRCode(address, symbol) {
   const qrPanel = document.querySelector(".qr-panel");
   if (!qrPanel || !address) return;
 
   qrPanel.innerHTML = "";
-
-  const qrContainer = document.createElement("div");
-  qrContainer.style.textAlign = "center";
-  qrContainer.style.padding = "16px";
-  qrContainer.style.background = "white";
-  qrContainer.style.borderRadius = "14px";
-  qrContainer.style.display = "inline-block";
+  const wrap = document.createElement("div");
+  wrap.style.textAlign = "center";
+  wrap.style.padding = "16px";
+  wrap.style.background = "white";
+  wrap.style.borderRadius = "14px";
+  wrap.style.display = "inline-block";
 
   const img = document.createElement("img");
   const qrData = encodeURIComponent(address);
   img.src = `https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=${qrData}&bgcolor=ffffff&color=000000&margin=10&qzone=1`;
   img.alt = `${symbol} QR Code`;
   img.style.borderRadius = "10px";
-  img.style.boxShadow = "0 10px 18px rgba(0,0,0,0.18)";
   img.loading = "lazy";
 
-  qrContainer.appendChild(img);
-  qrPanel.appendChild(qrContainer);
+  wrap.appendChild(img);
+  qrPanel.appendChild(wrap);
 }
 
-// ======== DONATION SUMMARY =========
+// ======== SUMMARY =========
 function updateSummary() {
-  const summaryBox = document.querySelector(".donation-summary");
-  if (!summaryBox) return;
+  const box = document.querySelector(".donation-summary");
+  if (!box) return;
 
-  if (selectedAmount && selectedCrypto) {
-    const rate = rates[selectedCrypto] || 0;
-    if (!rate) {
-      summaryBox.classList.add("visible");
-      summaryBox.innerHTML = `
-        <div class="enhanced-summary">
-          <h4>Donation Summary</h4>
-          <div class="conversion-note">Fetching live rate for ${selectedCrypto}...</div>
-        </div>
-      `;
-      saveDonationPreference();
-      return;
-    }
+  if (!(selectedAmount && selectedCrypto)) {
+    box.classList.remove("visible");
+    box.innerHTML = "";
+    return;
+  }
 
-    let equivalent, networkFee, totalCrypto;
-
-    if (selectedCrypto === "BTC") {
-      equivalent = (selectedAmount / rate).toFixed(8);
-      networkFee = "0.0002";
-      totalCrypto = (parseFloat(equivalent) + parseFloat(networkFee)).toFixed(8);
-    } else if (selectedCrypto === "ETH") {
-      equivalent = (selectedAmount / rate).toFixed(6);
-      networkFee = "0.003";
-      totalCrypto = (parseFloat(equivalent) + parseFloat(networkFee)).toFixed(6);
-    } else if (selectedCrypto === "SOL") {
-      equivalent = (selectedAmount / rate).toFixed(4);
-      networkFee = "0.000005";
-      totalCrypto = (parseFloat(equivalent) + parseFloat(networkFee)).toFixed(4);
-    } else if (selectedCrypto === "USDT") {
-      equivalent = (selectedAmount / rate).toFixed(2);
-      networkFee = "0.003";
-      totalCrypto = (parseFloat(equivalent) + parseFloat(networkFee)).toFixed(2);
-    } else if (selectedCrypto === "USDC") {
-      equivalent = (selectedAmount / rate).toFixed(2);
-      networkFee = "0.000005";
-      totalCrypto = (parseFloat(equivalent) + parseFloat(networkFee)).toFixed(2);
-    } else if (selectedCrypto === "XMR") {
-      equivalent = (selectedAmount / rate).toFixed(6);
-      networkFee = "0.0001";
-      totalCrypto = (parseFloat(equivalent) + parseFloat(networkFee)).toFixed(6);
-    } else {
-      equivalent = (selectedAmount / rate).toFixed(6);
-      networkFee = "0.001";
-      totalCrypto = (parseFloat(equivalent) + parseFloat(networkFee)).toFixed(6);
-    }
-
-    // Label for summary display
-    const displayNames = {
-      BTC: "Bitcoin",
-      ETH: "Ethereum",
-      SOL: "Solana",
-      USDT: "USDT",
-      USDC: "USDC",
-      XMR: "Monero"
-    };
-
-    summaryBox.innerHTML = `
+  const rate = rates[selectedCrypto] || 0;
+  if (!rate) {
+    box.classList.add("visible");
+    box.innerHTML = `
       <div class="enhanced-summary">
         <h4>Donation Summary</h4>
-
-        <div class="summary-line">
-          <span class="summary-label">Amount</span>
-          <span class="summary-value">$${selectedAmount.toFixed(2)} USD</span>
-        </div>
-
-        <div class="summary-line">
-          <span class="summary-label">Cryptocurrency</span>
-          <span class="summary-value">${displayNames[selectedCrypto] || selectedCrypto}</span>
-        </div>
-
-        <div class="summary-line">
-          <span class="summary-label">You send</span>
-          <span class="summary-value">${equivalent} ${selectedCrypto}</span>
-        </div>
-
-        <div class="summary-line">
-          <span class="summary-label">Est. network fee</span>
-          <span class="summary-value">~${networkFee} ${selectedCrypto}</span>
-        </div>
-
-        <div class="summary-line total">
-          <span class="summary-label">Total to send</span>
-          <span class="summary-value">${totalCrypto} ${selectedCrypto}</span>
-        </div>
-
-        <div class="conversion-note">
-          Rate: 1 ${selectedCrypto} = $${rate.toLocaleString()}
-        </div>
+        <div class="conversion-note">Fetching live rate for ${selectedCrypto}...</div>
       </div>
     `;
-
-    summaryBox.classList.add("visible");
     saveDonationPreference();
-  } else {
-    summaryBox.classList.remove("visible");
-    summaryBox.innerHTML = "";
+    return;
   }
+
+  let equivalent, networkFee, totalCrypto;
+
+  if (selectedCrypto === "BTC") {
+    equivalent = (selectedAmount / rate).toFixed(8);
+    networkFee = "0.0002";
+    totalCrypto = (parseFloat(equivalent) + parseFloat(networkFee)).toFixed(8);
+  } else if (selectedCrypto === "ETH") {
+    equivalent = (selectedAmount / rate).toFixed(6);
+    networkFee = "0.003";
+    totalCrypto = (parseFloat(equivalent) + parseFloat(networkFee)).toFixed(6);
+  } else if (selectedCrypto === "SOL") {
+    equivalent = (selectedAmount / rate).toFixed(4);
+    networkFee = "0.000005";
+    totalCrypto = (parseFloat(equivalent) + parseFloat(networkFee)).toFixed(4);
+  } else if (selectedCrypto === "USDT") {
+    equivalent = (selectedAmount / rate).toFixed(2);
+    networkFee = "0.003";
+    totalCrypto = (parseFloat(equivalent) + parseFloat(networkFee)).toFixed(2);
+  } else if (selectedCrypto === "USDC") {
+    equivalent = (selectedAmount / rate).toFixed(2);
+    networkFee = "0.000005";
+    totalCrypto = (parseFloat(equivalent) + parseFloat(networkFee)).toFixed(2);
+  } else if (selectedCrypto === "XMR") {
+    equivalent = (selectedAmount / rate).toFixed(6);
+    networkFee = "0.0001";
+    totalCrypto = (parseFloat(equivalent) + parseFloat(networkFee)).toFixed(6);
+  } else {
+    equivalent = (selectedAmount / rate).toFixed(6);
+    networkFee = "0.001";
+    totalCrypto = (parseFloat(equivalent) + parseFloat(networkFee)).toFixed(6);
+  }
+
+  const displayNames = { BTC: "Bitcoin", ETH: "Ethereum", SOL: "Solana", USDT: "USDT", USDC: "USDC", XMR: "Monero" };
+
+  box.innerHTML = `
+    <div class="enhanced-summary">
+      <h4>Donation Summary</h4>
+
+      <div class="summary-line">
+        <span class="summary-label">Amount</span>
+        <span class="summary-value">$${selectedAmount.toFixed(2)} USD</span>
+      </div>
+
+      <div class="summary-line">
+        <span class="summary-label">Cryptocurrency</span>
+        <span class="summary-value">${displayNames[selectedCrypto] || selectedCrypto}</span>
+      </div>
+
+      <div class="summary-line">
+        <span class="summary-label">You send</span>
+        <span class="summary-value">${equivalent} ${selectedCrypto}</span>
+      </div>
+
+      <div class="summary-line">
+        <span class="summary-label">Est. network fee</span>
+        <span class="summary-value">~${networkFee} ${selectedCrypto}</span>
+      </div>
+
+      <div class="summary-line total">
+        <span class="summary-label">Total to send</span>
+        <span class="summary-value">${totalCrypto} ${selectedCrypto}</span>
+      </div>
+
+      <div class="conversion-note">
+        Rate: 1 ${selectedCrypto} = $${rate.toLocaleString()}
+      </div>
+    </div>
+  `;
+
+  box.classList.add("visible");
+  saveDonationPreference();
 }
 
 // ======== LOCAL STORAGE =========
@@ -423,13 +383,9 @@ function setupLocalStorage() {
 }
 
 function saveDonationPreference() {
-  const preference = {
-    amount: selectedAmount,
-    crypto: selectedCrypto,
-    timestamp: Date.now()
-  };
+  const pref = { amount: selectedAmount, crypto: selectedCrypto, timestamp: Date.now() };
   try {
-    localStorage.setItem("uncensoredDonationPref", JSON.stringify(preference));
+    localStorage.setItem("uncensoredDonationPref", JSON.stringify(pref));
   } catch {}
 }
 
@@ -438,50 +394,38 @@ function loadDonationPreference() {
     const saved = localStorage.getItem("uncensoredDonationPref");
     if (!saved) return;
 
-    const preference = JSON.parse(saved);
+    const pref = JSON.parse(saved);
+    if (Date.now() - pref.timestamp > 24 * 60 * 60 * 1000) return;
 
-    // 24h validity
-    if (Date.now() - preference.timestamp > 24 * 60 * 60 * 1000) return;
-
-    if (preference.amount) {
-      selectedAmount = preference.amount;
-
-      // click preset if matches, otherwise set custom
+    if (pref.amount) {
+      selectedAmount = pref.amount;
       const preset = Array.from(document.querySelectorAll(".amt-btn")).find(
-        (b) => b.dataset.amount && parseFloat(b.dataset.amount) === parseFloat(preference.amount)
+        (b) => b.dataset.amount && parseFloat(b.dataset.amount) === parseFloat(pref.amount)
       );
-
-      if (preset) {
-        preset.click();
-      } else {
+      if (preset) preset.click();
+      else {
         document.querySelector(".amt-btn.custom")?.click();
         const input = document.querySelector(".custom-input");
-        if (input) input.value = parseFloat(preference.amount).toFixed(2);
+        if (input) input.value = parseFloat(pref.amount).toFixed(2);
       }
     }
 
-    if (preference.crypto) {
-      const item = Array.from(document.querySelectorAll(".crypto-item")).find(
-        (i) => i.dataset.symbol === preference.crypto
-      );
+    if (pref.crypto) {
+      const item = Array.from(document.querySelectorAll(".crypto-item")).find((i) => i.dataset.symbol === pref.crypto);
       if (item) item.click();
     }
-  } catch {
-    // ignore
-  }
+  } catch {}
 }
 
 // ======== TOAST =========
 function showToast(message, duration = 2400) {
   document.querySelectorAll(".toast").forEach((t) => t.remove());
-
   const toast = document.createElement("div");
   toast.className = "toast";
   toast.textContent = message;
   document.body.appendChild(toast);
 
   setTimeout(() => toast.classList.add("show"), 60);
-
   setTimeout(() => {
     toast.classList.remove("show");
     setTimeout(() => toast.remove(), 320);
@@ -493,54 +437,14 @@ function triggerHapticFeedback() {
   if (navigator.vibrate) navigator.vibrate(40);
 }
 
-// ======== CONFETTI =========
-function setupConfetti() {
-  // loaded on demand
-}
-
-function showConfetti(particleCount = 60) {
-  for (let i = 0; i < particleCount; i++) createParticle();
-}
-
-function createParticle() {
-  const particle = document.createElement("div");
-  particle.style.position = "fixed";
-  particle.style.width = "8px";
-  particle.style.height = "8px";
-  particle.style.background = `hsl(${Math.random() * 360}, 100%, 50%)`;
-  particle.style.borderRadius = "50%";
-  particle.style.pointerEvents = "none";
-  particle.style.zIndex = "1200";
-  particle.style.left = `${Math.random() * 100}vw`;
-  particle.style.top = "-10px";
-
-  document.body.appendChild(particle);
-
-  const animation = particle.animate(
-    [
-      { transform: "translateY(0) rotate(0deg)", opacity: 1 },
-      { transform: `translateY(${window.innerHeight}px) rotate(${Math.random() * 360}deg)`, opacity: 0 }
-    ],
-    {
-      duration: 900 + Math.random() * 1800,
-      easing: "cubic-bezier(0.1, 0.8, 0.2, 1)"
-    }
-  );
-
-  animation.onfinish = () => particle.remove();
-}
-
 // ======== SCROLL EFFECTS =========
 function setupScrollEffects() {
   const sections = document.querySelectorAll(".section");
-  const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) entry.target.classList.add("in-view");
-      });
-    },
-    { threshold: 0.12 }
-  );
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) entry.target.classList.add("in-view");
+    });
+  }, { threshold: 0.12 });
 
   sections.forEach((s) => observer.observe(s));
 }
@@ -592,4 +496,4 @@ function setupBackToTop() {
   });
 }
 
-console.log("✅ Uncensored Social donation page loaded");
+console.log("✅ Uncensored Social donation page loaded (no confetti)");
