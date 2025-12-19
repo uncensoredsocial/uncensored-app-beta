@@ -3699,3 +3699,24 @@
 .post-wrapper .us-video-player .us-video-center-btn {
   display: none !important;
 }
+
+/* ✅ FIX: post text should never touch the card edges */
+.post-body {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+/* text spacing */
+.post-body .post-text {
+  padding: 10px 0; /* vertical only since body has left/right padding */
+  margin: 0;
+  word-break: break-word;
+}
+
+/* ensure hashtags/mentions don’t cause weird overflow */
+.post-body .post-text a,
+.post-body .post-text .hashtag,
+.post-body .post-text .mention {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
