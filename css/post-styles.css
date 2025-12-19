@@ -3694,3 +3694,8 @@
   display: block !important;
   background: #000 !important;
 }
+
+/* ✅ Remove center overlay play/pause button completely */
+.post-wrapper .us-video-player .us-video-center-btn {
+  display: none !important;
+}
