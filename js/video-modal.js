@@ -1,5 +1,9 @@
 // js/video-modal.js
 // Video modal for post.html only (opens from the custom player's fullscreen button)
+// - No native Safari video controls
+// - Double tap left/right to seek -10/+10
+// - Only ONE top-left close button
+// - Bottom comment button closes modal and scrolls to comments
 
 (function () {
   const API_BASE = "https://uncensored-app-beta-production.up.railway.app/api";
@@ -12,19 +16,25 @@
     constructor() {
       // DOM
       this.modal = document.getElementById("videoModal");
-      this.modalVideo = document.getElementById("modalVideo");
+      this.video = document.getElementById("videoModalVideo");
 
-      this.backBtn = document.getElementById("backToPostBtn");
-      this.closeBtn = document.getElementById("closeModalBtn");
-      this.commentsBtn = document.getElementById("modalCommentsBtn");
+      this.closeBtn = document.getElementById("videoModalClose");
 
-      this.postInfo = document.getElementById("modalPostInfo");
+      this.tapLayer = document.getElementById("videoTapLayer");
+      this.leftZone = document.getElementById("videoDoubleLeft");
+      this.rightZone = document.getElementById("videoDoubleRight");
+      this.centerBtn = document.getElementById("videoCenterBtn");
+      this.feedback = document.getElementById("skipFeedback");
 
-      // Actions
-      this.likeBtn = this.modal?.querySelector(".modal-like-btn");
-      this.commentBtn = this.modal?.querySelector(".modal-comment-btn");
-      this.saveBtn = this.modal?.querySelector(".modal-save-btn");
-      this.shareBtn = this.modal?.querySelector(".modal-share-btn");
+      // Bottom actions
+      this.likeBtn = document.getElementById("vmLikeBtn");
+      this.commentBtn = document.getElementById("vmCommentBtn");
+      this.saveBtn = document.getElementById("vmSaveBtn");
+      this.shareBtn = document.getElementById("vmShareBtn");
+
+      this.likeCountEl = document.getElementById("vmLikeCount");
+      this.commentCountEl = document.getElementById("vmCommentCount");
+      this.saveCountEl = document.getElementById("vmSaveCount");
 
       // State
       this.isOpen = false;
@@ -39,7 +49,13 @@
         wasPlaying: false,
       };
 
-      if (!this.modal || !this.modalVideo) {
+      // double tap
+      this.DOUBLE_TAP_MS = 280;
+      this.SEEK_STEP = 10;
+      this.lastTapL = 0;
+      this.lastTapR = 0;
+
+      if (!this.modal || !this.video) {
         console.warn("PostVideoModal: modal markup not found in post.html");
         return;
       }
@@ -51,8 +67,7 @@
 
     // ---------- Binding ----------
     bindGlobal() {
-      // If PostPage renders after load, we also re-bind later.
-      // (Safe to call multiple times)
+      // rebinding is safe; we mark buttons
       const rebinder = () => this.bindFullscreenButtons();
       document.addEventListener("click", rebinder, true);
 
@@ -64,70 +79,123 @@
     }
 
     bindModalControls() {
-      this.closeBtn?.addEventListener("click", () => this.close());
-      this.backBtn?.addEventListener("click", () => this.close());
-      this.commentsBtn?.addEventListener("click", () => this.goToComments());
+      // Close modal
+      this.closeBtn?.addEventListener("click", (e) => {
+        e.preventDefault();
+        this.close();
+      });
 
-      // overlay click closes (only if click background, not inside container)
+      // Click outside (background) closes
       this.modal.addEventListener("click", (e) => {
+        // Only if clicking the overlay background, not inside content
         if (e.target === this.modal) this.close();
       });
 
-      // keyboard
+      // Escape closes
       document.addEventListener("keydown", (e) => {
         if (!this.isOpen) return;
         if (e.key === "Escape") this.close();
       });
 
-      // action buttons
-      this.modal?.addEventListener("click", (e) => {
-        const btn = e.target.closest(".modal-action-btn");
-        if (!btn) return;
-
-        const action = btn.dataset.action;
-        if (!action) return;
-
-        if (action === "comment") return this.goToComments();
-        if (action === "share") return this.share();
-
-        if (action === "like") return this.toggleLike();
-        if (action === "save") return this.toggleSave();
+      // Single tap toggles play/pause (we never tap the <video>)
+      this.tapLayer?.addEventListener("click", (e) => {
+        e.preventDefault();
+        this.togglePlay();
       });
+
+      this.centerBtn?.addEventListener("click", (e) => {
+        e.preventDefault();
+        this.togglePlay();
+      });
+
+      // Double tap zones
+      this.attachDoubleTap(this.leftZone, "L");
+      this.attachDoubleTap(this.rightZone, "R");
+
+      // Bottom buttons
+      this.commentBtn?.addEventListener("click", (e) => {
+        e.preventDefault();
+        this.goToComments();
+      });
+
+      this.likeBtn?.addEventListener("click", (e) => {
+        e.preventDefault();
+        this.toggleLike();
+      });
+
+      this.saveBtn?.addEventListener("click", (e) => {
+        e.preventDefault();
+        this.toggleSave();
+      });
+
+      this.shareBtn?.addEventListener("click", (e) => {
+        e.preventDefault();
+        this.share();
+      });
+
+      // Keep state synced
+      this.video.addEventListener("play", () => this.setState("playing"));
+      this.video.addEventListener("pause", () => this.setState("paused"));
+      this.video.addEventListener("ended", () => this.setState("paused"));
     }
 
     bindFullscreenButtons() {
-      // Bind to your custom player fullscreen button
-      // Avoid double-binding by marking elements
+      // Bind to your custom player fullscreen button (.us-fullscreen)
       const buttons = document.querySelectorAll(".us-video-player .us-fullscreen");
       buttons.forEach((btn) => {
         if (btn.dataset.boundModal === "1") return;
         btn.dataset.boundModal = "1";
 
-        btn.addEventListener("click", (e) => {
-          // Your Post.js already attaches a handler to .us-fullscreen.
-          // We must stop it so only THIS modal opens.
-          e.preventDefault();
-          e.stopPropagation();
-          e.stopImmediatePropagation?.();
+        btn.addEventListener(
+          "click",
+          (e) => {
+            // stop any other fullscreen handlers
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation?.();
 
-          const player = btn.closest(".us-video-player");
-          const vid = player?.querySelector("video");
-          const postEl = btn.closest("[data-post-id]");
-          const postId = postEl?.dataset?.postId || null;
+            const player = btn.closest(".us-video-player");
+            const vid = player?.querySelector("video");
+            const postEl = btn.closest("[data-post-id]");
+            const postId = postEl?.dataset?.postId || null;
 
-          this.open(vid, postId);
-        }, true);
+            this.open(vid, postId);
+          },
+          true
+        );
       });
     }
 
-    // ---------- Open / Close ----------
+    // ---------- Core ----------
+    setState(state) {
+      // state: "playing" | "paused"
+      this.modal.dataset.state = state;
+
+      const icon = this.centerBtn?.querySelector("i");
+      if (icon) {
+        icon.className = state === "playing" ? "fa-solid fa-pause" : "fa-solid fa-play";
+      }
+    }
+
+    configureVideoForNoNativeUI() {
+      // Critical: do not show native controls
+      this.video.removeAttribute("controls");
+      this.video.setAttribute("playsinline", "");
+      this.video.setAttribute("webkit-playsinline", "");
+      this.video.setAttribute("controlslist", "nodownload noplaybackrate noremoteplayback");
+      this.video.disablePictureInPicture = true;
+
+      // Even if something adds controls later, this helps on some browsers
+      this.video.controls = false;
+    }
+
     async open(videoEl, postId) {
       if (!videoEl) return;
 
       this.originalVideo = videoEl;
       this.postId = postId;
 
-      // capture state
+      // capture original state
       this.playbackState = {
         time: this.originalVideo.currentTime || 0,
         volume: this.originalVideo.volume ?? 1,
@@ -136,39 +204,48 @@
       };
 
       // pause original
-      try { this.originalVideo.pause(); } catch {}
+      try {
+        this.originalVideo.pause();
+      } catch {}
 
-      // set modal source correctly
+      // src
       const src = this.getPlayableSrc(this.originalVideo);
       if (!src) {
         console.warn("PostVideoModal: no playable src found for video");
         return;
       }
 
-      // Use src attribute (not <source>) for modal video simplicity
-      this.modalVideo.src = src;
-      this.modalVideo.currentTime = this.playbackState.time;
-      this.modalVideo.volume = this.playbackState.volume;
-      this.modalVideo.muted = this.playbackState.muted;
+      // configure modal video
+      this.configureVideoForNoNativeUI();
+
+      this.video.src = src;
+      this.video.currentTime = this.playbackState.time;
+      this.video.volume = this.playbackState.volume;
+      this.video.muted = this.playbackState.muted;
 
       // show modal
-      this.modal.classList.add("active");
+      this.modal.classList.remove("hidden");
+      this.modal.setAttribute("aria-hidden", "false");
       document.body.style.overflow = "hidden";
       this.isOpen = true;
 
+      // optional hash
       window.location.hash = "video-modal";
 
-      // try play if it was playing before
+      // update UI counts/icons
+      await this.populatePostInfo();
+
+      // play if it was playing before (autoplay may be blocked)
       if (this.playbackState.wasPlaying) {
         try {
-          await this.modalVideo.play();
+          await this.video.play();
+          this.setState("playing");
         } catch {
-          // autoplay may be blocked
+          this.setState("paused");
         }
+      } else {
+        this.setState("paused");
       }
-
-      // populate UI (prefer existing loaded post from PostPage)
-      await this.populatePostInfo();
     }
 
     close() {
@@ -176,17 +253,20 @@
 
       // capture modal state back
       try {
-        this.playbackState.time = this.modalVideo.currentTime || 0;
-        this.playbackState.wasPlaying = !this.modalVideo.paused;
+        this.playbackState.time = this.video.currentTime || 0;
+        this.playbackState.wasPlaying = !this.video.paused;
       } catch {}
 
       // stop modal video
-      try { this.modalVideo.pause(); } catch {}
-      this.modalVideo.removeAttribute("src");
-      this.modalVideo.load();
+      try {
+        this.video.pause();
+      } catch {}
+      this.video.removeAttribute("src");
+      this.video.load();
 
       // hide
-      this.modal.classList.remove("active");
+      this.modal.classList.add("hidden");
+      this.modal.setAttribute("aria-hidden", "true");
       document.body.style.overflow = "";
       this.isOpen = false;
 
@@ -209,23 +289,90 @@
       }
     }
 
+    togglePlay() {
+      if (!this.video) return;
+
+      if (this.video.paused) {
+        this.video
+          .play()
+          .then(() => this.setState("playing"))
+          .catch(() => this.setState("paused"));
+      } else {
+        this.video.pause();
+        this.setState("paused");
+      }
+    }
+
+    // ---------- Double tap seek ----------
+    clamp(n, min, max) {
+      return Math.max(min, Math.min(max, n));
+    }
+
+    showSkip(dir) {
+      if (!this.feedback) return;
+
+      this.feedback.className = "us-skip-feedback show " + (dir === "f" ? "forward" : "backward");
+      this.feedback.innerHTML =
+        dir === "f"
+          ? `<i class="fa-solid fa-forward"></i>`
+          : `<i class="fa-solid fa-backward"></i>`;
+
+      window.clearTimeout(this._skipT);
+      this._skipT = window.setTimeout(() => {
+        this.feedback.className = "us-skip-feedback";
+        this.feedback.innerHTML = "";
+      }, 450);
+    }
+
+    seekBy(seconds) {
+      const dur = isFinite(this.video.duration) ? this.video.duration : 0;
+      const next = this.clamp((this.video.currentTime || 0) + seconds, 0, dur || 10e9);
+      this.video.currentTime = next;
+      this.showSkip(seconds > 0 ? "f" : "b");
+    }
+
+    attachDoubleTap(zoneEl, side) {
+      if (!zoneEl) return;
+
+      // Mobile: touchend double-tap timing
+      zoneEl.addEventListener(
+        "touchend",
+        (e) => {
+          e.preventDefault();
+
+          const now = Date.now();
+          if (side === "L") {
+            if (now - this.lastTapL < this.DOUBLE_TAP_MS) this.seekBy(-this.SEEK_STEP);
+            this.lastTapL = now;
+          } else {
+            if (now - this.lastTapR < this.DOUBLE_TAP_MS) this.seekBy(this.SEEK_STEP);
+            this.lastTapR = now;
+          }
+        },
+        { passive: false }
+      );
+
+      // Desktop fallback
+      zoneEl.addEventListener("dblclick", (e) => {
+        e.preventDefault();
+        this.seekBy(side === "L" ? -this.SEEK_STEP : this.SEEK_STEP);
+      });
+    }
+
     // ---------- Helpers ----------
     getPlayableSrc(videoEl) {
-      // Best: currentSrc (after load)
       if (videoEl.currentSrc) return videoEl.currentSrc;
-
-      // If <video src="">
       if (videoEl.src) return videoEl.src;
 
-      // If <source src="">
       const source = videoEl.querySelector("source");
       if (source?.src) return source.src;
 
       return null;
     }
 
+    // ---------- Post data + UI ----------
     async populatePostInfo() {
-      // If PostPage is on window and has loaded a post, use it
+      // Prefer the already loaded post from PostPage if available
       const pagePost = window.postPage?.post;
       if (pagePost?.id) {
         this.postData = pagePost;
@@ -233,7 +380,6 @@
         return;
       }
 
-      // Otherwise fetch by ID
       if (!this.postId) return;
 
       try {
@@ -241,6 +387,7 @@
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
         const res = await fetch(`${API_BASE}/posts/${encodeURIComponent(this.postId)}`, { headers });
         if (!res.ok) return;
+
         const data = await res.json();
         this.postData = data;
         this.updateModalUI(data);
@@ -250,75 +397,55 @@
     }
 
     updateModalUI(post) {
-      if (!this.postInfo) return;
-
-      const user = post.user || {};
-      const avatar = user.avatar_url || "default-profile.PNG";
-      const username = user.username || "unknown";
-      const content = post.content || "";
-
       const likes = typeof post.likes === "number" ? post.likes : 0;
       const comments = typeof post.comments_count === "number" ? post.comments_count : 0;
 
-      const img = this.postInfo.querySelector(".modal-profile-pic");
-      const h4 = this.postInfo.querySelector("h4");
-      const p = this.postInfo.querySelector("p");
-      const stats = this.postInfo.querySelector(".modal-stats");
+      // Your API might not have save count — keep it safe
+      const saves =
+        typeof post.saves === "number"
+          ? post.saves
+          : typeof post.save_count === "number"
+          ? post.save_count
+          : 0;
 
-      if (img) {
-        img.src = avatar;
-        img.onerror = function () { this.src = "default-profile.PNG"; };
-        img.alt = username;
-      }
-      if (h4) h4.textContent = `@${username}`;
-      if (p) p.textContent = content;
+      if (this.likeCountEl) this.likeCountEl.textContent = String(likes);
+      if (this.commentCountEl) this.commentCountEl.textContent = String(comments);
+      if (this.saveCountEl) this.saveCountEl.textContent = String(saves);
 
-      if (stats) {
-        stats.innerHTML = `
-          <span><i class="far fa-heart"></i> ${likes}</span>
-          <span><i class="far fa-comment"></i> ${comments}</span>
-        `;
-      }
+      const liked = !!post.liked_by_me;
+      const saved = !!post.saved_by_me;
 
-      // buttons state
+      // Like icon
       if (this.likeBtn) {
-        const liked = !!post.liked_by_me;
+        const i = this.likeBtn.querySelector("i");
+        if (i) i.className = liked ? "fa-solid fa-heart" : "fa-regular fa-heart";
         this.likeBtn.classList.toggle("liked", liked);
-        this.likeBtn.innerHTML = `
-          <i class="${liked ? "fas" : "far"} fa-heart"></i>
-          <span class="like-count">${likes}</span>
-        `;
       }
 
-      if (this.commentBtn) {
-        this.commentBtn.innerHTML = `
-          <i class="far fa-comment"></i>
-          <span class="comment-count">${comments}</span>
-        `;
-      }
-
+      // Save icon
       if (this.saveBtn) {
-        const saved = !!post.saved_by_me;
+        const i = this.saveBtn.querySelector("i");
+        if (i) i.className = saved ? "fa-solid fa-bookmark" : "fa-regular fa-bookmark";
         this.saveBtn.classList.toggle("saved", saved);
-        this.saveBtn.innerHTML = `
-          <i class="${saved ? "fas" : "far"} fa-bookmark"></i>
-        `;
       }
     }
 
+    // ---------- Actions ----------
     goToComments() {
+      // Close modal and scroll to comments section
       this.close();
 
       setTimeout(() => {
         const el = document.getElementById("commentsSection");
         if (!el) return;
+
         const offset = 72;
         const y = el.getBoundingClientRect().top + window.pageYOffset - offset;
         window.scrollTo({ top: y, behavior: "smooth" });
-        // optional focus
+
         const input = document.getElementById("commentInput");
         if (input) setTimeout(() => input.focus(), 350);
-      }, 200);
+      }, 150);
     }
 
     async toggleLike() {
@@ -330,6 +457,7 @@
       const wasLiked = !!this.postData.liked_by_me;
       const oldLikes = typeof this.postData.likes === "number" ? this.postData.likes : 0;
       const newLikes = Math.max(0, oldLikes + (wasLiked ? -1 : 1));
+
       this.postData.liked_by_me = !wasLiked;
       this.postData.likes = newLikes;
       this.updateModalUI(this.postData);
@@ -342,17 +470,17 @@
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || "Like failed");
 
-        // sync from server if available
+        // sync
         if (typeof data.likes === "number") this.postData.likes = data.likes;
         if (typeof data.liked === "boolean") this.postData.liked_by_me = data.liked;
 
         this.updateModalUI(this.postData);
 
-        // also sync the post page button if present
+        // sync post page like button (best-effort)
         const postLikeBtn = document.querySelector(".post .like-btn");
         const postLikeCount = postLikeBtn?.querySelector(".like-count");
-        if (postLikeCount && typeof this.postData.likes === "number") {
-          postLikeCount.textContent = String(this.postData.likes);
+        if (postLikeBtn && postLikeCount) {
+          postLikeCount.textContent = String(this.postData.likes ?? 0);
           postLikeBtn.classList.toggle("liked", !!this.postData.liked_by_me);
           const icon = postLikeBtn.querySelector("i");
           if (icon) icon.className = `fa-${this.postData.liked_by_me ? "solid" : "regular"} fa-heart`;
@@ -385,7 +513,7 @@
         if (typeof data.saved === "boolean") this.postData.saved_by_me = data.saved;
         this.updateModalUI(this.postData);
 
-        // sync post page save button
+        // sync post page save button (best-effort)
         const postSaveBtn = document.querySelector(".post .save-btn");
         if (postSaveBtn) {
           postSaveBtn.classList.toggle("saved", !!this.postData.saved_by_me);
@@ -403,7 +531,10 @@
       if (navigator.share) {
         navigator.share({ title: "Uncensored Social", url }).catch(() => {});
       } else if (navigator.clipboard?.writeText) {
-        navigator.clipboard.writeText(url).then(() => alert("Link copied!")).catch(() => alert(url));
+        navigator.clipboard
+          .writeText(url)
+          .then(() => alert("Link copied!"))
+          .catch(() => alert(url));
       } else {
         alert(url);
       }
@@ -412,7 +543,7 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     // Only on post page where modal exists
-    if (document.getElementById("videoModal") && document.getElementById("modalVideo")) {
+    if (document.getElementById("videoModal") && document.getElementById("videoModalVideo")) {
       window.postVideoModal = new PostVideoModal();
     }
   });
