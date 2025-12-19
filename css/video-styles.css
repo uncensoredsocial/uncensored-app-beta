@@ -113,6 +113,7 @@
   object-fit: contain;
   border-radius: 12px;
   background: #000;
+  display: block; /* ✅ removes baseline gap */
 }
 
 /* Footer */
@@ -283,6 +284,7 @@
 
   /* critical: Safari UI triggers on direct interaction */
   pointer-events: none !important;
+  display: block; /* ✅ remove baseline gap */
 }
 
 /* ✅ Hard-hide iOS/Safari native UI if it tries */
@@ -316,7 +318,7 @@
 .us-video-double-left { left: 0; }
 .us-video-double-right { right: 0; }
 
-/* Center play */
+/* Center play (kept, but your JS hides it; CSS makes it safe) */
 .us-video-modal-center {
   position: absolute;
   left: 50%;
@@ -375,6 +377,16 @@
 .us-action-btn i { font-size: 18px; }
 .us-action-count { font-size: 13px; opacity: 0.95; }
 
+/* ✅ match feed-style filled icons */
+.us-action-btn.liked,
+.modal-action-btn.liked {
+  color: #ff4757;
+}
+.us-action-btn.saved,
+.modal-action-btn.saved {
+  color: #ffd700;
+}
+
 /* skip feedback */
 .us-skip-feedback {
   position: absolute;
@@ -398,27 +410,50 @@
 .us-skip-feedback.forward { right: 18px; }
 .us-skip-feedback.backward { left: 18px; }
 
+/* ===================================================== */
+/* ✅ NEW: VM TOP BAR + VIDEO LAYOUT (for your Dash modal) */
+/* ===================================================== */
+
 /* ✅ Keep a permanent black header area above the video */
 .vm-topbar {
   position: sticky;
   top: 0;
   z-index: 50;
   background: #000;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid rgba(255,255,255,0.12);
 }
 
 /* ✅ Put video underneath top bar */
 #videoModalContainer {
   display: flex;
   flex-direction: column;
+  background: #000;
 }
 
-/* topbar stays natural height, video takes remaining space */
-#videoModalContainer video,
+/* ✅ Video area fills remaining space and NEVER creates bottom black “gap” */
+#videoModalContainer .us-video-stage,
+#videoModalContainer .modal-video-player,
+#videoModalContainer .vm-stage {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ✅ Make sure the modal video behaves properly */
 #modalVideo {
   flex: 1;
   width: 100%;
   height: 100%;
   object-fit: contain;
   background: #000;
+  display: block;
+}
+
+/* ✅ Kill baseline/line-height spacing that can create phantom bars */
+#videoModalContainer,
+#videoModalContainer * {
+  line-height: normal;
+}
+
+.modal-video-player {
+  line-height: 0; /* ✅ prevents tiny “bottom bar gap” */
 }
