@@ -1,34 +1,223 @@
-<h3>Select cryptocurrency</h3>
-<div class="crypto-grid">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Donate — Uncensored Social</title>
 
-  <div class="crypto-item" data-symbol="BTC">
-    <img src="bitcoin.PNG" alt="Bitcoin">
-    <span>Bitcoin</span>
-  </div>
+  <!-- Font Awesome (UI icons only) -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    referrerpolicy="no-referrer"
+  />
 
-  <div class="crypto-item" data-symbol="ETH">
-    <img src="ethereum.PNG" alt="Ethereum">
-    <span>Ethereum</span>
-  </div>
+  <link rel="stylesheet" href="css/donation.css" />
+</head>
 
-  <div class="crypto-item" data-symbol="SOL">
-    <img src="solana.PNG" alt="Solana">
-    <span>Solana</span>
-  </div>
+<body class="donation-page">
 
-  <div class="crypto-item" data-symbol="USDT">
-    <img src="usdt.PNG" alt="USDT">
-    <span>USDT</span>
-  </div>
+  <!-- Header -->
+  <header class="don-header">
+    <div class="don-header-inner">
+      <div class="brand">
+        <img src="uncensored-logo.PNG" alt="Uncensored Social" class="logo" />
+        <div class="brand-text">
+          <div class="brand-name">Uncensored Social</div>
+          <div class="brand-tagline">Privacy-first social infrastructure</div>
+        </div>
+      </div>
 
-  <div class="crypto-item" data-symbol="USDC">
-    <img src="usdc.PNG" alt="USDC">
-    <span>USDC</span>
-  </div>
+      <a class="back-link" href="index.html" aria-label="Back to home">
+        <i class="fa-solid fa-arrow-left"></i>
+        <span>Back</span>
+      </a>
+    </div>
+  </header>
 
-  <div class="crypto-item" data-symbol="XMR">
-    <img src="monero.PNG" alt="Monero">
-    <span>Monero</span>
-  </div>
+  <!-- Hero -->
+  <section class="section hero-section">
+    <div class="hero-card">
+      <h1>Support the infrastructure</h1>
+      <p class="muted">
+        Donations directly fund privacy, censorship resistance, and the systems that keep the platform online.
+      </p>
+      <div class="hero-stats">
+        <div class="stat">
+          <i class="fa-solid fa-shield-halved"></i>
+          <span>censorship-resistant</span>
+        </div>
+        <div class="stat">
+          <i class="fa-solid fa-lock"></i>
+          <span>privacy focused</span>
+        </div>
+        <div class="stat">
+          <i class="fa-solid fa-server"></i>
+          <span>redundant infrastructure</span>
+        </div>
+      </div>
+    </div>
+  </section>
 
-</div>
+  <!-- What donations fund -->
+  <section class="section funding-section">
+    <h2>What donations fund</h2>
+    <div class="funding-grid">
+      <div class="funding-item">
+        <i class="fa-solid fa-route"></i>
+        <div>
+          <div class="funding-title">Tor integration</div>
+          <div class="funding-sub muted">privacy routing and access hardening</div>
+        </div>
+      </div>
+
+      <div class="funding-item">
+        <i class="fa-solid fa-comment-dots"></i>
+        <div>
+          <div class="funding-title">End-to-end encrypted messaging servers</div>
+          <div class="funding-sub muted">secure communication infrastructure</div>
+        </div>
+      </div>
+
+      <div class="funding-item">
+        <i class="fa-solid fa-database"></i>
+        <div>
+          <div class="funding-title">Bulletproof servers</div>
+          <div class="funding-sub muted">offshore + redundancy + uptime</div>
+        </div>
+      </div>
+
+      <div class="funding-item">
+        <i class="fa-solid fa-mobile-screen"></i>
+        <div>
+          <div class="funding-title">iOS & Android apps</div>
+          <div class="funding-sub muted">native builds + performance + security</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Donation flow -->
+  <section class="section donate-section">
+    <div class="donate-card">
+      <div class="donate-header">
+        <h2>Donate</h2>
+        <p class="muted">Choose an amount and a cryptocurrency. Copy the address or scan the QR.</p>
+      </div>
+
+      <!-- Amount -->
+      <div class="block">
+        <div class="block-title">
+          <i class="fa-solid fa-dollar-sign"></i>
+          <span>Select amount (USD)</span>
+        </div>
+
+        <div class="amount-grid" role="group" aria-label="Donation amount">
+          <button class="amt-btn" type="button" data-amount="5">$5</button>
+          <button class="amt-btn" type="button" data-amount="10">$10</button>
+          <button class="amt-btn" type="button" data-amount="25">$25</button>
+          <button class="amt-btn" type="button" data-amount="50">$50</button>
+          <button class="amt-btn" type="button" data-amount="100">$100</button>
+          <button class="amt-btn custom" type="button">Custom</button>
+        </div>
+
+        <input
+          class="custom-input"
+          type="number"
+          inputmode="decimal"
+          min="1"
+          step="0.01"
+          placeholder="Enter custom amount"
+          aria-label="Custom donation amount"
+        />
+      </div>
+
+      <!-- Crypto -->
+      <div class="block">
+        <div class="block-title">
+          <i class="fa-brands fa-bitcoin"></i>
+          <span>Select cryptocurrency</span>
+        </div>
+
+        <div class="crypto-grid" role="group" aria-label="Cryptocurrency selection">
+          <button class="crypto-item" type="button" data-symbol="BTC">
+            <img src="bitcoin.PNG" alt="Bitcoin icon" />
+            <div class="crypto-meta">
+              <div class="crypto-name">Bitcoin</div>
+              <div class="crypto-sub muted">BTC</div>
+            </div>
+          </button>
+
+          <button class="crypto-item" type="button" data-symbol="ETH">
+            <img src="ethereum.PNG" alt="Ethereum icon" />
+            <div class="crypto-meta">
+              <div class="crypto-name">Ethereum</div>
+              <div class="crypto-sub muted">ETH</div>
+            </div>
+          </button>
+
+          <button class="crypto-item" type="button" data-symbol="SOL">
+            <img src="solana.PNG" alt="Solana icon" />
+            <div class="crypto-meta">
+              <div class="crypto-name">Solana</div>
+              <div class="crypto-sub muted">SOL</div>
+            </div>
+          </button>
+
+          <button class="crypto-item" type="button" data-symbol="USDT">
+            <img src="usdt.PNG" alt="USDT icon" />
+            <div class="crypto-meta">
+              <div class="crypto-name">USDT</div>
+              <div class="crypto-sub muted">tether</div>
+            </div>
+          </button>
+
+          <button class="crypto-item" type="button" data-symbol="USDC">
+            <img src="usdc.PNG" alt="USDC icon" />
+            <div class="crypto-meta">
+              <div class="crypto-name">USDC</div>
+              <div class="crypto-sub muted">usd coin</div>
+            </div>
+          </button>
+
+          <button class="crypto-item" type="button" data-symbol="XMR">
+            <img src="monero.PNG" alt="Monero icon" />
+            <div class="crypto-meta">
+              <div class="crypto-name">Monero</div>
+              <div class="crypto-sub muted">XMR</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Wallet + QR -->
+      <div class="wallet-section" aria-live="polite">
+        <div class="wallet-top">
+          <div class="wallet-title">
+            <i class="fa-solid fa-wallet"></i>
+            <span>Wallet address</span>
+          </div>
+
+          <button class="copy-btn" type="button">
+            <i class="fa-solid fa-copy"></i>
+            <span>Copy address</span>
+          </button>
+        </div>
+
+        <div class="wallet-address" tabindex="0"></div>
+        <div class="crypto-price muted"></div>
+        <div class="qr-panel"></div>
+      </div>
+
+      <!-- Summary -->
+      <div class="donation-summary"></div>
+
+      <div class="fineprint muted">
+        Rates are approximate. Always verify the address and network before sending.
+      </div>
+    </div>
+  </section>
+
+  <script src="js/donations.js"></script>
+</body>
+</html>
