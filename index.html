@@ -3,230 +3,282 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Home - Uncensored Social</title>
+  <title>Donate — Uncensored Social</title>
 
-  <!-- Styles -->
-  <link rel="stylesheet" href="css/styles.css" />
-  <link rel="stylesheet" href="css/feed-styles.css" />
-  <link rel="stylesheet" href="css/icons.css" />
+  <!-- Font Awesome (UI icons only) -->
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-    integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
-    crossorigin="anonymous"
     referrerpolicy="no-referrer"
   />
 
-  <!-- Desktop tweaks: center feed, show full composer, and style bottom nav icons -->
-  <style>
-    @media (min-width: 900px) {
-      .content-wrapper {
-        max-width: 960px;
-        margin: 0 auto;
-        padding-top: 72px; /* push content down so post box isn't cut off */
-      }
-      .main-content {
-        max-width: 700px;
-        margin: 0 auto;
-      }
-    }
-
-    /* Force bottom nav to be visible on desktop too */
-    @media (min-width: 768px) {
-      .bottom-nav {
-        display: flex !important;
-      }
-    }
-
-    /* Font Awesome icons above labels in bottom nav */
-    .bottom-nav .nav-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 2px;
-    }
-
-    .bottom-nav .nav-icon {
-      font-size: 1.1rem;
-      line-height: 1;
-    }
-  </style>
+  <!-- ✅ lowercase on purpose -->
+  <link rel="stylesheet" href="css/donation-styles.css" />
 </head>
 
-<body>
-  <!-- ================= HEADER ================= -->
-  <header class="header">
-    <div class="header-left">
-      <div class="profile-section" id="profileSection">
-        <a href="profile.html" class="profile-icon">
-          <img
-            id="headerProfileImg"
-            src="default-profile.PNG"
-            alt="Profile"
-          />
-        </a>
+<body class="donation-page">
+
+  <!-- Header -->
+  <header class="don-header">
+    <div class="don-header-inner">
+      <div class="brand">
+        <img src="uncensored-logo.PNG" alt="Uncensored Social" class="logo" />
+        <div class="brand-text">
+          <div class="brand-name">Uncensored Social</div>
+          <div class="brand-tagline">Free speech. Real reach. Privacy-first.</div>
+        </div>
       </div>
 
-      <div class="auth-buttons" id="authButtons">
-        <a href="login.html" class="btn btn-sm btn-login">Log In</a>
-        <a href="signup.html" class="btn btn-sm btn-signup">Sign Up</a>
-      </div>
-    </div>
-
-    <h1 class="logo">Uncensored<span>Social</span></h1>
-
-    <div class="header-actions">
-      <button
-        class="btn btn-ghost btn-icon"
-        onclick="refreshFeed()"
-        title="Refresh"
-      >
-        <span class="icon icon-refresh"></span>
-      </button>
+      <a class="back-link" href="index.html" aria-label="Back to home">
+        <i class="fa-solid fa-arrow-left"></i>
+        <span>Back</span>
+      </a>
     </div>
   </header>
 
-  <!-- ================= MAIN CONTENT ================= -->
-  <div class="content-wrapper">
-    <main class="main-content">
-      <!-- ===== Post Creation Box ===== -->
-      <div class="post-creation auth-dependent" id="postCreation">
-        <div class="post-input-container">
-          <!-- SINGLE PROFILE PIC -->
-          <img
-            src="default-profile.PNG"
-            alt="You"
-            class="post-avatar"
-            id="postUserAvatar"
-          />
+  <!-- What donations fund (now the main top section) -->
+  <section class="section funding-section">
+    <div class="funding-top">
+      <h1>What donations fund</h1>
+      <p class="muted">
+        Your donation helps keep Uncensored Social online and growing — servers, encrypted messaging, Tor integration,
+        mobile apps, and future updates.
+      </p>
+    </div>
 
-          <textarea
-            id="postInput"
-            class="post-input"
-            placeholder="What's happening?"
-            maxlength="280"
-          ></textarea>
+    <div class="funding-grid">
+      <div class="funding-item">
+        <!-- ✅ NEW onion icon (different SVG, cleaner onion look) -->
+        <div class="onion-icon" aria-hidden="true">
+          <svg viewBox="0 0 64 64" width="22" height="22" class="onion-svg" role="img" aria-label="Onion icon">
+            <!-- top sprout -->
+            <path d="M32 6c3 3 4 7 3 11c-1-3-3-5-6-6c1-2 2-4 3-5z" opacity="0.85"/>
+            <path d="M32 6c-3 3-4 7-3 11c1-3 3-5 6-6c-1-2-2-4-3-5z" opacity="0.55"/>
+            <!-- onion body -->
+            <path d="M32 14c-9 7-20 16-20 30c0 10 8 18 20 18s20-8 20-18c0-14-11-23-20-30z"/>
+            <!-- inner layers -->
+            <path d="M32 20c-6 6-12 11-12 22c0 7 5 12 12 12s12-5 12-12c0-11-6-16-12-22z" opacity="0.45"/>
+            <path d="M32 25c-4 4-7 8-7 16c0 5 3 8 7 8s7-3 7-8c0-8-3-12-7-16z" opacity="0.35"/>
+            <!-- bottom tip -->
+            <path d="M32 62c-2-2-3-4-3-6h6c0 2-1 4-3 6z" opacity="0.65"/>
+          </svg>
+        </div>
+        <div>
+          <div class="funding-title">Tor integration</div>
+          <div class="funding-sub muted">privacy routing, access hardening, safer usage</div>
+        </div>
+      </div>
+
+      <div class="funding-item">
+        <i class="fa-solid fa-comments"></i>
+        <div>
+          <div class="funding-title">End-to-end encrypted messaging</div>
+          <div class="funding-sub muted">secure communication systems we’re implementing</div>
+        </div>
+      </div>
+
+      <div class="funding-item">
+        <i class="fa-solid fa-server"></i>
+        <div>
+          <div class="funding-title">Servers & uptime</div>
+          <div class="funding-sub muted">hosting, redundancy, scaling, backups, protection</div>
+        </div>
+      </div>
+
+      <div class="funding-item">
+        <i class="fa-solid fa-bullhorn"></i>
+        <div>
+          <div class="funding-title">Marketing & growth</div>
+          <div class="funding-sub muted">bringing in more users, creators, and reach</div>
+        </div>
+      </div>
+
+      <div class="funding-item">
+        <i class="fa-solid fa-mobile-screen"></i>
+        <div>
+          <div class="funding-title">iOS & Android apps</div>
+          <div class="funding-sub muted">native performance, better UX, better security</div>
+        </div>
+      </div>
+
+      <div class="funding-item">
+        <i class="fa-solid fa-wrench"></i>
+        <div>
+          <div class="funding-title">Future updates</div>
+          <div class="funding-sub muted">new features, improvements, stability over time</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Donation flow -->
+  <section class="section donate-section">
+    <div class="donate-card">
+      <div class="donate-header">
+        <h2>Donate</h2>
+        <p class="muted">Choose an amount and a cryptocurrency. Copy the address or scan the QR.</p>
+      </div>
+
+      <!-- Amount -->
+      <div class="block">
+        <div class="block-title">
+          <i class="fa-solid fa-dollar-sign"></i>
+          <span>Select amount (USD)</span>
         </div>
 
-        <!-- Media upload row -->
-        <div class="post-media-row">
-          <input
-            type="file"
-            id="postMediaInput"
-            accept="image/*,video/*"
-            style="display: none"
-          />
+        <div class="amount-grid" role="group" aria-label="Donation amount">
+          <button class="amt-btn" type="button" data-amount="5">$5</button>
+          <button class="amt-btn" type="button" data-amount="10">$10</button>
+          <button class="amt-btn" type="button" data-amount="25">$25</button>
+          <button class="amt-btn" type="button" data-amount="50">$50</button>
+          <button class="amt-btn" type="button" data-amount="100">$100</button>
+          <button class="amt-btn custom" type="button">Custom</button>
+        </div>
 
-          <button
-            type="button"
-            class="btn btn-secondary"
-            id="addMediaBtn"
-          >
-            Add image / video
+        <input
+          class="custom-input"
+          type="number"
+          inputmode="decimal"
+          min="1"
+          step="0.01"
+          placeholder="Enter custom amount"
+          aria-label="Custom donation amount"
+        />
+      </div>
+
+      <!-- Crypto -->
+      <div class="block">
+        <div class="block-title">
+          <i class="fa-brands fa-bitcoin"></i>
+          <span>Select cryptocurrency</span>
+        </div>
+
+        <div class="crypto-grid" role="group" aria-label="Cryptocurrency selection">
+          <button class="crypto-item" type="button" data-symbol="BTC">
+            <img src="bitcoin.PNG" alt="Bitcoin icon" />
+            <div class="crypto-meta">
+              <div class="crypto-name">Bitcoin</div>
+              <div class="crypto-sub muted">BTC</div>
+            </div>
           </button>
 
-          <span id="mediaFileName" class="media-filename"></span>
-        </div>
+          <button class="crypto-item" type="button" data-symbol="ETH">
+            <img src="ethereum.PNG" alt="Ethereum icon" />
+            <div class="crypto-meta">
+              <div class="crypto-name">Ethereum</div>
+              <div class="crypto-sub muted">ETH</div>
+            </div>
+          </button>
 
-        <div class="post-actions-bar">
-          <div class="post-options">
-            <!-- character counter that feed.js updates -->
-            <span
-              id="charCounter"
-              class="char-counter composer-char-count"
-            >
-              0/280
-            </span>
-          </div>
+          <button class="crypto-item" type="button" data-symbol="SOL">
+            <img src="solana.PNG" alt="Solana icon" />
+            <div class="crypto-meta">
+              <div class="crypto-name">Solana</div>
+              <div class="crypto-sub muted">SOL</div>
+            </div>
+          </button>
 
-          <button class="btn btn-primary" id="postButton" disabled>
-            Post
+          <button class="crypto-item" type="button" data-symbol="USDT">
+            <img src="usdt.PNG" alt="USDT icon" />
+            <div class="crypto-meta">
+              <div class="crypto-name">USDT</div>
+              <div class="crypto-sub muted">Tether</div>
+            </div>
+          </button>
+
+          <button class="crypto-item" type="button" data-symbol="USDC">
+            <img src="usdc.PNG" alt="USDC icon" />
+            <div class="crypto-meta">
+              <div class="crypto-name">USDC</div>
+              <div class="crypto-sub muted">USD Coin</div>
+            </div>
+          </button>
+
+          <button class="crypto-item" type="button" data-symbol="XMR">
+            <img src="monero.PNG" alt="Monero icon" />
+            <div class="crypto-meta">
+              <div class="crypto-name">Monero</div>
+              <div class="crypto-sub muted">XMR</div>
+            </div>
           </button>
         </div>
       </div>
 
-      <!-- ===== FEED TABS ===== -->
-      <div class="feed-tabs" id="feedTabs">
-        <button
-          class="feed-tab-btn active"
-          data-tab="recent"
-          data-feed-mode="recent"
-        >
-          Recent
-        </button>
-        <button
-          class="feed-tab-btn"
-          data-tab="popular"
-          data-feed-mode="popular"
-        >
-          Popular
-        </button>
+      <!-- Wallet + QR -->
+      <div class="wallet-section" aria-live="polite">
+        <div class="wallet-top">
+          <div class="wallet-title">
+            <i class="fa-solid fa-wallet"></i>
+            <span>Wallet address</span>
+          </div>
+
+          <button class="copy-btn" type="button">
+            <i class="fa-solid fa-copy"></i>
+            <span>Copy address</span>
+          </button>
+        </div>
+
+        <div class="wallet-address" tabindex="0"></div>
+        <div class="crypto-price muted"></div>
+        <div class="qr-panel"></div>
       </div>
 
-      <!-- ===== GUEST MESSAGE ===== -->
-      <div class="guest-message" id="guestMessage">
-        <div class="guest-content">
-          <h2>Join the Conversation</h2>
-          <p>Create an account to interact, like, post, and more.</p>
+      <!-- Summary -->
+      <div class="donation-summary"></div>
 
-          <div class="guest-actions">
-            <a href="signup.html" class="btn btn-primary btn-lg"
-              >Create Account</a
-            >
-            <a href="login.html" class="btn btn-secondary btn-lg">Log In</a>
+      <div class="fineprint muted">
+        Rates are approximate. Always verify the address and network before sending.
+      </div>
+
+      <!-- Safe payments + Why crypto (NO social-proof badges anymore) -->
+      <div class="pay-trust">
+        <h3>Safe crypto payments</h3>
+        <p class="muted">
+          Donations are sent directly to official project wallets. You stay in control of your funds.
+        </p>
+
+        <div class="safe-list">
+          <div class="safe-item">
+            <i class="fa-solid fa-shield"></i>
+            <div>
+              <div class="safe-title">Direct & non-custodial</div>
+              <div class="safe-sub muted">You send from your wallet — no middleman holds your funds.</div>
+            </div>
+          </div>
+
+          <div class="safe-item">
+            <i class="fa-solid fa-check-double"></i>
+            <div>
+              <div class="safe-title">Verify before sending</div>
+              <div class="safe-sub muted">Copy the address and confirm the network shown above.</div>
+            </div>
+          </div>
+
+          <div class="safe-item">
+            <i class="fa-solid fa-lock"></i>
+            <div>
+              <div class="safe-title">Simple & private</div>
+              <div class="safe-sub muted">No account required. No processor can deplatform donations.</div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- ===== FEED ===== -->
-      <div class="feed" id="feedContainer">
-        <div class="loading-indicator" id="feedLoading">
-          <div class="loading-spinner"></div>
-          <span>Loading posts...</span>
+        <button class="accordion-btn" type="button" aria-expanded="false">
+          <span><i class="fa-solid fa-circle-question"></i> Why crypto?</span>
+          <i class="fa-solid fa-chevron-down chev"></i>
+        </button>
+
+        <div class="accordion-panel" hidden>
+          <ul class="why-list">
+            <li><i class="fa-solid fa-minus"></i> Traditional processors can freeze or block donations.</li>
+            <li><i class="fa-solid fa-minus"></i> Crypto keeps support direct and censorship-resistant.</li>
+            <li><i class="fa-solid fa-minus"></i> You control the transaction and can verify everything.</li>
+          </ul>
         </div>
-        <!-- shown when there are no posts -->
-        <div class="feed-empty" id="feedEmpty" style="display: none;">
-          <p>No posts yet. Be the first to post!</p>
-        </div>
       </div>
-    </main>
-  </div>
+    </div>
+  </section>
 
-  <!-- ================= BOTTOM NAV ================= -->
-  <nav class="bottom-nav" id="bottomNav">
-  <a href="index.html" class="nav-item">
-    <i class="fa-solid fa-house nav-icon"></i>
-    <span class="nav-label">Home</span>
-  </a>
-  <a href="search.html" class="nav-item active">
-    <i class="fa-solid fa-magnifying-glass nav-icon"></i>
-    <span class="nav-label">Search</span>
-  </a>
-  <a href="notifications.html" class="nav-item">
-    <i class="fa-regular fa-bell nav-icon"></i>
-    <span class="nav-label">Alerts</span>
-  </a>
-  <a href="messages.html" class="nav-item">
-    <i class="fa-regular fa-envelope nav-icon"></i>
-    <span class="nav-label">Messages</span>
-  </a>
-</nav>
-
-  <!-- Scripts -->
-  <script src="js/auth.js"></script>
-  <script src="js/feed.js"></script>
-  <script src="js/app.js"></script>
-
-  <!-- small helper for the refresh button -->
-  <script>
-    function refreshFeed() {
-      if (window.feedManager) {
-        window.feedManager.page = 1;
-        window.feedManager.hasMore = true;
-        window.feedManager.loadPosts(true);
-      }
-    }
-  </script>
+  <script src="js/donations.js"></script>
 </body>
 </html>
