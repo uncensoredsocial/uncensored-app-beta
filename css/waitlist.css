@@ -509,6 +509,7 @@ input::placeholder{ color: rgba(255,255,255,.35); }
   font-size:13px;
 }
 
+/* ✅ UPDATED per request: center crypto title + icons + button on all devices */
 .cryptoRow{
   margin-top:14px;
   padding:14px;
@@ -517,13 +518,17 @@ input::placeholder{ color: rgba(255,255,255,.35); }
   background: rgba(0,0,0,.28);
 
   display:flex;
+  flex-direction:column;
   align-items:center;
-  justify-content:space-between;
+  justify-content:center;
   gap:12px;
   flex-wrap:wrap;
+
+  text-align:center;
 }
+
 .cryptoTitle{ font-weight:950; color: rgba(255,255,255,.90); }
-.cryptoIcons{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.cryptoIcons{ display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap; }
 .cryptoIcons img{
   width:26px;height:26px;
   border-radius:8px;
