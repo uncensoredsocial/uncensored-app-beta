@@ -12,7 +12,7 @@
     referrerpolicy="no-referrer"
   />
 
-  <!-- ✅ Your renamed CSS file -->
+  <!-- ✅ lowercase on purpose -->
   <link rel="stylesheet" href="css/donation-styles.css" />
 </head>
 
@@ -36,124 +36,15 @@
     </div>
   </header>
 
-  <!-- Hero -->
-  <section class="section hero-section">
-    <div class="hero-card">
-      <h1>Support the infrastructure</h1>
-
-      <p class="muted hero-sub">
-        This is the platform built to protect your voice — no shadowbans, no silent reach-killing,
-        no censorship games. If you’re tired of being controlled, this is what you support.
-      </p>
-
-      <div class="hero-stats" aria-label="Platform benefits">
-        <div class="stat">
-          <i class="fa-solid fa-shield-halved"></i>
-          <span>Censorship Resistance</span>
-        </div>
-        <div class="stat">
-          <i class="fa-solid fa-lock"></i>
-          <span>Privacy Focused</span>
-        </div>
-        <div class="stat">
-          <i class="fa-solid fa-server"></i>
-          <span>Redundant Infrastructure</span>
-        </div>
-      </div>
-
-      <div class="hero-bottom" aria-label="What you're supporting">
-        <div class="pill">
-          <i class="fa-solid fa-database"></i>
-          <span>Servers that keep the platform online</span>
-        </div>
-        <div class="pill">
-          <i class="fa-solid fa-bullhorn"></i>
-          <span>Marketing to bring in more users</span>
-        </div>
-        <div class="pill">
-          <i class="fa-solid fa-comments"></i>
-          <span>End-to-end encrypted messaging</span>
-        </div>
-        <div class="pill">
-          <i class="fa-solid fa-wrench"></i>
-          <span>Future updates and feature upgrades</span>
-        </div>
-        <div class="pill">
-          <i class="fa-solid fa-mobile-screen"></i>
-          <span>iOS and Android apps</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Social proof + trust -->
-  <section class="section trust-section">
-    <div class="trust-grid">
-      <div class="trust-card">
-        <h2>Community-powered</h2>
-        <p class="muted">
-          No advertisers controlling reach. No pay-to-play algorithm. Built with supporters who want a platform
-          that doesn’t punish people for speaking.
-        </p>
-
-        <div class="proof-badges">
-          <div class="badge"><i class="fa-solid fa-users"></i><span>Community-funded</span></div>
-          <div class="badge"><i class="fa-solid fa-eye-slash"></i><span>No shadowbans</span></div>
-          <div class="badge"><i class="fa-solid fa-ban"></i><span>No censorship games</span></div>
-        </div>
-      </div>
-
-      <div class="trust-card">
-        <h2>Safe crypto payments</h2>
-        <p class="muted">
-          Donations are sent directly to official project wallets. You stay in control of your funds.
-        </p>
-
-        <div class="safe-list">
-          <div class="safe-item">
-            <i class="fa-solid fa-shield"></i>
-            <div>
-              <div class="safe-title">Direct & non-custodial</div>
-              <div class="safe-sub muted">You send from your wallet — no middleman holds your funds.</div>
-            </div>
-          </div>
-
-          <div class="safe-item">
-            <i class="fa-solid fa-check-double"></i>
-            <div>
-              <div class="safe-title">Verify before sending</div>
-              <div class="safe-sub muted">Copy the address and confirm the network shown on this page.</div>
-            </div>
-          </div>
-
-          <div class="safe-item">
-            <i class="fa-solid fa-lock"></i>
-            <div>
-              <div class="safe-title">Simple & private</div>
-              <div class="safe-sub muted">No account required. No payment processor can deplatform the page.</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Why crypto accordion -->
-        <button class="accordion-btn" type="button" aria-expanded="false">
-          <span><i class="fa-solid fa-circle-question"></i> Why crypto?</span>
-          <i class="fa-solid fa-chevron-down chev"></i>
-        </button>
-        <div class="accordion-panel" hidden>
-          <ul class="why-list">
-            <li><i class="fa-solid fa-minus"></i> Traditional processors can freeze or block donations.</li>
-            <li><i class="fa-solid fa-minus"></i> Crypto keeps support direct and censorship-resistant.</li>
-            <li><i class="fa-solid fa-minus"></i> You control the transaction and can verify everything.</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- What donations fund -->
+  <!-- What donations fund (now the main top section) -->
   <section class="section funding-section">
-    <h2>What donations fund</h2>
+    <div class="funding-top">
+      <h1>What donations fund</h1>
+      <p class="muted">
+        Your donation helps keep Uncensored Social online and growing — servers, encrypted messaging, Tor integration,
+        mobile apps, and future updates.
+      </p>
+    </div>
 
     <div class="funding-grid">
       <div class="funding-item">
@@ -172,33 +63,33 @@
       </div>
 
       <div class="funding-item">
-        <i class="fa-solid fa-comment-dots"></i>
+        <i class="fa-solid fa-comments"></i>
         <div>
           <div class="funding-title">End-to-end encrypted messaging</div>
-          <div class="funding-sub muted">secure communication infrastructure we are building</div>
+          <div class="funding-sub muted">secure communication systems we’re implementing</div>
         </div>
       </div>
 
       <div class="funding-item">
-        <i class="fa-solid fa-database"></i>
+        <i class="fa-solid fa-server"></i>
         <div>
-          <div class="funding-title">Servers and uptime</div>
-          <div class="funding-sub muted">bulletproof hosting, redundancy, backups, scaling</div>
+          <div class="funding-title">Servers & uptime</div>
+          <div class="funding-sub muted">hosting, redundancy, scaling, backups, protection</div>
         </div>
       </div>
 
       <div class="funding-item">
         <i class="fa-solid fa-bullhorn"></i>
         <div>
-          <div class="funding-title">Marketing and growth</div>
-          <div class="funding-sub muted">more users, more creators, stronger network effect</div>
+          <div class="funding-title">Marketing & growth</div>
+          <div class="funding-sub muted">bringing in more users, creators, and reach</div>
         </div>
       </div>
 
       <div class="funding-item">
         <i class="fa-solid fa-mobile-screen"></i>
         <div>
-          <div class="funding-title">iOS and Android apps</div>
+          <div class="funding-title">iOS & Android apps</div>
           <div class="funding-sub muted">native performance, better UX, better security</div>
         </div>
       </div>
@@ -207,7 +98,7 @@
         <i class="fa-solid fa-wrench"></i>
         <div>
           <div class="funding-title">Future updates</div>
-          <div class="funding-sub muted">new features, improvements, and long-term stability</div>
+          <div class="funding-sub muted">new features, improvements, stability over time</div>
         </div>
       </div>
     </div>
@@ -330,6 +221,59 @@
 
       <div class="fineprint muted">
         Rates are approximate. Always verify the address and network before sending.
+      </div>
+
+      <!-- ✅ moved trust + why-crypto BELOW wallet/QR -->
+      <div class="pay-trust">
+        <h3>Safe crypto payments</h3>
+        <p class="muted">
+          Donations are sent directly to official project wallets. You stay in control of your funds.
+        </p>
+
+        <div class="safe-list">
+          <div class="safe-item">
+            <i class="fa-solid fa-shield"></i>
+            <div>
+              <div class="safe-title">Direct & non-custodial</div>
+              <div class="safe-sub muted">You send from your wallet — no middleman holds your funds.</div>
+            </div>
+          </div>
+
+          <div class="safe-item">
+            <i class="fa-solid fa-check-double"></i>
+            <div>
+              <div class="safe-title">Verify before sending</div>
+              <div class="safe-sub muted">Copy the address and confirm the network shown above.</div>
+            </div>
+          </div>
+
+          <div class="safe-item">
+            <i class="fa-solid fa-lock"></i>
+            <div>
+              <div class="safe-title">Simple & private</div>
+              <div class="safe-sub muted">No account required. No processor can deplatform donations.</div>
+            </div>
+          </div>
+        </div>
+
+        <button class="accordion-btn" type="button" aria-expanded="false">
+          <span><i class="fa-solid fa-circle-question"></i> Why crypto?</span>
+          <i class="fa-solid fa-chevron-down chev"></i>
+        </button>
+
+        <div class="accordion-panel" hidden>
+          <ul class="why-list">
+            <li><i class="fa-solid fa-minus"></i> Traditional processors can freeze or block donations.</li>
+            <li><i class="fa-solid fa-minus"></i> Crypto keeps support direct and censorship-resistant.</li>
+            <li><i class="fa-solid fa-minus"></i> You control the transaction and can verify everything.</li>
+          </ul>
+        </div>
+
+        <div class="social-proof">
+          <div class="badge"><i class="fa-solid fa-users"></i><span>Community-funded</span></div>
+          <div class="badge"><i class="fa-solid fa-eye-slash"></i><span>No shadowbans</span></div>
+          <div class="badge"><i class="fa-solid fa-ban"></i><span>No censorship games</span></div>
+        </div>
       </div>
     </div>
   </section>
