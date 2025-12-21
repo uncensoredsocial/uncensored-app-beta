@@ -119,16 +119,20 @@ img{ display:block; }
   text-align:center;
 }
 
-/* ✅ New onion icon styles */
+/* ✅ Onion (Tor) icon — forced visible */
 .onion-icon{
   margin-top:2px;
   width:22px;
   height:22px;
   display:grid;
   place-items:center;
+  flex: 0 0 22px;
 }
 .onion-svg{
-  fill: var(--accent);
+  width:22px;
+  height:22px;
+  display:block;
+  fill: var(--accent) !important;
 }
 
 .funding-title{ font-weight: 900; }
