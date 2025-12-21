@@ -1,5 +1,5 @@
 // donations.js — Uncensored Social Donation Page
-// Includes: live rates, QR, copy, summary, localStorage, section reveal, back-to-top, "Why crypto" accordion
+// Includes: live rates, QR, copy, summary, localStorage, section reveal, back-to-top, why-crypto accordion
 // No confetti.
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -31,7 +31,6 @@ function setupAmountSelection() {
 
       if (btn.classList.contains("custom")) {
         customInput.style.display = "block";
-        // Focus without forcing scrollIntoView (iOS scrolls enough already)
         setTimeout(() => customInput.focus({ preventScroll: false }), 0);
         selectedAmount = null;
         updateSummary();
@@ -46,11 +45,7 @@ function setupAmountSelection() {
 
   customInput.addEventListener("input", (e) => {
     const val = parseFloat(e.target.value);
-    if (!isNaN(val) && val > 0) {
-      selectedAmount = val;
-    } else {
-      selectedAmount = null;
-    }
+    selectedAmount = (!isNaN(val) && val > 0) ? val : null;
     updateSummary();
   });
 
@@ -147,19 +142,15 @@ function setupCryptoSelection() {
     }
   }
 
-  // Copy button
   if (copyBtn) {
     copyBtn.addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(walletAddress.textContent);
-
         copyBtn.innerHTML = `<i class="fa-solid fa-check"></i><span>Copied</span>`;
         copyBtn.style.background = "rgba(16,185,129,0.18)";
         copyBtn.style.borderColor = "rgba(16,185,129,0.45)";
-
         showToast("Wallet address copied");
         triggerHapticFeedback();
-
         setTimeout(() => {
           copyBtn.innerHTML = `<i class="fa-solid fa-copy"></i><span>Copy address</span>`;
           copyBtn.style.background = "";
@@ -171,7 +162,6 @@ function setupCryptoSelection() {
     });
   }
 
-  // allow rates refresh to update the line
   window.__updateCryptoPriceInfo = updateCryptoPriceInfo;
 }
 
@@ -391,14 +381,12 @@ function setupWhyCryptoAccordion() {
 // ======== TOAST =========
 function showToast(message, duration = 2300) {
   document.querySelectorAll(".toast").forEach((t) => t.remove());
-
   const toast = document.createElement("div");
   toast.className = "toast";
   toast.textContent = message;
   document.body.appendChild(toast);
 
   setTimeout(() => toast.classList.add("show"), 60);
-
   setTimeout(() => {
     toast.classList.remove("show");
     setTimeout(() => toast.remove(), 320);
