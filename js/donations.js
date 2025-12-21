@@ -1,4 +1,6 @@
-// donations.js — Uncensored Social Donation Page (NO confetti)
+// donations.js — Uncensored Social Donation Page
+// Includes: live rates, QR, copy, summary, localStorage, section reveal, back-to-top, "Why crypto" accordion
+// No confetti.
 
 document.addEventListener("DOMContentLoaded", () => {
   initializeApp();
@@ -8,9 +10,10 @@ function initializeApp() {
   setupAmountSelection();
   setupCryptoSelection();
   setupRealTimeRates();
-  setupScrollEffects();
+  setupScrollReveal();
   setupBackToTop();
   setupLocalStorage();
+  setupWhyCryptoAccordion();
 }
 
 // ======== AMOUNT SELECTION =========
@@ -28,8 +31,10 @@ function setupAmountSelection() {
 
       if (btn.classList.contains("custom")) {
         customInput.style.display = "block";
-        customInput.focus();
+        // Focus without forcing scrollIntoView (iOS scrolls enough already)
+        setTimeout(() => customInput.focus({ preventScroll: false }), 0);
         selectedAmount = null;
+        updateSummary();
       } else {
         customInput.style.display = "none";
         selectedAmount = parseFloat(btn.dataset.amount);
@@ -43,24 +48,15 @@ function setupAmountSelection() {
     const val = parseFloat(e.target.value);
     if (!isNaN(val) && val > 0) {
       selectedAmount = val;
-      updateSummary();
-    } else if (e.target.value === "") {
+    } else {
       selectedAmount = null;
-      updateSummary();
     }
+    updateSummary();
   });
 
   customInput.addEventListener("blur", (e) => {
     if (e.target.value && !isNaN(parseFloat(e.target.value))) {
       e.target.value = parseFloat(e.target.value).toFixed(2);
-    }
-  });
-
-  document.addEventListener("keydown", (e) => {
-    if (e.altKey && e.key >= "1" && e.key <= "6") {
-      e.preventDefault();
-      const index = parseInt(e.key, 10) - 1;
-      if (amountButtons[index]) amountButtons[index].click();
     }
   });
 }
@@ -73,46 +69,29 @@ function setupCryptoSelection() {
   const copyBtn = document.querySelector(".copy-btn");
   const cryptoPrice = document.querySelector(".crypto-price");
 
+  // Your real wallet addresses (from your provided snippet)
   const wallets = {
-    BTC: {
-      address: "bc1qc78ztftkxzehx3veuar3fstse2vcvd4nslzqvy",
-      networks: ["Bitcoin Mainnet"]
-    },
-    ETH: {
-      address: "0x20190e969bc2654219702413B8AacD3c0099000e",
-      networks: ["ERC-20 Only"]
-    },
-    SOL: {
-      address: "CunPMZC9QitsSrS1wbPUPEqXJ41jxejyok18FEFB1LFH",
-      networks: ["Solana Mainnet"]
-    },
-    USDT: {
-      address: "0x20190e969bc2654219702413B8AacD3c0099000e",
-      networks: ["ERC-20 Only"]
-    },
-    USDC: {
-      address: "CunPMZC9QitsSrS1wbPUPEqXJ41jxejyok18FEFB1LFH",
-      networks: ["Solana Only"]
-    },
-    XMR: {
-      address: "43nwFS7KR1xLavzjeFuUJj9zhMETFN1gVHbEMeCkYCJMTWpfGkEWjdJK76tkcFEWYAZdmYwXw2dbEEZEZAsa1bE6TQHV9bv",
-      networks: ["Monero Mainnet"]
-    }
+    BTC: { address: "bc1qc78ztftkxzehx3veuar3fstse2vcvd4nslzqvy", networks: ["Bitcoin Mainnet"] },
+    ETH: { address: "0x20190e969bc2654219702413B8AacD3c0099000e", networks: ["ERC-20 Only"] },
+    SOL: { address: "CunPMZC9QitsSrS1wbPUPEqXJ41jxejyok18FEFB1LFH", networks: ["Solana Mainnet"] },
+    USDT:{ address: "0x20190e969bc2654219702413B8AacD3c0099000e", networks: ["ERC-20 Only"] },
+    USDC:{ address: "CunPMZC9QitsSrS1wbPUPEqXJ41jxejyok18FEFB1LFH", networks: ["Solana Only"] },
+    XMR: { address: "43nwFS7KR1xLavzjeFuUJj9zhMETFN1gVHbEMeCkYCJMTWpfGkEWjdJK76tkcFEWYAZdmYwXw2dbEEZEZAsa1bE6TQHV9bv", networks: ["Monero Mainnet"] }
   };
 
   cryptoItems.forEach((item) => {
     item.addEventListener("click", () => {
       cryptoItems.forEach((i) => i.classList.remove("active"));
       item.classList.add("active");
-
       selectedCrypto = item.dataset.symbol;
-      showEnhancedWallet(selectedCrypto);
+
+      showWallet(selectedCrypto);
       updateSummary();
       triggerHapticFeedback();
     });
   });
 
-  function showEnhancedWallet(symbol) {
+  function showWallet(symbol) {
     if (!wallets[symbol]) return;
 
     walletSection.style.display = "block";
@@ -133,7 +112,7 @@ function setupCryptoSelection() {
     selector.className = "network-selector";
     selector.innerHTML = `
       <div style="margin-top:12px;">
-        <div class="muted" style="font-weight:900; margin-bottom:8px;">
+        <div class="muted" style="font-weight:950; margin-bottom:8px;">
           <i class="fa-solid fa-network-wired" style="color: var(--accent); margin-right:8px;"></i>
           Network
         </div>
@@ -146,22 +125,21 @@ function setupCryptoSelection() {
                 border:1px solid rgba(255,255,255,0.12);
                 background: rgba(0,0,0,0.45);
                 color:#fff;
-                font-weight:900;
+                font-weight:950;
               "
             >${n}</button>
           `).join("")}
         </div>
       </div>
     `;
-
     walletAddress.insertAdjacentElement("afterend", selector);
   }
 
   function updateCryptoPriceInfo(symbol) {
     const rate = rates[symbol] || 0;
     if (selectedAmount && rate > 0) {
-      const equivalent = (selectedAmount / rate).toFixed(symbol === "BTC" ? 8 : 6);
-      cryptoPrice.textContent = `$${selectedAmount.toFixed(2)} ≈ ${equivalent} ${symbol}`;
+      const eq = (selectedAmount / rate).toFixed(symbol === "BTC" ? 8 : 6);
+      cryptoPrice.textContent = `$${selectedAmount.toFixed(2)} ≈ ${eq} ${symbol}`;
     } else if (rate > 0) {
       cryptoPrice.textContent = `Current ${symbol} price: $${rate.toLocaleString()}`;
     } else {
@@ -169,30 +147,35 @@ function setupCryptoSelection() {
     }
   }
 
+  // Copy button
   if (copyBtn) {
     copyBtn.addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(walletAddress.textContent);
+
         copyBtn.innerHTML = `<i class="fa-solid fa-check"></i><span>Copied</span>`;
         copyBtn.style.background = "rgba(16,185,129,0.18)";
         copyBtn.style.borderColor = "rgba(16,185,129,0.45)";
+
         showToast("Wallet address copied");
         triggerHapticFeedback();
+
         setTimeout(() => {
           copyBtn.innerHTML = `<i class="fa-solid fa-copy"></i><span>Copy address</span>`;
           copyBtn.style.background = "";
           copyBtn.style.borderColor = "";
-        }, 1800);
+        }, 1600);
       } catch {
         showToast("Failed to copy address");
       }
     });
   }
 
+  // allow rates refresh to update the line
   window.__updateCryptoPriceInfo = updateCryptoPriceInfo;
 }
 
-// ======== RATES =========
+// ======== REAL-TIME RATES =========
 let rates = { BTC: 0, ETH: 0, SOL: 0, USDT: 0, USDC: 0, XMR: 0 };
 
 function setupRealTimeRates() {
@@ -203,11 +186,11 @@ function setupRealTimeRates() {
 
 async function fetchRates() {
   try {
-    const response = await fetch(
+    const res = await fetch(
       "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,tether,usd-coin,monero&vs_currencies=usd"
     );
-    if (!response.ok) throw new Error("API response not OK");
-    const data = await response.json();
+    if (!res.ok) throw new Error("Rates API error");
+    const data = await res.json();
 
     rates = {
       BTC: data.bitcoin?.usd || rates.BTC,
@@ -225,42 +208,42 @@ async function fetchRates() {
       window.__updateCryptoPriceInfo(selectedCrypto);
     }
   } catch {
-    console.warn("Failed to fetch live rates. Using cached rates.");
+    // keep last known rates
   }
 }
 
 function updateLivePricesDisplay() {
   document.querySelectorAll(".crypto-item").forEach((item) => {
     const symbol = item.dataset.symbol;
-    const currentRate = rates[symbol];
+    const rate = rates[symbol];
 
     const existing = item.querySelector(".live-price");
     if (existing) existing.remove();
 
-    if (currentRate && currentRate > 0) {
-      const price = document.createElement("div");
-      price.className = "live-price";
+    if (rate && rate > 0) {
+      const el = document.createElement("div");
+      el.className = "live-price";
 
       let formatted;
-      if (currentRate >= 1000) formatted = `$${currentRate.toLocaleString()}`;
-      else if (currentRate >= 1) formatted = `$${currentRate.toFixed(2)}`;
-      else formatted = `$${currentRate.toFixed(4)}`;
+      if (rate >= 1000) formatted = `$${rate.toLocaleString()}`;
+      else if (rate >= 1) formatted = `$${rate.toFixed(2)}`;
+      else formatted = `$${rate.toFixed(4)}`;
 
-      price.textContent = formatted;
+      el.textContent = formatted;
 
       const meta = item.querySelector(".crypto-meta");
-      if (meta) meta.appendChild(price);
-      else item.appendChild(price);
+      (meta || item).appendChild(el);
     }
   });
 }
 
-// ======== QR =========
+// ======== QR CODE =========
 function generateQRCode(address, symbol) {
   const qrPanel = document.querySelector(".qr-panel");
   if (!qrPanel || !address) return;
 
   qrPanel.innerHTML = "";
+
   const wrap = document.createElement("div");
   wrap.style.textAlign = "center";
   wrap.style.padding = "16px";
@@ -303,39 +286,16 @@ function updateSummary() {
     return;
   }
 
-  let equivalent, networkFee, totalCrypto;
+  let eq, fee, total;
+  if (selectedCrypto === "BTC") { eq = (selectedAmount / rate).toFixed(8); fee="0.0002"; total=(+eq + +fee).toFixed(8); }
+  else if (selectedCrypto === "ETH") { eq = (selectedAmount / rate).toFixed(6); fee="0.003"; total=(+eq + +fee).toFixed(6); }
+  else if (selectedCrypto === "SOL") { eq = (selectedAmount / rate).toFixed(4); fee="0.000005"; total=(+eq + +fee).toFixed(4); }
+  else if (selectedCrypto === "USDT") { eq = (selectedAmount / rate).toFixed(2); fee="0.003"; total=(+eq + +fee).toFixed(2); }
+  else if (selectedCrypto === "USDC") { eq = (selectedAmount / rate).toFixed(2); fee="0.000005"; total=(+eq + +fee).toFixed(2); }
+  else if (selectedCrypto === "XMR") { eq = (selectedAmount / rate).toFixed(6); fee="0.0001"; total=(+eq + +fee).toFixed(6); }
+  else { eq = (selectedAmount / rate).toFixed(6); fee="0.001"; total=(+eq + +fee).toFixed(6); }
 
-  if (selectedCrypto === "BTC") {
-    equivalent = (selectedAmount / rate).toFixed(8);
-    networkFee = "0.0002";
-    totalCrypto = (parseFloat(equivalent) + parseFloat(networkFee)).toFixed(8);
-  } else if (selectedCrypto === "ETH") {
-    equivalent = (selectedAmount / rate).toFixed(6);
-    networkFee = "0.003";
-    totalCrypto = (parseFloat(equivalent) + parseFloat(networkFee)).toFixed(6);
-  } else if (selectedCrypto === "SOL") {
-    equivalent = (selectedAmount / rate).toFixed(4);
-    networkFee = "0.000005";
-    totalCrypto = (parseFloat(equivalent) + parseFloat(networkFee)).toFixed(4);
-  } else if (selectedCrypto === "USDT") {
-    equivalent = (selectedAmount / rate).toFixed(2);
-    networkFee = "0.003";
-    totalCrypto = (parseFloat(equivalent) + parseFloat(networkFee)).toFixed(2);
-  } else if (selectedCrypto === "USDC") {
-    equivalent = (selectedAmount / rate).toFixed(2);
-    networkFee = "0.000005";
-    totalCrypto = (parseFloat(equivalent) + parseFloat(networkFee)).toFixed(2);
-  } else if (selectedCrypto === "XMR") {
-    equivalent = (selectedAmount / rate).toFixed(6);
-    networkFee = "0.0001";
-    totalCrypto = (parseFloat(equivalent) + parseFloat(networkFee)).toFixed(6);
-  } else {
-    equivalent = (selectedAmount / rate).toFixed(6);
-    networkFee = "0.001";
-    totalCrypto = (parseFloat(equivalent) + parseFloat(networkFee)).toFixed(6);
-  }
-
-  const displayNames = { BTC: "Bitcoin", ETH: "Ethereum", SOL: "Solana", USDT: "USDT", USDC: "USDC", XMR: "Monero" };
+  const displayNames = { BTC:"Bitcoin", ETH:"Ethereum", SOL:"Solana", USDT:"USDT", USDC:"USDC", XMR:"Monero" };
 
   box.innerHTML = `
     <div class="enhanced-summary">
@@ -353,17 +313,17 @@ function updateSummary() {
 
       <div class="summary-line">
         <span class="summary-label">You send</span>
-        <span class="summary-value">${equivalent} ${selectedCrypto}</span>
+        <span class="summary-value">${eq} ${selectedCrypto}</span>
       </div>
 
       <div class="summary-line">
         <span class="summary-label">Est. network fee</span>
-        <span class="summary-value">~${networkFee} ${selectedCrypto}</span>
+        <span class="summary-value">~${fee} ${selectedCrypto}</span>
       </div>
 
       <div class="summary-line total">
         <span class="summary-label">Total to send</span>
-        <span class="summary-value">${totalCrypto} ${selectedCrypto}</span>
+        <span class="summary-value">${total} ${selectedCrypto}</span>
       </div>
 
       <div class="conversion-note">
@@ -384,23 +344,20 @@ function setupLocalStorage() {
 
 function saveDonationPreference() {
   const pref = { amount: selectedAmount, crypto: selectedCrypto, timestamp: Date.now() };
-  try {
-    localStorage.setItem("uncensoredDonationPref", JSON.stringify(pref));
-  } catch {}
+  try { localStorage.setItem("uncensoredDonationPref", JSON.stringify(pref)); } catch {}
 }
 
 function loadDonationPreference() {
   try {
     const saved = localStorage.getItem("uncensoredDonationPref");
     if (!saved) return;
-
     const pref = JSON.parse(saved);
     if (Date.now() - pref.timestamp > 24 * 60 * 60 * 1000) return;
 
     if (pref.amount) {
       selectedAmount = pref.amount;
       const preset = Array.from(document.querySelectorAll(".amt-btn")).find(
-        (b) => b.dataset.amount && parseFloat(b.dataset.amount) === parseFloat(pref.amount)
+        b => b.dataset.amount && parseFloat(b.dataset.amount) === parseFloat(pref.amount)
       );
       if (preset) preset.click();
       else {
@@ -411,21 +368,37 @@ function loadDonationPreference() {
     }
 
     if (pref.crypto) {
-      const item = Array.from(document.querySelectorAll(".crypto-item")).find((i) => i.dataset.symbol === pref.crypto);
+      const item = Array.from(document.querySelectorAll(".crypto-item"))
+        .find(i => i.dataset.symbol === pref.crypto);
       if (item) item.click();
     }
   } catch {}
 }
 
+// ======== WHY CRYPTO ACCORDION =========
+function setupWhyCryptoAccordion() {
+  const btn = document.querySelector(".accordion-btn");
+  const panel = document.querySelector(".accordion-panel");
+  if (!btn || !panel) return;
+
+  btn.addEventListener("click", () => {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    panel.hidden = expanded;
+  });
+}
+
 // ======== TOAST =========
-function showToast(message, duration = 2400) {
+function showToast(message, duration = 2300) {
   document.querySelectorAll(".toast").forEach((t) => t.remove());
+
   const toast = document.createElement("div");
   toast.className = "toast";
   toast.textContent = message;
   document.body.appendChild(toast);
 
   setTimeout(() => toast.classList.add("show"), 60);
+
   setTimeout(() => {
     toast.classList.remove("show");
     setTimeout(() => toast.remove(), 320);
@@ -434,19 +407,19 @@ function showToast(message, duration = 2400) {
 
 // ======== HAPTIC =========
 function triggerHapticFeedback() {
-  if (navigator.vibrate) navigator.vibrate(40);
+  if (navigator.vibrate) navigator.vibrate(35);
 }
 
-// ======== SCROLL EFFECTS =========
-function setupScrollEffects() {
+// ======== SCROLL REVEAL =========
+function setupScrollReveal() {
   const sections = document.querySelectorAll(".section");
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) entry.target.classList.add("in-view");
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (e.isIntersecting) e.target.classList.add("in-view");
     });
   }, { threshold: 0.12 });
 
-  sections.forEach((s) => observer.observe(s));
+  sections.forEach((s) => obs.observe(s));
 }
 
 // ======== BACK TO TOP =========
@@ -496,4 +469,4 @@ function setupBackToTop() {
   });
 }
 
-console.log("✅ Uncensored Social donation page loaded (no confetti)");
+console.log("✅ Uncensored Social donation page loaded");
