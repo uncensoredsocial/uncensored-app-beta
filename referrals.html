@@ -2,99 +2,159 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Referrals — Uncensored Social</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Referrals — Uncensored Social</title>
 
+  <!-- Keep filenames lowercase on GitHub Pages -->
   <link rel="stylesheet" href="css/referrals.css" />
 
-  <!-- Pre-launch config (still blocks real app pages elsewhere) -->
+  <!-- Optional: pre-launch config (does NOT log them into the platform) -->
   <script src="js/launch-config.js"></script>
 </head>
+
 <body>
   <div class="wrap">
+
     <header class="top">
       <div class="brand">
-        <div class="logoDot"></div>
-        <div>
+        <div class="logoDot" aria-hidden="true"></div>
+        <div class="brandText">
           <div class="title">Uncensored Social</div>
           <div class="sub">Referral Dashboard</div>
         </div>
       </div>
-      <button id="logoutBtn" class="btn ghost small hidden">Log out</button>
+
+      <button id="logoutBtn" class="btn ghost small hidden" type="button">Log out</button>
     </header>
 
-    <!-- AUTH -->
+    <!-- AUTH CARD -->
     <section id="authCard" class="card">
-      <h2>Early Access Account</h2>
-      <p class="muted">Create an account to track referrals. Platform access stays locked until launch.</p>
+      <h2>Create your Early Access account</h2>
+      <p class="muted">
+        This account is for referrals only until launch. You will not be able to access the platform yet.
+      </p>
 
-      <div class="tabs">
-        <button class="tab active" id="tabSignup">Sign up</button>
-        <button class="tab" id="tabLogin">Log in</button>
+      <div class="tabs" role="tablist" aria-label="Auth tabs">
+        <button id="tabSignup" class="tab active" type="button" role="tab" aria-selected="true">Sign up</button>
+        <button id="tabLogin" class="tab" type="button" role="tab" aria-selected="false">Log in</button>
       </div>
 
-      <form id="signupForm" class="form">
-        <div class="row"><input id="signupEmail" type="email" placeholder="Email" autocomplete="email" required /></div>
-        <div class="row"><input id="signupPass" type="password" placeholder="Password (min 6 chars)" autocomplete="new-password" required /></div>
-        <button type="submit" class="btn">Create account</button>
+      <!-- SIGNUP -->
+      <form id="signupForm" class="form" autocomplete="on">
+        <div class="field">
+          <label class="label" for="signupEmail">Email</label>
+          <input id="signupEmail" type="email" placeholder="you@example.com" autocomplete="email" required />
+        </div>
+
+        <div class="field">
+          <label class="label" for="signupPass">Password</label>
+          <input id="signupPass" type="password" placeholder="Password (min 6 chars)" autocomplete="new-password" required />
+          <div class="hint muted">Use at least 6 characters.</div>
+        </div>
+
+        <button type="submit" class="btn primary">Create account</button>
       </form>
 
-      <form id="loginForm" class="form hidden">
-        <div class="row"><input id="loginEmail" type="email" placeholder="Email" autocomplete="email" required /></div>
-        <div class="row"><input id="loginPass" type="password" placeholder="Password" autocomplete="current-password" required /></div>
-        <button type="submit" class="btn">Log in</button>
+      <!-- LOGIN -->
+      <form id="loginForm" class="form hidden" autocomplete="on">
+        <div class="field">
+          <label class="label" for="loginEmail">Email</label>
+          <input id="loginEmail" type="email" placeholder="you@example.com" autocomplete="email" required />
+        </div>
+
+        <div class="field">
+          <label class="label" for="loginPass">Password</label>
+          <input id="loginPass" type="password" placeholder="Password" autocomplete="current-password" required />
+        </div>
+
+        <button type="submit" class="btn primary">Log in</button>
       </form>
 
-      <div id="authStatus" class="status muted"></div>
+      <div id="authStatus" class="status muted" aria-live="polite"></div>
     </section>
 
     <!-- DASHBOARD -->
     <section id="dash" class="grid hidden">
+
+      <!-- Referral Link + Progress -->
       <div class="card">
         <h2>Your referral link</h2>
+
         <div class="row">
           <input id="refLink" readonly />
-          <button id="copyBtn" class="btn">Copy</button>
+          <button id="copyBtn" class="btn primary" type="button">Copy</button>
         </div>
-        <button id="shareBtn" class="btn ghost">Share</button>
+
+        <button id="shareBtn" class="btn ghost" type="button">Share</button>
 
         <div class="progressWrap">
           <div class="progressTop">
             <span class="muted">Progress</span>
             <span id="refCountPill" class="pill">0 invites</span>
           </div>
-          <div class="progress"><div id="progressFill"></div></div>
+
+          <div class="progress" aria-label="Invite progress">
+            <div id="progressFill"></div>
+          </div>
+
           <div id="tierText" class="muted small"></div>
         </div>
+
+        <div class="divider"></div>
+
+        <h3 class="sectionTitle">Rewards</h3>
+        <ul class="tiers">
+          <li><span class="tierNum">3</span> Early Access Priority</li>
+          <li><span class="tierNum">10</span> Founder Badge</li>
+          <li><span class="tierNum">25</span> Username Reservation</li>
+          <li><span class="tierNum">100</span> Lifetime Verified</li>
+        </ul>
       </div>
 
+      <!-- Username reservation -->
       <div class="card">
-        <h2>Reserve username</h2>
-        <p class="muted small">Unlocked at 25 invites.</p>
+        <h2>Reserve your username</h2>
+        <p class="muted small">
+          Unlocks at 25 invites. Reserved usernames can only be claimed by your account at launch.
+        </p>
 
         <div class="row">
-          <input id="usernameInput" placeholder="username" autocomplete="off" />
-          <button id="reserveBtn" class="btn" type="button">Reserve</button>
+          <input id="usernameInput" placeholder="username" autocomplete="off" autocapitalize="none" spellcheck="false" />
+          <button id="reserveBtn" class="btn primary" type="button">Reserve</button>
         </div>
-        <div id="reserveStatus" class="status muted"></div>
+
+        <div id="reserveStatus" class="status muted" aria-live="polite"></div>
+
+        <div class="divider"></div>
+
+        <div class="noteBox">
+          <div class="noteTitle">Rules</div>
+          <div class="noteText muted small">
+            3–20 characters. Letters (a–z), numbers (0–9), underscores only.
+          </div>
+        </div>
       </div>
 
+      <!-- Leaderboard -->
       <div class="card full">
         <div class="cardHead">
           <h2>Leaderboard</h2>
           <span class="muted small">Live</span>
         </div>
-        <div id="leaderboard" class="table"></div>
+        <div id="leaderboard" class="table" role="table" aria-label="Leaderboard"></div>
       </div>
 
+      <!-- Invited List -->
       <div class="card full">
         <div class="cardHead">
           <h2>People you invited</h2>
           <span class="muted small">Live</span>
         </div>
-        <div id="invitedList" class="table"></div>
+        <div id="invitedList" class="table" role="table" aria-label="Invited list"></div>
       </div>
+
     </section>
+
   </div>
 
   <script type="module" src="js/referrals-auth.js"></script>
