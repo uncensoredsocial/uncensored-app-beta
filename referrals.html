@@ -7,12 +7,11 @@
 
   <link rel="stylesheet" href="css/referrals.css" />
 
-  <!-- ✅ Pre-launch config (keeps app locked even if logged in) -->
+  <!-- Pre-launch config (still blocks real app pages elsewhere) -->
   <script src="js/launch-config.js"></script>
 </head>
 <body>
   <div class="wrap">
-
     <header class="top">
       <div class="brand">
         <div class="logoDot"></div>
@@ -21,14 +20,13 @@
           <div class="sub">Referral Dashboard</div>
         </div>
       </div>
-
       <button id="logoutBtn" class="btn ghost small hidden">Log out</button>
     </header>
 
-    <!-- AUTH CARD (signup/login on this page) -->
+    <!-- AUTH -->
     <section id="authCard" class="card">
-      <h2>Create your Early Access account</h2>
-      <p class="muted">This account is for referrals only until launch. You will not be able to access the platform yet.</p>
+      <h2>Early Access Account</h2>
+      <p class="muted">Create an account to track referrals. Platform access stays locked until launch.</p>
 
       <div class="tabs">
         <button class="tab active" id="tabSignup">Sign up</button>
@@ -36,22 +34,14 @@
       </div>
 
       <form id="signupForm" class="form">
-        <div class="row">
-          <input id="signupEmail" type="email" placeholder="Email" autocomplete="email" required />
-        </div>
-        <div class="row">
-          <input id="signupPass" type="password" placeholder="Password (min 6 chars)" autocomplete="new-password" required />
-        </div>
+        <div class="row"><input id="signupEmail" type="email" placeholder="Email" autocomplete="email" required /></div>
+        <div class="row"><input id="signupPass" type="password" placeholder="Password (min 6 chars)" autocomplete="new-password" required /></div>
         <button type="submit" class="btn">Create account</button>
       </form>
 
       <form id="loginForm" class="form hidden">
-        <div class="row">
-          <input id="loginEmail" type="email" placeholder="Email" autocomplete="email" required />
-        </div>
-        <div class="row">
-          <input id="loginPass" type="password" placeholder="Password" autocomplete="current-password" required />
-        </div>
+        <div class="row"><input id="loginEmail" type="email" placeholder="Email" autocomplete="email" required /></div>
+        <div class="row"><input id="loginPass" type="password" placeholder="Password" autocomplete="current-password" required /></div>
         <button type="submit" class="btn">Log in</button>
       </form>
 
@@ -62,12 +52,10 @@
     <section id="dash" class="grid hidden">
       <div class="card">
         <h2>Your referral link</h2>
-
         <div class="row">
           <input id="refLink" readonly />
           <button id="copyBtn" class="btn">Copy</button>
         </div>
-
         <button id="shareBtn" class="btn ghost">Share</button>
 
         <div class="progressWrap">
@@ -75,21 +63,20 @@
             <span class="muted">Progress</span>
             <span id="refCountPill" class="pill">0 invites</span>
           </div>
-          <div class="progress">
-            <div id="progressFill"></div>
-          </div>
+          <div class="progress"><div id="progressFill"></div></div>
           <div id="tierText" class="muted small"></div>
         </div>
       </div>
 
       <div class="card">
-        <h2>Rewards</h2>
-        <ul class="tiers">
-          <li><span class="tierNum">3</span> Early Access Priority</li>
-          <li><span class="tierNum">10</span> Founder Badge</li>
-          <li><span class="tierNum">25</span> Username Reservation</li>
-          <li><span class="tierNum">100</span> Lifetime Verified</li>
-        </ul>
+        <h2>Reserve username</h2>
+        <p class="muted small">Unlocked at 25 invites.</p>
+
+        <div class="row">
+          <input id="usernameInput" placeholder="username" autocomplete="off" />
+          <button id="reserveBtn" class="btn" type="button">Reserve</button>
+        </div>
+        <div id="reserveStatus" class="status muted"></div>
       </div>
 
       <div class="card full">
@@ -108,7 +95,6 @@
         <div id="invitedList" class="table"></div>
       </div>
     </section>
-
   </div>
 
   <script type="module" src="js/referrals-auth.js"></script>
