@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Join the Uncensored Network</title>
 
+    <!-- ✅ Pre-launch gate (blocks signup.html until launch) -->
+    <script src="js/launch-config.js"></script>
+    <script src="js/launch-guard.js"></script>
+
     <!-- Auth styles -->
     <link rel="stylesheet" href="css/auth-styles.css" />
 
@@ -204,8 +208,8 @@
             }
 
             .auth-card {
-                margin: 0 6px;           /* extra space from left/right edges */
-                padding: 28px 20px;      /* slightly tighter padding so it feels balanced */
+                margin: 0 6px;
+                padding: 28px 20px;
             }
         }
     </style>
@@ -286,6 +290,7 @@
         </div>
     </div>
 
+    <!-- Auth logic (won’t be reachable pre-launch because of redirect) -->
     <script src="js/auth.js"></script>
 </body>
 </html>
