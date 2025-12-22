@@ -17,6 +17,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 const authCard = document.getElementById("authCard");
 const dash = document.getElementById("dash");
 const logoutBtn = document.getElementById("logoutBtn");
+const settingsLogoutBtn = document.getElementById("settingsLogoutBtn");
 const authStatus = document.getElementById("authStatus");
 
 const tabSignup = document.getElementById("tabSignup");
@@ -183,13 +184,92 @@ tabSignup.addEventListener("click", () => setTab("signup"));
 tabLogin.addEventListener("click", () => setTab("login"));
 
 /* ============================================================
-   AUTH — SIGNUP / LOGIN / LOGOUT
+   REALTIME (LIVE)
 ============================================================ */
+function unsubscribeRealtime(){
+  try{
+    if (invitedChannel) supabase.removeChannel(invitedChannel);
+    if (leaderboardChannel) supabase.removeChannel(leaderboardChannel);
+  } catch {}
+  invitedChannel = null;
+  leaderboardChannel = null;
+}
 
+function subscribeRealtime(){
+  unsubscribeRealtime();
+
+  invitedChannel = supabase
+    .channel("invited-live")
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "waitlist_leads" },
+      (payload) => {
+        const row = payload?.new;
+        if (row && myLead && row.referred_by === myLead.ref_code){
+          loadInvited();
+        }
+      }
+    )
+    .subscribe();
+
+  leaderboardChannel = supabase
+    .channel("leaderboard-live")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "waitlist_leads" },
+      async () => {
+        await loadLeaderboard();
+        await refreshMyCount();
+      }
+    )
+    .subscribe();
+}
+
+/* ============================================================
+   LOGOUT (ON PAGE)
+============================================================ */
+async function doLogout(){
+  try{
+    await supabase.auth.signOut();
+  } catch {}
+
+  unsubscribeRealtime();
+
+  myLead = null;
+  refLinkEl.value = "";
+  progressFill.style.width = "0%";
+  refCountPill.textContent = "0 invites";
+  tierText.textContent = "";
+  reserveStatus.textContent = "";
+  usernameInput.value = "";
+
+  authCard.classList.remove("hidden");
+  dash.classList.add("hidden");
+  logoutBtn.classList.add("hidden");
+
+  // Optional: clear pending ref so it doesn’t get reused
+  // localStorage.removeItem("pending_ref");
+}
+
+if (logoutBtn){
+  logoutBtn.addEventListener("click", async () => {
+    await doLogout();
+  });
+}
+
+if (settingsLogoutBtn){
+  settingsLogoutBtn.addEventListener("click", async (e) => {
+    e.preventDefault();
+    await doLogout();
+  });
+}
+
+/* ============================================================
+   AUTH — SIGNUP / LOGIN
+============================================================ */
 /**
- * IMPORTANT:
- * This flow assumes you DISABLED "Confirm email" in Supabase.
- * Then signup is instant and we auto-login immediately.
+ * This assumes you turned OFF "Confirm email" in Supabase.
+ * Signup is instant; we auto-login right after signup.
  */
 signupForm.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -210,7 +290,6 @@ signupForm.addEventListener("submit", async (e) => {
     return;
   }
 
-  // Auto-login right after signup (no email verification)
   setStatus(authStatus, "Signing you in…");
   const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
 
@@ -222,7 +301,6 @@ signupForm.addEventListener("submit", async (e) => {
   setStatus(authStatus, "");
   await boot();
 
-  // Optional: remove signup form values
   signupEmail.value = "";
   signupPass.value = "";
 });
@@ -249,14 +327,6 @@ loginForm.addEventListener("submit", async (e) => {
 
   setStatus(authStatus, "");
   await boot();
-});
-
-/**
- * Header logout button sends them to the logout page (you asked for a logout page).
- * That page will sign out and redirect.
- */
-logoutBtn.addEventListener("click", () => {
-  window.location.href = "logout.html";
 });
 
 /* ============================================================
@@ -306,7 +376,6 @@ async function ensureMyLead(){
     throw new Error("Lead row missing after RPC.");
   }
 
-  // referrals.html?ref=CODE
   const origin = window.location.origin;
   const path = window.location.pathname;
   const baseDir = path.endsWith("/") ? path : path.replace(/[^/]*$/, "");
@@ -387,48 +456,6 @@ reserveBtn.addEventListener("click", async () => {
 });
 
 /* ============================================================
-   REALTIME (LIVE)
-============================================================ */
-function unsubscribeRealtime(){
-  try{
-    if (invitedChannel) supabase.removeChannel(invitedChannel);
-    if (leaderboardChannel) supabase.removeChannel(leaderboardChannel);
-  } catch {}
-  invitedChannel = null;
-  leaderboardChannel = null;
-}
-
-function subscribeRealtime(){
-  unsubscribeRealtime();
-
-  invitedChannel = supabase
-    .channel("invited-live")
-    .on(
-      "postgres_changes",
-      { event: "INSERT", schema: "public", table: "waitlist_leads" },
-      (payload) => {
-        const row = payload?.new;
-        if (row && myLead && row.referred_by === myLead.ref_code){
-          loadInvited();
-        }
-      }
-    )
-    .subscribe();
-
-  leaderboardChannel = supabase
-    .channel("leaderboard-live")
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "waitlist_leads" },
-      async () => {
-        await loadLeaderboard();
-        await refreshMyCount();
-      }
-    )
-    .subscribe();
-}
-
-/* ============================================================
    BOOT
 ============================================================ */
 async function boot(){
@@ -451,7 +478,6 @@ async function boot(){
   await loadInvited();
   subscribeRealtime();
 
-  // Optional: remove ?ref= from the URL once logged in (prevents re-storing pending_ref)
   if (window.location.search.includes("ref=")) {
     const cleanUrl = window.location.pathname;
     history.replaceState({}, "", cleanUrl);
