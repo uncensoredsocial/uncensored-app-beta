@@ -1,11 +1,17 @@
-(((() => {
-  if (window.LAUNCH_ENABLED === true) return;
+(() => {
+  const cfg = window.__UNCENSORED_LAUNCH__;
+  if (!cfg || cfg.enabled === true) return;
 
-  // allowed pre-launch pages
-  const allowed = ["referrals.html", "waitlist.html", "index.html", ""];
+  const allowedPages = [
+    "",                 // /
+    "index.html",
+    "waitlist.html",
+    "referrals.html"
+  ];
+
   const file = (location.pathname.split("/").pop() || "").toLowerCase();
 
-  if (!allowed.includes(file)) {
-    location.replace(window.PRELAUNCH_REDIRECT || "referrals.html");
+  if (!allowedPages.includes(file)) {
+    location.replace(cfg.redirect);
   }
 })();
