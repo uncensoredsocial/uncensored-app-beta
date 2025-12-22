@@ -3,8 +3,8 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 /* ============================================================
    CONFIG — PUT YOUR VALUES HERE
 ============================================================ */
-const SUPABASE_URL = "https://hbbbsreonwhvqfvbszne.supabase.co";
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
+const SUPABASE_URL = "https://YOUR_PROJECT.supabase.co";
+const SUPABASE_ANON = "YOUR_PUBLIC_ANON_KEY";
 
 /* ============================================================
    INIT
@@ -144,7 +144,6 @@ function renderRows(container, rows, mode){
       `;
     }
 
-    // invited list
     return `
       <div class="rowItem">
         <div class="left">
@@ -186,6 +185,12 @@ tabLogin.addEventListener("click", () => setTab("login"));
 /* ============================================================
    AUTH — SIGNUP / LOGIN / LOGOUT
 ============================================================ */
+
+/**
+ * IMPORTANT:
+ * This flow assumes you DISABLED "Confirm email" in Supabase.
+ * Then signup is instant and we auto-login immediately.
+ */
 signupForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -199,19 +204,27 @@ signupForm.addEventListener("submit", async (e) => {
 
   setStatus(authStatus, "Creating account…");
 
-  const { error } = await supabase.auth.signUp({ email, password });
-
-  // If you have "Confirm email" ON, user must confirm before session exists.
-  // You can keep it OFF for prelaunch so sign-up is instant.
-  if (error){
-    setStatus(authStatus, `Error: ${error.message}`);
+  const { error: signUpErr } = await supabase.auth.signUp({ email, password });
+  if (signUpErr){
+    setStatus(authStatus, `Error: ${signUpErr.message}`);
     return;
   }
 
-  setStatus(authStatus, "Account created. Now log in.");
-  setTab("login");
-  loginEmail.value = email;
-  loginPass.value = "";
+  // Auto-login right after signup (no email verification)
+  setStatus(authStatus, "Signing you in…");
+  const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+
+  if (signInErr){
+    setStatus(authStatus, `Error: ${signInErr.message}`);
+    return;
+  }
+
+  setStatus(authStatus, "");
+  await boot();
+
+  // Optional: remove signup form values
+  signupEmail.value = "";
+  signupPass.value = "";
 });
 
 loginForm.addEventListener("submit", async (e) => {
@@ -238,9 +251,12 @@ loginForm.addEventListener("submit", async (e) => {
   await boot();
 });
 
-logoutBtn.addEventListener("click", async () => {
-  await supabase.auth.signOut();
-  window.location.reload();
+/**
+ * Header logout button sends them to the logout page (you asked for a logout page).
+ * That page will sign out and redirect.
+ */
+logoutBtn.addEventListener("click", () => {
+  window.location.href = "logout.html";
 });
 
 /* ============================================================
@@ -273,7 +289,6 @@ shareBtn.addEventListener("click", async () => {
    DATA LOADERS
 ============================================================ */
 async function ensureMyLead(){
-  // This RPC creates/finds your lead row and credits pending_ref once.
   const pendingRef = (localStorage.getItem("pending_ref") || "").trim() || null;
 
   const { data, error } = await supabase.rpc("create_my_lead", {
@@ -284,7 +299,6 @@ async function ensureMyLead(){
     throw new Error(error.message);
   }
 
-  // Clear it so refreshes don’t double-credit
   if (pendingRef) localStorage.removeItem("pending_ref");
 
   myLead = data?.[0];
@@ -292,10 +306,9 @@ async function ensureMyLead(){
     throw new Error("Lead row missing after RPC.");
   }
 
-  // Make a clean referral link:
   // referrals.html?ref=CODE
   const origin = window.location.origin;
-  const path = window.location.pathname; // /referrals.html
+  const path = window.location.pathname;
   const baseDir = path.endsWith("/") ? path : path.replace(/[^/]*$/, "");
   const refUrl = `${origin}${baseDir}referrals.html?ref=${encodeURIComponent(myLead.ref_code)}`;
 
@@ -388,7 +401,6 @@ function unsubscribeRealtime(){
 function subscribeRealtime(){
   unsubscribeRealtime();
 
-  // Live invited inserts (only matters if row's referred_by matches you)
   invitedChannel = supabase
     .channel("invited-live")
     .on(
@@ -403,7 +415,6 @@ function subscribeRealtime(){
     )
     .subscribe();
 
-  // Live leaderboard changes (any lead insert/update)
   leaderboardChannel = supabase
     .channel("leaderboard-live")
     .on(
@@ -425,23 +436,26 @@ async function boot(){
   const session = sessionData?.session;
 
   if (!session){
-    // Logged out
     authCard.classList.remove("hidden");
     dash.classList.add("hidden");
     logoutBtn.classList.add("hidden");
     return;
   }
 
-  // Logged in
   authCard.classList.add("hidden");
   dash.classList.remove("hidden");
   logoutBtn.classList.remove("hidden");
 
-  // Load everything
   await ensureMyLead();
   await loadLeaderboard();
   await loadInvited();
   subscribeRealtime();
+
+  // Optional: remove ?ref= from the URL once logged in (prevents re-storing pending_ref)
+  if (window.location.search.includes("ref=")) {
+    const cleanUrl = window.location.pathname;
+    history.replaceState({}, "", cleanUrl);
+  }
 }
 
 /* ============================================================
