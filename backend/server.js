@@ -44,7 +44,7 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'ssssss@gmail.com')
 app.use(
   cors({
     origin: [
-      'https://spepdb.github.io', // frontend
+      'https://uncensoredsocial.github.io', // frontend
       'https://uncensored-app-beta-production.up.railway.app' // backend (for tests / tools)
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
