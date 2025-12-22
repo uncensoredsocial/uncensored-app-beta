@@ -8,7 +8,7 @@
   <!-- Keep filenames lowercase on GitHub Pages -->
   <link rel="stylesheet" href="css/referrals.css" />
 
-  <!-- Optional: pre-launch config (does NOT log them into the platform) -->
+  <!-- Optional: pre-launch config -->
   <script src="js/launch-config.js"></script>
 </head>
 
@@ -17,13 +17,16 @@
 
     <header class="top">
       <div class="brand">
-        <div class="logoDot" aria-hidden="true"></div>
+        <!-- ✅ Your logo -->
+        <img src="uncensored-logo.PNG" alt="Uncensored Social" class="brandLogo" />
+
         <div class="brandText">
           <div class="title">Uncensored Social</div>
           <div class="sub">Referral Dashboard</div>
         </div>
       </div>
 
+      <!-- Simple button logout (header) -->
       <button id="logoutBtn" class="btn ghost small hidden" type="button">Log out</button>
     </header>
 
@@ -132,6 +135,21 @@
           <div class="noteText muted small">
             3–20 characters. Letters (a–z), numbers (0–9), underscores only.
           </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- ✅ Settings-style logout card INSIDE the referrals page -->
+        <div class="settings-list">
+          <a href="#" class="settings-link-card settings-link-danger" id="settingsLogoutBtn">
+            <div class="settings-link-text">
+              <div class="settings-link-title">Log out</div>
+              <div class="settings-link-description">
+                Sign out of Uncensored Social on this device.
+              </div>
+            </div>
+            <span class="settings-link-arrow">›</span>
+          </a>
         </div>
       </div>
 
