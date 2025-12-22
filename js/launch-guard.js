@@ -1,11 +1,11 @@
-(() => {
-  const launch = window.LAUNCH_ENABLED === true;
+(((() => {
+  if (window.LAUNCH_ENABLED === true) return;
 
-  // pages you want blocked until launch:
-  const blockedPages = ["/login.html", "/signup.html"];
+  // allowed pre-launch pages
+  const allowed = ["referrals.html", "waitlist.html", "index.html", ""];
+  const file = (location.pathname.split("/").pop() || "").toLowerCase();
 
-  const path = location.pathname.toLowerCase();
-  if (!launch && blockedPages.includes(path)) {
-    location.replace(window.PRELAUNCH_REDIRECT || "/waitlist.html");
+  if (!allowed.includes(file)) {
+    location.replace(window.PRELAUNCH_REDIRECT || "referrals.html");
   }
 })();
