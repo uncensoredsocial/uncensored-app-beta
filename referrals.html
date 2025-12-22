@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Your Referrals — Uncensored Social</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Uncensored Social — Early Access" />
+  <meta property="og:description" content="Join early access. Invite friends. Earn rewards." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://YOURDOMAIN.com/" />
+  <meta property="og:image" content="https://YOURDOMAIN.com/og-waitlist.png" />
+
+  <link rel="stylesheet" href="css/referrals.css" />
+</head>
+<body>
+
+<div class="container">
+  <h1>Your Referral Dashboard</h1>
+
+  <div class="card">
+    <p>Your referral link</p>
+    <input id="refLink" readonly />
+    <button id="copyBtn">Copy</button>
+    <button id="shareBtn">Share</button>
+  </div>
+
+  <div class="card">
+    <h2>Progress</h2>
+    <div class="progress">
+      <div id="progressFill"></div>
+    </div>
+    <p id="progressText"></p>
+  </div>
+
+  <div class="card">
+    <h2>Rewards</h2>
+    <ul>
+      <li>3 invites → Early Access Priority</li>
+      <li>10 invites → Founder Badge</li>
+      <li>25 invites → Username Reservation</li>
+      <li>100 invites → Lifetime Verified</li>
+    </ul>
+  </div>
+
+  <div class="card hidden" id="usernameBox">
+    <h2>Reserve your username</h2>
+    <input id="usernameInput" placeholder="username" />
+    <button id="reserveBtn">Reserve</button>
+    <p id="reserveStatus"></p>
+  </div>
+</div>
+
+<script src="js/referrals.js"></script>
+</body>
+</html>
