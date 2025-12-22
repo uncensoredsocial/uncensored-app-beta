@@ -1,15 +1,13 @@
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
-
 /* ============================================================
-   CONFIG — PUT YOUR VALUES HERE
+   SUPABASE CONFIG (your real values)
 ============================================================ */
 const SUPABASE_URL = "https://hbbbsreonwhvqfvbszne.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
 
 /* ============================================================
-   INIT
+   INIT (UMD build exposes window.supabase)
 ============================================================ */
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 /* ============================================================
    DOM
@@ -53,7 +51,7 @@ let invitedChannel = null;
 let leaderboardChannel = null;
 
 /* ============================================================
-   REF CAPTURE (credit referral once)
+   REF CAPTURE
 ============================================================ */
 const params = new URLSearchParams(window.location.search);
 const refFromUrl = params.get("ref");
@@ -184,12 +182,12 @@ tabSignup.addEventListener("click", () => setTab("signup"));
 tabLogin.addEventListener("click", () => setTab("login"));
 
 /* ============================================================
-   REALTIME (LIVE)
+   REALTIME
 ============================================================ */
 function unsubscribeRealtime(){
   try{
-    if (invitedChannel) supabase.removeChannel(invitedChannel);
-    if (leaderboardChannel) supabase.removeChannel(leaderboardChannel);
+    if (invitedChannel) supabaseClient.removeChannel(invitedChannel);
+    if (leaderboardChannel) supabaseClient.removeChannel(leaderboardChannel);
   } catch {}
   invitedChannel = null;
   leaderboardChannel = null;
@@ -198,10 +196,9 @@ function unsubscribeRealtime(){
 function subscribeRealtime(){
   unsubscribeRealtime();
 
-  invitedChannel = supabase
+  invitedChannel = supabaseClient
     .channel("invited-live")
-    .on(
-      "postgres_changes",
+    .on("postgres_changes",
       { event: "INSERT", schema: "public", table: "waitlist_leads" },
       (payload) => {
         const row = payload?.new;
@@ -212,10 +209,9 @@ function subscribeRealtime(){
     )
     .subscribe();
 
-  leaderboardChannel = supabase
+  leaderboardChannel = supabaseClient
     .channel("leaderboard-live")
-    .on(
-      "postgres_changes",
+    .on("postgres_changes",
       { event: "*", schema: "public", table: "waitlist_leads" },
       async () => {
         await loadLeaderboard();
@@ -226,13 +222,10 @@ function subscribeRealtime(){
 }
 
 /* ============================================================
-   LOGOUT (ON PAGE)
+   LOGOUT
 ============================================================ */
 async function doLogout(){
-  try{
-    await supabase.auth.signOut();
-  } catch {}
-
+  try { await supabaseClient.auth.signOut(); } catch {}
   unsubscribeRealtime();
 
   myLead = null;
@@ -246,31 +239,14 @@ async function doLogout(){
   authCard.classList.remove("hidden");
   dash.classList.add("hidden");
   logoutBtn.classList.add("hidden");
-
-  // Optional: clear pending ref so it doesn’t get reused
-  // localStorage.removeItem("pending_ref");
 }
 
-if (logoutBtn){
-  logoutBtn.addEventListener("click", async () => {
-    await doLogout();
-  });
-}
-
-if (settingsLogoutBtn){
-  settingsLogoutBtn.addEventListener("click", async (e) => {
-    e.preventDefault();
-    await doLogout();
-  });
-}
+logoutBtn?.addEventListener("click", doLogout);
+settingsLogoutBtn?.addEventListener("click", (e) => { e.preventDefault(); doLogout(); });
 
 /* ============================================================
-   AUTH — SIGNUP / LOGIN
+   AUTH (requires Confirm email OFF + Saved)
 ============================================================ */
-/**
- * This assumes you turned OFF "Confirm email" in Supabase.
- * Signup is instant; we auto-login right after signup.
- */
 signupForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -284,25 +260,27 @@ signupForm.addEventListener("submit", async (e) => {
 
   setStatus(authStatus, "Creating account…");
 
-  const { error: signUpErr } = await supabase.auth.signUp({ email, password });
-  if (signUpErr){
-    setStatus(authStatus, `Error: ${signUpErr.message}`);
-    return;
+  try {
+    const { error: signUpErr } = await supabaseClient.auth.signUp({ email, password });
+    if (signUpErr){
+      setStatus(authStatus, `Error: ${signUpErr.message}`);
+      return;
+    }
+
+    setStatus(authStatus, "Signing you in…");
+    const { error: signInErr } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (signInErr){
+      setStatus(authStatus, `Error: ${signInErr.message}`);
+      return;
+    }
+
+    setStatus(authStatus, "");
+    await boot();
+    signupEmail.value = "";
+    signupPass.value = "";
+  } catch (err) {
+    setStatus(authStatus, `Error: ${err?.message || err || "Load failed"}`);
   }
-
-  setStatus(authStatus, "Signing you in…");
-  const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
-
-  if (signInErr){
-    setStatus(authStatus, `Error: ${signInErr.message}`);
-    return;
-  }
-
-  setStatus(authStatus, "");
-  await boot();
-
-  signupEmail.value = "";
-  signupPass.value = "";
 });
 
 loginForm.addEventListener("submit", async (e) => {
@@ -318,15 +296,17 @@ loginForm.addEventListener("submit", async (e) => {
 
   setStatus(authStatus, "Logging in…");
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-  if (error){
-    setStatus(authStatus, `Error: ${error.message}`);
-    return;
+  try {
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error){
+      setStatus(authStatus, `Error: ${error.message}`);
+      return;
+    }
+    setStatus(authStatus, "");
+    await boot();
+  } catch (err) {
+    setStatus(authStatus, `Error: ${err?.message || err || "Load failed"}`);
   }
-
-  setStatus(authStatus, "");
-  await boot();
 });
 
 /* ============================================================
@@ -356,25 +336,20 @@ shareBtn.addEventListener("click", async () => {
 });
 
 /* ============================================================
-   DATA LOADERS
+   DATA
 ============================================================ */
 async function ensureMyLead(){
   const pendingRef = (localStorage.getItem("pending_ref") || "").trim() || null;
 
-  const { data, error } = await supabase.rpc("create_my_lead", {
+  const { data, error } = await supabaseClient.rpc("create_my_lead", {
     p_referred_by: pendingRef
   });
 
-  if (error){
-    throw new Error(error.message);
-  }
-
+  if (error) throw new Error(error.message);
   if (pendingRef) localStorage.removeItem("pending_ref");
 
   myLead = data?.[0];
-  if (!myLead || !myLead.ref_code){
-    throw new Error("Lead row missing after RPC.");
-  }
+  if (!myLead || !myLead.ref_code) throw new Error("Lead row missing after RPC.");
 
   const origin = window.location.origin;
   const path = window.location.pathname;
@@ -386,7 +361,7 @@ async function ensureMyLead(){
 }
 
 async function loadLeaderboard(){
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from("leaderboard")
     .select("ref_code, ref_count, email_masked, created_at")
     .limit(25);
@@ -405,7 +380,7 @@ async function loadInvited(){
     return;
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from("waitlist_leads")
     .select("email, created_at, referred_by")
     .eq("referred_by", myLead.ref_code)
@@ -421,7 +396,7 @@ async function loadInvited(){
 }
 
 async function refreshMyCount(){
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from("waitlist_leads")
     .select("ref_count, ref_code, email")
     .single();
@@ -433,7 +408,7 @@ async function refreshMyCount(){
 }
 
 /* ============================================================
-   USERNAME RESERVATION (SERVER ENFORCED)
+   RESERVE USERNAME
 ============================================================ */
 reserveBtn.addEventListener("click", async () => {
   setStatus(reserveStatus, "Reserving…");
@@ -444,7 +419,7 @@ reserveBtn.addEventListener("click", async () => {
     return;
   }
 
-  const { data, error } = await supabase.rpc("reserve_username", { p_username: username });
+  const { data, error } = await supabaseClient.rpc("reserve_username", { p_username: username });
 
   if (error){
     setStatus(reserveStatus, `Error: ${error.message}`);
@@ -459,7 +434,7 @@ reserveBtn.addEventListener("click", async () => {
    BOOT
 ============================================================ */
 async function boot(){
-  const { data: sessionData } = await supabase.auth.getSession();
+  const { data: sessionData } = await supabaseClient.auth.getSession();
   const session = sessionData?.session;
 
   if (!session){
@@ -484,7 +459,4 @@ async function boot(){
   }
 }
 
-/* ============================================================
-   START
-============================================================ */
 boot();
