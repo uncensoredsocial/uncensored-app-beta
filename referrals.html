@@ -6,10 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <link rel="stylesheet" href="css/referrals.css" />
-</head>
 
+  <!-- ✅ Pre-launch config (keeps app locked even if logged in) -->
+  <script src="js/launch-config.js"></script>
+</head>
 <body>
   <div class="wrap">
+
     <header class="top">
       <div class="brand">
         <div class="logoDot"></div>
@@ -22,17 +25,37 @@
       <button id="logoutBtn" class="btn ghost small hidden">Log out</button>
     </header>
 
-    <!-- LOGIN -->
-    <section id="loginCard" class="card">
-      <h2>Log in to see your referrals</h2>
-      <p class="muted">We’ll email you a magic link. This keeps invited emails private.</p>
+    <!-- AUTH CARD (signup/login on this page) -->
+    <section id="authCard" class="card">
+      <h2>Create your Early Access account</h2>
+      <p class="muted">This account is for referrals only until launch. You will not be able to access the platform yet.</p>
 
-      <div class="row">
-        <input id="loginEmail" type="email" placeholder="you@example.com" autocomplete="email" />
-        <button id="sendLinkBtn" class="btn">Send magic link</button>
+      <div class="tabs">
+        <button class="tab active" id="tabSignup">Sign up</button>
+        <button class="tab" id="tabLogin">Log in</button>
       </div>
 
-      <div id="loginStatus" class="status muted"></div>
+      <form id="signupForm" class="form">
+        <div class="row">
+          <input id="signupEmail" type="email" placeholder="Email" autocomplete="email" required />
+        </div>
+        <div class="row">
+          <input id="signupPass" type="password" placeholder="Password (min 6 chars)" autocomplete="new-password" required />
+        </div>
+        <button type="submit" class="btn">Create account</button>
+      </form>
+
+      <form id="loginForm" class="form hidden">
+        <div class="row">
+          <input id="loginEmail" type="email" placeholder="Email" autocomplete="email" required />
+        </div>
+        <div class="row">
+          <input id="loginPass" type="password" placeholder="Password" autocomplete="current-password" required />
+        </div>
+        <button type="submit" class="btn">Log in</button>
+      </form>
+
+      <div id="authStatus" class="status muted"></div>
     </section>
 
     <!-- DASHBOARD -->
@@ -85,8 +108,9 @@
         <div id="invitedList" class="table"></div>
       </div>
     </section>
+
   </div>
 
-  <script type="module" src="js/referrals.js"></script>
+  <script type="module" src="js/referrals-auth.js"></script>
 </body>
 </html>
