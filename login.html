@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Log In – UncensoredSocial</title>
 
-    <!-- ✅ Pre-launch gate (blocks login.html until launch) -->
-    <script src="js/launch-config.js"></script>
-    <script src="js/launch-guard.js"></script>
+    <script>
+      // Pre-launch: block login page completely
+      window.location.replace("waitlist.html");
+    </script>
 
     <!-- Global + auth styles -->
     <link rel="stylesheet" href="css/styles.css" />
@@ -129,7 +130,7 @@
         </a>
     </nav>
 
-    <!-- Auth logic (won’t be reachable pre-launch because of redirect) -->
+    <!-- Auth logic -->
     <script src="js/auth.js"></script>
 </body>
 </html>
