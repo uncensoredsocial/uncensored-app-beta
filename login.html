@@ -128,53 +128,57 @@
         </a>
     </nav>
 
-    <!-- ✅ Supabase (needed for admin-only enforcement) -->
+    <!-- ✅ Supabase (needed for routing admins/non-admins after login) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- Auth logic -->
     <script src="js/auth.js"></script>
 
-    <!-- ✅ Pre-launch: ONLY admins can stay logged in from login.html -->
+    <!-- ✅ Pre-launch behavior:
+         - everyone can open login.html
+         - after login:
+           - admin => index.html
+           - non-admin => prelaunch.html
+    -->
     <script>
       (function () {
         const cfg = window.__UNCENSORED_LAUNCH__ || {};
-        const redirect = cfg.redirect || "waitlist.html";
+        const prelaunch = cfg.prelaunchPage || "prelaunch.html";
         const admins = (cfg.adminEmails || []).map(e => String(e).toLowerCase());
 
-        // On launch day, normal behavior
+        // If launch is enabled, allow normal behavior (no forced redirects)
         if (cfg.enabled === true) return;
-
-        // Must have admins configured
-        if (!admins.length) {
-          window.location.replace(redirect);
-          return;
-        }
 
         const SUPABASE_URL = "https://hbbbsreonwhvqfvbszne.supabase.co";
         const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
         const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-        async function enforce() {
-          try {
-            const { data } = await sb.auth.getUser();
-            const email = (data?.user?.email || "").toLowerCase();
+        async function routeIfLoggedIn() {
+          const { data } = await sb.auth.getUser();
+          const email = (data?.user?.email || "").toLowerCase();
 
-            // Not logged in yet => allow viewing the login form
-            if (!email) return;
+          // Not logged in => stay on login page
+          if (!email) return;
 
-            // Logged in but not admin => kick out
-            if (!admins.includes(email)) {
-              try { await sb.auth.signOut(); } catch {}
-              window.location.replace(redirect);
-            }
-          } catch {
-            window.location.replace(redirect);
+          // Non-admin => go to prelaunch page
+          if (!admins.includes(email)) {
+            window.location.replace(prelaunch);
+            return;
           }
+
+          // Admin => go to index (admin can access the real app)
+          window.location.replace("index.html");
         }
 
-        // Check now + after login
-        enforce();
-        sb.auth.onAuthStateChange(() => enforce());
+        // Run if they are already logged in
+        routeIfLoggedIn().catch(() => {});
+
+        // Run right after login happens
+        sb.auth.onAuthStateChange((event) => {
+          if (event === "SIGNED_IN") {
+            routeIfLoggedIn().catch(() => {});
+          }
+        });
       })();
     </script>
 </body>
