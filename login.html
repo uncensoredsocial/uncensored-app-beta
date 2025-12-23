@@ -128,58 +128,119 @@
         </a>
     </nav>
 
-    <!-- ✅ Supabase (needed for routing admins/non-admins after login) -->
+    <!-- ✅ Supabase (this page uses Supabase auth directly) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <!-- Auth logic -->
-    <script src="js/auth.js"></script>
+    <script>
+      /* ============================================================
+         Supabase config (your real values)
+      ============================================================ */
+      const SUPABASE_URL = "https://hbbbsreonwhvqfvbszne.supabase.co";
+      const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
+      const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-    <!-- ✅ Pre-launch behavior:
-         - everyone can open login.html
+      /* ============================================================
+         DOM helpers
+      ============================================================ */
+      const loginForm = document.getElementById("loginForm");
+      const loginBtn = document.getElementById("loginBtn");
+      const loginIdentifier = document.getElementById("loginIdentifier");
+      const loginPassword = document.getElementById("loginPassword");
+
+      const errorMessage = document.getElementById("errorMessage");
+      const successMessage = document.getElementById("successMessage");
+
+      function showErr(msg){
+        errorMessage.textContent = msg;
+        errorMessage.classList.remove("hidden");
+        successMessage.classList.add("hidden");
+      }
+      function showOk(msg){
+        successMessage.textContent = msg;
+        successMessage.classList.remove("hidden");
+        errorMessage.classList.add("hidden");
+      }
+      function clearMsgs(){
+        errorMessage.textContent = "";
+        successMessage.textContent = "";
+        errorMessage.classList.add("hidden");
+        successMessage.classList.add("hidden");
+      }
+
+      /* ============================================================
+         Routing rules you asked for
+         - login.html is open to everyone
          - after login:
            - admin => index.html
            - non-admin => prelaunch.html
-    -->
-    <script>
-      (function () {
-        const cfg = window.__UNCENSORED_LAUNCH__ || {};
-        const prelaunch = cfg.prelaunchPage || "prelaunch.html";
-        const admins = (cfg.adminEmails || []).map(e => String(e).toLowerCase());
+      ============================================================ */
+      const cfg = window.__UNCENSORED_LAUNCH__ || {};
+      const admins = (cfg.adminEmails || []).map(e => String(e).toLowerCase());
+      const prelaunch = cfg.prelaunchPage || "prelaunch.html";
 
-        // If launch is enabled, allow normal behavior (no forced redirects)
-        if (cfg.enabled === true) return;
+      async function routeIfLoggedIn(){
+        const { data } = await sb.auth.getUser();
+        const email = (data?.user?.email || "").toLowerCase();
+        if (!email) return;
 
-        const SUPABASE_URL = "https://hbbbsreonwhvqfvbszne.supabase.co";
-        const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
-        const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+        if (cfg.enabled === true) {
+          // launch live: let them in normally
+          window.location.replace("index.html");
+          return;
+        }
 
-        async function routeIfLoggedIn() {
-          const { data } = await sb.auth.getUser();
-          const email = (data?.user?.email || "").toLowerCase();
+        // prelaunch: admin goes to app, non-admin goes to prelaunch page
+        if (admins.includes(email)) window.location.replace("index.html");
+        else window.location.replace(prelaunch);
+      }
 
-          // Not logged in => stay on login page
-          if (!email) return;
+      // If already logged in, route immediately
+      routeIfLoggedIn().catch(() => {});
 
-          // Non-admin => go to prelaunch page
-          if (!admins.includes(email)) {
-            window.location.replace(prelaunch);
+      /* ============================================================
+         Login submit (Supabase)
+      ============================================================ */
+      loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        clearMsgs();
+
+        const ident = (loginIdentifier.value || "").trim();
+        const password = loginPassword.value || "";
+
+        if (!ident || !password){
+          showErr("Enter your email and password.");
+          return;
+        }
+
+        // During prelaunch, we need email login. (Username login would require extra mapping.)
+        if (!ident.includes("@")) {
+          showErr("Use your email to log in for now.");
+          return;
+        }
+
+        loginBtn.disabled = true;
+        loginBtn.textContent = "Signing in…";
+
+        try {
+          const { error } = await sb.auth.signInWithPassword({
+            email: ident,
+            password
+          });
+
+          if (error){
+            showErr(error.message || "Login failed.");
             return;
           }
 
-          // Admin => go to index (admin can access the real app)
-          window.location.replace("index.html");
+          showOk("Signed in. Redirecting…");
+          setTimeout(() => routeIfLoggedIn().catch(() => {}), 250);
+        } catch (err) {
+          showErr(err?.message || "Load failed");
+        } finally {
+          loginBtn.disabled = false;
+          loginBtn.textContent = "Sign In";
         }
-
-        // Run if they are already logged in
-        routeIfLoggedIn().catch(() => {});
-
-        // Run right after login happens
-        sb.auth.onAuthStateChange((event) => {
-          if (event === "SIGNED_IN") {
-            routeIfLoggedIn().catch(() => {});
-          }
-        });
-      })();
+      });
     </script>
 </body>
 </html>
