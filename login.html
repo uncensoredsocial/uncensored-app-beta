@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Log In – UncensoredSocial</title>
 
-    <!-- ✅ Launch config (admin emails live here) -->
+    <!-- ✅ Launch config -->
     <script src="js/launch-config.js"></script>
 
     <!-- Global + auth styles -->
@@ -20,7 +20,6 @@
         referrerpolicy="no-referrer"
     />
 
-    <!-- Same desktop tweaks + bottom nav icon styling as index.html -->
     <style>
         @media (min-width: 900px) {
             .content-wrapper {
@@ -33,15 +32,11 @@
                 margin: 0 auto;
             }
         }
-
-        /* Force bottom nav to be visible on desktop too (same as index) */
         @media (min-width: 768px) {
             .bottom-nav {
                 display: flex !important;
             }
         }
-
-        /* Font Awesome icons above labels in bottom nav (same as index) */
         .bottom-nav .nav-item {
             display: flex;
             flex-direction: column;
@@ -49,7 +44,6 @@
             justify-content: center;
             gap: 2px;
         }
-
         .bottom-nav .nav-icon {
             font-size: 1.1rem;
             line-height: 1;
@@ -57,29 +51,25 @@
     </style>
 </head>
 <body class="auth-page">
-    <!-- SIMPLE HEADER (no profile image) -->
     <header class="header auth-header">
         <div class="header-left"></div>
-
         <h1 class="logo">Uncensored<span>Social</span></h1>
-
         <div class="header-actions"></div>
     </header>
 
-    <!-- Centered auth content -->
     <main class="auth-main">
         <section class="auth-card">
             <h2 class="auth-title">Welcome Back</h2>
-            <p class="auth-subtitle">Sign in to your private account</p>
+            <p class="auth-subtitle">Sign in to your account</p>
 
             <form id="loginForm" novalidate>
                 <div class="form-group">
-                    <label for="loginIdentifier">Email or Username</label>
+                    <label for="loginIdentifier">Email</label>
                     <input
                         type="text"
                         id="loginIdentifier"
                         autocomplete="username"
-                        placeholder="you@example.com or @username"
+                        placeholder="you@example.com"
                     />
                 </div>
 
@@ -108,7 +98,6 @@
         </section>
     </main>
 
-    <!-- Bottom nav: EXACT same markup as index.html -->
     <nav class="bottom-nav" id="bottomNav">
         <a href="index.html" class="nav-item active">
             <i class="fa-solid fa-house nav-icon"></i>
@@ -128,119 +117,82 @@
         </a>
     </nav>
 
-    <!-- ✅ Supabase (this page uses Supabase auth directly) -->
+    <!-- ✅ Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+    <!-- ✅ Login logic for Supabase -->
     <script>
-      /* ============================================================
-         Supabase config (your real values)
-      ============================================================ */
-      const SUPABASE_URL = "https://hbbbsreonwhvqfvbszne.supabase.co";
-      const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
-      const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+      (function () {
+        const cfg = window.__UNCENSORED_LAUNCH__ || {};
+        const admins = (cfg.adminEmails || []).map(e => String(e).toLowerCase());
+        const prelaunchPage = cfg.prelaunchPage || "prelaunch.html";
 
-      /* ============================================================
-         DOM helpers
-      ============================================================ */
-      const loginForm = document.getElementById("loginForm");
-      const loginBtn = document.getElementById("loginBtn");
-      const loginIdentifier = document.getElementById("loginIdentifier");
-      const loginPassword = document.getElementById("loginPassword");
+        const SUPABASE_URL = "https://hbbbsreonwhvqfvbszne.supabase.co";
+        const SUPABASE_ANON =
+          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
 
-      const errorMessage = document.getElementById("errorMessage");
-      const successMessage = document.getElementById("successMessage");
+        const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-      function showErr(msg){
-        errorMessage.textContent = msg;
-        errorMessage.classList.remove("hidden");
-        successMessage.classList.add("hidden");
-      }
-      function showOk(msg){
-        successMessage.textContent = msg;
-        successMessage.classList.remove("hidden");
-        errorMessage.classList.add("hidden");
-      }
-      function clearMsgs(){
-        errorMessage.textContent = "";
-        successMessage.textContent = "";
-        errorMessage.classList.add("hidden");
-        successMessage.classList.add("hidden");
-      }
+        const form = document.getElementById("loginForm");
+        const idEl = document.getElementById("loginIdentifier");
+        const pwEl = document.getElementById("loginPassword");
+        const errEl = document.getElementById("errorMessage");
+        const okEl = document.getElementById("successMessage");
+        const btn = document.getElementById("loginBtn");
 
-      /* ============================================================
-         Routing rules you asked for
-         - login.html is open to everyone
-         - after login:
-           - admin => index.html
-           - non-admin => prelaunch.html
-      ============================================================ */
-      const cfg = window.__UNCENSORED_LAUNCH__ || {};
-      const admins = (cfg.adminEmails || []).map(e => String(e).toLowerCase());
-      const prelaunch = cfg.prelaunchPage || "prelaunch.html";
-
-      async function routeIfLoggedIn(){
-        const { data } = await sb.auth.getUser();
-        const email = (data?.user?.email || "").toLowerCase();
-        if (!email) return;
-
-        if (cfg.enabled === true) {
-          // launch live: let them in normally
-          window.location.replace("index.html");
-          return;
+        function showErr(msg){
+          errEl.textContent = msg;
+          errEl.classList.remove("hidden");
+          okEl.classList.add("hidden");
+        }
+        function showOk(msg){
+          okEl.textContent = msg;
+          okEl.classList.remove("hidden");
+          errEl.classList.add("hidden");
         }
 
-        // prelaunch: admin goes to app, non-admin goes to prelaunch page
-        if (admins.includes(email)) window.location.replace("index.html");
-        else window.location.replace(prelaunch);
-      }
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
 
-      // If already logged in, route immediately
-      routeIfLoggedIn().catch(() => {});
+          const email = (idEl.value || "").trim().toLowerCase();
+          const password = pwEl.value || "";
 
-      /* ============================================================
-         Login submit (Supabase)
-      ============================================================ */
-      loginForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        clearMsgs();
-
-        const ident = (loginIdentifier.value || "").trim();
-        const password = loginPassword.value || "";
-
-        if (!ident || !password){
-          showErr("Enter your email and password.");
-          return;
-        }
-
-        // During prelaunch, we need email login. (Username login would require extra mapping.)
-        if (!ident.includes("@")) {
-          showErr("Use your email to log in for now.");
-          return;
-        }
-
-        loginBtn.disabled = true;
-        loginBtn.textContent = "Signing in…";
-
-        try {
-          const { error } = await sb.auth.signInWithPassword({
-            email: ident,
-            password
-          });
-
-          if (error){
-            showErr(error.message || "Login failed.");
+          if (!email || !password) {
+            showErr("Enter email and password.");
             return;
           }
 
-          showOk("Signed in. Redirecting…");
-          setTimeout(() => routeIfLoggedIn().catch(() => {}), 250);
-        } catch (err) {
-          showErr(err?.message || "Load failed");
-        } finally {
-          loginBtn.disabled = false;
-          loginBtn.textContent = "Sign In";
-        }
-      });
+          btn.disabled = true;
+          btn.textContent = "Signing in…";
+
+          try {
+            const { error } = await sb.auth.signInWithPassword({ email, password });
+            if (error) {
+              showErr(error.message);
+              return;
+            }
+
+            // Decide where to go pre-launch
+            if (cfg.enabled === true) {
+              window.location.replace("index.html");
+              return;
+            }
+
+            if (admins.includes(email)) {
+              showOk("Admin login successful. Redirecting…");
+              setTimeout(() => window.location.replace("index.html"), 400);
+            } else {
+              showOk("Login successful. The platform isn’t live yet — redirecting…");
+              setTimeout(() => window.location.replace(prelaunchPage), 400);
+            }
+          } catch (err) {
+            showErr(err?.message || "Load failed");
+          } finally {
+            btn.disabled = false;
+            btn.textContent = "Sign In";
+          }
+        });
+      })();
     </script>
 </body>
 </html>
