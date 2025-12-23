@@ -15,19 +15,13 @@ window.__UNCENSORED_LAUNCH__ = {
   // Repo base (important for referrals)
   baseUrl: "https://uncensoredsocial.github.io/uncensored-app-beta/",
 
-  /* ============================================================
-     ✅ Admin allowlist (ONLY these emails can use the real app
-     during pre-launch; everyone else gets redirected)
-     ============================================================ */
+  // ✅ admins can access the whole site prelaunch
   adminEmails: [
     "ssssss@gmail.com",
     "eeeeee@gmail.com"
   ],
 
-  /* ============================================================
-     ✅ Pages that should ALWAYS be accessible pre-launch
-     (public funnel pages). This prevents redirect loops.
-     ============================================================ */
+  // ✅ Always accessible pages prelaunch (public)
   publicPathsAllow: [
     "/uncensored-app-beta/",
     "/uncensored-app-beta/index.html",
@@ -35,25 +29,18 @@ window.__UNCENSORED_LAUNCH__ = {
     "/uncensored-app-beta/waitlist.html",
     "/uncensored-app-beta/prelaunch.html",
     "/uncensored-app-beta/referrals.html",
-
-    // signup for referrals
     "/uncensored-app-beta/signup.html",
 
-    // ✅ LOGIN PAGE MUST BE ALLOWED
+    // ✅ IMPORTANT: allow login page for everyone
     "/uncensored-app-beta/login.html",
 
-    // optional
     "/uncensored-app-beta/donation.html"
   ],
 
-  /* ============================================================
-     ✅ Admin bypass for ALL pages
-     ============================================================ */
+  // ✅ Admins bypass all pages
   adminBypassAllPages: true,
 
-  /* ============================================================
-     ✅ Optional extra admin-only pages
-     ============================================================ */
+  // optional (kept)
   adminPathsAllowAll: [
     "/uncensored-app-beta/index.html",
     "/uncensored-app-beta/messages.html",
@@ -62,7 +49,5 @@ window.__UNCENSORED_LAUNCH__ = {
     "/uncensored-app-beta/profile.html",
     "/uncensored-app-beta/settings.html",
     "/uncensored-app-beta/admin.html"
-    "/uncensored-app-beta/post.html"
-    "/uncensored-app-beta/user.html"
   ]
 };
