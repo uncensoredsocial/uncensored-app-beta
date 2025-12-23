@@ -1,3 +1,4 @@
+// js/launch-config.js
 // 🔒 PRE-LAUNCH SETTINGS (single source of truth)
 window.__UNCENSORED_LAUNCH__ = {
   enabled: false, // 🔁 flip to true on launch day
@@ -15,13 +16,13 @@ window.__UNCENSORED_LAUNCH__ = {
   // Repo base (important for referrals)
   baseUrl: "https://uncensoredsocial.github.io/uncensored-app-beta/",
 
-  // ✅ admins can access the whole site prelaunch
+  // ✅ Admin allowlist (only these can use real app pre-launch)
   adminEmails: [
     "ssssss@gmail.com",
     "eeeeee@gmail.com"
   ],
 
-  // ✅ Always accessible pages prelaunch (public)
+  // ✅ Public pages allowed (no redirect loops)
   publicPathsAllow: [
     "/uncensored-app-beta/",
     "/uncensored-app-beta/index.html",
@@ -29,25 +30,13 @@ window.__UNCENSORED_LAUNCH__ = {
     "/uncensored-app-beta/waitlist.html",
     "/uncensored-app-beta/prelaunch.html",
     "/uncensored-app-beta/referrals.html",
-    "/uncensored-app-beta/signup.html",
 
-    // ✅ IMPORTANT: allow login page for everyone
+    "/uncensored-app-beta/signup.html",
     "/uncensored-app-beta/login.html",
 
     "/uncensored-app-beta/donation.html"
   ],
 
-  // ✅ Admins bypass all pages
-  adminBypassAllPages: true,
-
-  // optional (kept)
-  adminPathsAllowAll: [
-    "/uncensored-app-beta/index.html",
-    "/uncensored-app-beta/messages.html",
-    "/uncensored-app-beta/search.html",
-    "/uncensored-app-beta/notifications.html",
-    "/uncensored-app-beta/profile.html",
-    "/uncensored-app-beta/settings.html",
-    "/uncensored-app-beta/admin.html"
-  ]
+  // ✅ Admins can access everything pre-launch
+  adminBypassAllPages: true
 };
