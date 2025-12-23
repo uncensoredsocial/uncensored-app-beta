@@ -11,14 +11,30 @@
   const allow = new Set(cfg.publicPathsAllow || []);
   if (allow.has(path)) return;
 
-  // We must have supabase loaded to check admin session
-  if (!window.supabase) {
+  // ✅ Ensure Supabase is available (auto-load if missing)
+  async function ensureSupabase() {
+    if (window.supabase) return;
+    await new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+      s.async = true;
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  try {
+    await ensureSupabase();
+  } catch {
     window.location.replace(redirect);
     return;
   }
 
   const SUPABASE_URL = "https://hbbbsreonwhvqfvbszne.supabase.co";
-  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
+  const SUPABASE_ANON =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
+
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
   try {
