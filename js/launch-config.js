@@ -22,7 +22,7 @@ window.__UNCENSORED_LAUNCH__ = {
   adminEmails: [
     // TODO: put your real admin emails here (lowercase preferred)
     "ssssss@gmail.com"
-    "eeeeee@gmail.com
+    "eeeeee@gmail.com"
   ],
 
   /* ============================================================
