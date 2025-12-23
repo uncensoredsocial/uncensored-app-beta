@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Log In – UncensoredSocial</title>
 
-    <!-- ✅ Pre-launch config (admin-only login gate uses this) -->
+    <!-- ✅ Launch config (admin emails live here) -->
     <script src="js/launch-config.js"></script>
 
     <!-- Global + auth styles -->
@@ -128,59 +128,53 @@
         </a>
     </nav>
 
-    <!-- ✅ Supabase client for admin-only enforcement (UMD build) -->
+    <!-- ✅ Supabase (needed for admin-only enforcement) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <!-- Auth logic (your existing file) -->
+    <!-- Auth logic -->
     <script src="js/auth.js"></script>
 
-    <!-- ✅ Admin-only login gate (pre-launch) -->
+    <!-- ✅ Pre-launch: ONLY admins can stay logged in from login.html -->
     <script>
       (function () {
         const cfg = window.__UNCENSORED_LAUNCH__ || {};
         const redirect = cfg.redirect || "waitlist.html";
         const admins = (cfg.adminEmails || []).map(e => String(e).toLowerCase());
 
-        // On launch day, do nothing
+        // On launch day, normal behavior
         if (cfg.enabled === true) return;
 
-        // If no admins configured, safest is to block everyone from using login.html
+        // Must have admins configured
         if (!admins.length) {
           window.location.replace(redirect);
           return;
         }
 
-        // Create a Supabase client (same project as referrals)
         const SUPABASE_URL = "https://hbbbsreonwhvqfvbszne.supabase.co";
         const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
         const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-        async function enforceAdminOnly() {
+        async function enforce() {
           try {
             const { data } = await sb.auth.getUser();
             const email = (data?.user?.email || "").toLowerCase();
 
-            // Not logged in yet = allow seeing the login form
+            // Not logged in yet => allow viewing the login form
             if (!email) return;
 
-            // Logged in but not admin -> sign out and redirect
+            // Logged in but not admin => kick out
             if (!admins.includes(email)) {
               try { await sb.auth.signOut(); } catch {}
               window.location.replace(redirect);
             }
           } catch {
-            // If anything fails, keep them off login page prelaunch
             window.location.replace(redirect);
           }
         }
 
-        // Run now (if already logged in)
-        enforceAdminOnly();
-
-        // Run again after auth changes (after you sign in)
-        sb.auth.onAuthStateChange(() => {
-          enforceAdminOnly();
-        });
+        // Check now + after login
+        enforce();
+        sb.auth.onAuthStateChange(() => enforce());
       })();
     </script>
 </body>
