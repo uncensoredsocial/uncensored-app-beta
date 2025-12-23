@@ -7,11 +7,10 @@
   const admins = (cfg.adminEmails || []).map(e => String(e).toLowerCase());
   const path = window.location.pathname;
 
-  // ✅ Allow public pages always (including login.html)
+  // ✅ Allow public funnel pages
   const allow = new Set(cfg.publicPathsAllow || []);
   if (allow.has(path)) return;
 
-  // ✅ Ensure Supabase is available (auto-load if missing)
   async function ensureSupabase() {
     if (window.supabase) return;
     await new Promise((resolve, reject) => {
@@ -41,19 +40,19 @@
     const { data } = await sb.auth.getUser();
     const email = (data?.user?.email || "").toLowerCase();
 
-    // not logged in -> block
+    // Not logged in → block
     if (!email) {
       window.location.replace(redirect);
       return;
     }
 
-    // not admin -> block
+    // Logged in but not admin → block
     if (!admins.includes(email)) {
       window.location.replace(redirect);
       return;
     }
 
-    // admin -> allow everything
+    // Admin → allow everything
     return;
   } catch {
     window.location.replace(redirect);
