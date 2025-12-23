@@ -5,16 +5,27 @@ const SUPABASE_URL = "https://hbbbsreonwhvqfvbszne.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
 
 /* ============================================================
-   REFERRAL BASE URL (YOUR REPO NAME)
-   FINAL format:
-   https://uncensoredsocial.github.io/uncensored-app-beta/?ref=ABC123
-============================================================ */
-const REFERRAL_BASE_URL = "https://uncensoredsocial.github.io/uncensored-app-beta/";
-
-/* ============================================================
    INIT (UMD build exposes window.supabase)
 ============================================================ */
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+/* ============================================================
+   LAUNCH CONFIG (repo base)
+============================================================ */
+function getBaseUrl() {
+  // preferred: your single source of truth object
+  const cfg = window.__UNCENSORED_LAUNCH__ || {};
+  let base = cfg.baseUrl || "";
+
+  // fallback for GitHub Pages repo
+  if (!base) {
+    base = "https://uncensoredsocial.github.io/uncensored-app-beta/";
+  }
+
+  // ensure trailing slash
+  if (!base.endsWith("/")) base += "/";
+  return base;
+}
 
 /* ============================================================
    DOM
@@ -50,17 +61,7 @@ const usernameInput = document.getElementById("usernameInput");
 const reserveBtn = document.getElementById("reserveBtn");
 const reserveStatus = document.getElementById("reserveStatus");
 
-/* Optional persistent reserved UI (recommended)
-   Add this HTML in referrals.html:
-   <div id="reservedBox" class="reservedBox hidden">
-     <div class="reservedTop">
-       <div class="reservedTitle">Reserved username</div>
-       <div class="reservedBadge">Reserved</div>
-     </div>
-     <div id="reservedHandle" class="reservedHandle">@username</div>
-     <div class="muted small">This will be yours at launch.</div>
-   </div>
-*/
+// Optional reserved box (you added this in referrals.html)
 const reservedBox = document.getElementById("reservedBox");
 const reservedHandle = document.getElementById("reservedHandle");
 
@@ -68,11 +69,14 @@ const reservedHandle = document.getElementById("reservedHandle");
    STATE
 ============================================================ */
 let myLead = null;
+let myUser = null;
 let invitedChannel = null;
 let leaderboardChannel = null;
 
 /* ============================================================
-   REF CAPTURE (store ref so it survives signup/login)
+   REF CAPTURE (if someone visits referrals.html?ref=XXXX)
+   NOTE: Your *real* referral link will go to signup.html, but
+         keeping this here doesn’t hurt.
 ============================================================ */
 const params = new URLSearchParams(window.location.search);
 const refFromUrl = params.get("ref");
@@ -97,6 +101,28 @@ function nextTier(count){
   return null;
 }
 
+function setReserveLockedUI(count){
+  const unlocked = count >= 25;
+  reserveBtn.disabled = !unlocked;
+  usernameInput.disabled = !unlocked;
+
+  // If already reserved, we keep the reserved box and status text.
+  const alreadyReserved = reservedBox && !reservedBox.classList.contains("hidden");
+
+  if (!unlocked){
+    // Locked message (no more "loading your account...")
+    if (!alreadyReserved) {
+      reserveStatus.textContent = "Locked — you need 25 invites to reserve a username.";
+    }
+    return;
+  }
+
+  // Unlocked but not reserved yet
+  if (!alreadyReserved) {
+    reserveStatus.textContent = "Unlocked — reserve your username now.";
+  }
+}
+
 function setTierUI(count){
   const pct = Math.min((count / 25) * 100, 100);
   progressFill.style.width = pct + "%";
@@ -110,15 +136,7 @@ function setTierUI(count){
     tierText.textContent = `You’re ${remaining} invite${remaining === 1 ? "" : "s"} away from: ${next.label}`;
   }
 
-  const unlocked = count >= 25;
-  reserveBtn.disabled = !unlocked;
-  usernameInput.disabled = !unlocked;
-
-  if (!unlocked){
-    setStatus(reserveStatus, "You can’t reserve a username yet — get 25 invites to unlock.");
-  } else if (!reserveStatus.textContent.trim()){
-    setStatus(reserveStatus, "Unlocked — reserve your username now.");
-  }
+  setReserveLockedUI(count);
 }
 
 /* ============================================================
@@ -179,59 +197,6 @@ function renderRows(container, rows, mode){
   }).join("");
 }
 
-async function copyToClipboard(text){
-  try{
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    // iOS fallback
-    try{
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.left = "-9999px";
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-}
-
-function makeRefUrl(refCode){
-  return `${REFERRAL_BASE_URL}?ref=${encodeURIComponent(refCode)}`;
-}
-
-function cleanRefFromUrl(){
-  if (window.location.search.includes("ref=")) {
-    const cleanUrl = window.location.pathname;
-    history.replaceState({}, "", cleanUrl);
-  }
-}
-
-function randomRefCode(len = 6){
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let out = "";
-  for (let i = 0; i < len; i++){
-    out += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return out;
-}
-
-function showReserved(username){
-  if (reservedBox && reservedHandle){
-    reservedHandle.textContent = `@${username}`;
-    reservedBox.classList.remove("hidden");
-  }
-  setStatus(reserveStatus, `Reserved username: @${username} ✅`);
-  usernameInput.disabled = true;
-  reserveBtn.disabled = true;
-}
-
 /* ============================================================
    TABS UI
 ============================================================ */
@@ -281,7 +246,6 @@ function subscribeRealtime(){
         const row = payload?.new;
         if (row && myLead && row.referred_by === myLead.ref_code){
           loadInvited();
-          refreshMyCount(); // count might change via trigger/RPC
         }
       }
     )
@@ -307,17 +271,20 @@ async function doLogout(){
   unsubscribeRealtime();
 
   myLead = null;
-  refLinkEl.value = "";
+  myUser = null;
+
+  if (refLinkEl) refLinkEl.value = "";
   progressFill.style.width = "0%";
   refCountPill.textContent = "0 invites";
   tierText.textContent = "";
+
   reserveStatus.textContent = "";
   usernameInput.value = "";
+  usernameInput.disabled = true;
+  reserveBtn.disabled = true;
 
   if (reservedBox) reservedBox.classList.add("hidden");
   if (reservedHandle) reservedHandle.textContent = "@username";
-  usernameInput.disabled = true;
-  reserveBtn.disabled = true;
 
   authCard.classList.remove("hidden");
   dash.classList.add("hidden");
@@ -328,7 +295,7 @@ logoutBtn?.addEventListener("click", doLogout);
 settingsLogoutBtn?.addEventListener("click", (e) => { e.preventDefault(); doLogout(); });
 
 /* ============================================================
-   AUTH (Confirm email OFF in Supabase)
+   AUTH (Confirm Email should be OFF)
 ============================================================ */
 signupForm?.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -358,10 +325,9 @@ signupForm?.addEventListener("submit", async (e) => {
     }
 
     setStatus(authStatus, "");
-    await boot();
-
     signupEmail.value = "";
     signupPass.value = "";
+    await boot();
   } catch (err) {
     setStatus(authStatus, `Error: ${err?.message || err || "Load failed"}`);
   }
@@ -394,106 +360,70 @@ loginForm?.addEventListener("submit", async (e) => {
 });
 
 /* ============================================================
-   COPY / SHARE (real, stable link)
+   COPY / SHARE (robust for iOS / permissions)
 ============================================================ */
-copyBtn?.addEventListener("click", async () => {
-  const val = refLinkEl.value || "";
-  if (!val) return;
-
-  const ok = await copyToClipboard(val);
-  if (ok){
-    const old = copyBtn.textContent;
-    copyBtn.textContent = "Copied!";
-    setTimeout(() => (copyBtn.textContent = old), 1200);
-  } else {
-    alert("Could not copy. Long-press the link to copy.");
+async function safeCopy(text){
+  try{
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // fallback prompt
+    window.prompt("Copy this link:", text);
+    return false;
   }
+}
+
+copyBtn?.addEventListener("click", async () => {
+  const val = refLinkEl?.value || "";
+  if (!val) return;
+  await safeCopy(val);
 });
 
 shareBtn?.addEventListener("click", async () => {
-  const url = refLinkEl.value || "";
+  const url = refLinkEl?.value || "";
   if (!url) return;
 
   const text = "Join Uncensored Social early access — invite friends and earn rewards.";
 
   try {
     if (navigator.share) {
-      await navigator.share({ title: "Uncensored Social", text, url });
+      await navigator.share({ title: document.title, text, url });
     } else {
-      const ok = await copyToClipboard(url);
-      alert(ok ? "Link copied!" : "Could not copy. Long-press the link to copy.");
+      await safeCopy(url);
     }
-  } catch {}
+  } catch {
+    await safeCopy(url);
+  }
 });
+
+/* ============================================================
+   REFERRAL LINK (THIS IS THE FIX)
+   Link must go to signup.html?ref=CODE so invites count.
+============================================================ */
+function setReferralLink(refCode){
+  const base = getBaseUrl();
+  const url = `${base}signup.html?ref=${encodeURIComponent(refCode)}`;
+  if (refLinkEl) refLinkEl.value = url;
+}
 
 /* ============================================================
    DATA
 ============================================================ */
 async function ensureMyLead(){
-  // Try RPC first (recommended)
   const pendingRef = (localStorage.getItem("pending_ref") || "").trim() || null;
 
-  let rpcOk = false;
-  try{
-    const { data, error } = await supabaseClient.rpc("create_my_lead", {
-      p_referred_by: pendingRef
-    });
+  // create or fetch my lead row, credit referrer if pending_ref exists
+  const { data, error } = await supabaseClient.rpc("create_my_lead", {
+    p_referred_by: pendingRef
+  });
 
-    if (!error && data && data[0] && data[0].ref_code){
-      myLead = data[0];
-      rpcOk = true;
-    }
-  } catch {
-    rpcOk = false;
-  }
-
-  // If RPC not present / failed: fallback to manual insert/select
-  if (!rpcOk){
-    const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
-    if (userErr) throw new Error(userErr.message);
-    const user = userData?.user;
-    if (!user) throw new Error("Not logged in.");
-
-    // Check existing row for this user
-    let { data: existing, error: selErr } = await supabaseClient
-      .from("waitlist_leads")
-      .select("id,user_id,email,ref_code,referred_by,ref_count,created_at")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (!selErr && existing){
-      myLead = existing;
-    } else {
-      // Create one
-      const referredBy = pendingRef || null;
-      const newRef = randomRefCode(6);
-
-      const { data: ins, error: insErr } = await supabaseClient
-        .from("waitlist_leads")
-        .insert({
-          user_id: user.id,
-          email: user.email,
-          ref_code: newRef,
-          referred_by: referredBy,
-          ref_count: 0
-        })
-        .select("id,user_id,email,ref_code,referred_by,ref_count,created_at")
-        .single();
-
-      if (insErr) throw new Error(insErr.message);
-      myLead = ins;
-    }
-  }
-
+  if (error) throw new Error(error.message);
   if (pendingRef) localStorage.removeItem("pending_ref");
 
-  if (!myLead || !myLead.ref_code){
-    throw new Error("Lead row missing.");
-  }
+  myLead = data?.[0];
+  if (!myLead || !myLead.ref_code) throw new Error("Lead row missing after RPC.");
 
-  // REAL stable referral link
-  refLinkEl.value = makeRefUrl(myLead.ref_code);
-
+  setReferralLink(myLead.ref_code);
   setTierUI(Number(myLead.ref_count || 0));
 }
 
@@ -501,6 +431,7 @@ async function loadLeaderboard(){
   const { data, error } = await supabaseClient
     .from("leaderboard")
     .select("ref_code, ref_count, email_masked, created_at")
+    .order("ref_count", { ascending: false })
     .limit(25);
 
   if (error){
@@ -533,104 +464,80 @@ async function loadInvited(){
 }
 
 async function refreshMyCount(){
-  // pull my row again (by user_id if we have it)
-  if (!myLead?.user_id){
-    return;
-  }
-
+  // RLS: single row = current user lead (your policies/RPC handle this)
   const { data, error } = await supabaseClient
     .from("waitlist_leads")
-    .select("ref_count, ref_code, email, user_id")
-    .eq("user_id", myLead.user_id)
-    .maybeSingle();
+    .select("ref_count, ref_code")
+    .single();
 
   if (!error && data){
-    myLead.ref_count = Number(data.ref_count || 0);
-    myLead.ref_code = data.ref_code;
-    setTierUI(myLead.ref_count);
-    refLinkEl.value = makeRefUrl(myLead.ref_code);
-  }
-}
-
-async function loadMyReservedUsername(){
-  if (!myLead?.user_id) return;
-
-  const { data, error } = await supabaseClient
-    .from("reserved_usernames")
-    .select("username")
-    .eq("owner_user_id", myLead.user_id)
-    .maybeSingle();
-
-  if (!error && data?.username){
-    showReserved(data.username);
-  } else {
-    if (reservedBox) reservedBox.classList.add("hidden");
-    usernameInput.disabled = !(Number(myLead.ref_count || 0) >= 25);
-    reserveBtn.disabled = !(Number(myLead.ref_count || 0) >= 25);
+    if (myLead) {
+      myLead.ref_count = Number(data.ref_count || 0);
+      myLead.ref_code = data.ref_code || myLead.ref_code;
+    }
+    setTierUI(Number(data.ref_count || 0));
+    if (data.ref_code) setReferralLink(data.ref_code);
   }
 }
 
 /* ============================================================
-   RESERVE USERNAME (NO more "lead row missing")
+   RESERVED USERNAME (persistent UI)
+============================================================ */
+function showReserved(username){
+  if (reservedHandle) reservedHandle.textContent = `@${username}`;
+  if (reservedBox) reservedBox.classList.remove("hidden");
+  reserveStatus.textContent = `Your username is reserved: @${username} ✅`;
+}
+
+async function loadMyReservedUsername(){
+  // show latest reserved name if any
+  const { data, error } = await supabaseClient
+    .from("reserved_usernames")
+    .select("username, reserved_at")
+    .order("reserved_at", { ascending: false })
+    .limit(1);
+
+  if (error) return;
+
+  const row = (data || [])[0];
+  if (row?.username){
+    showReserved(row.username);
+  }
+}
+
+/* ============================================================
+   RESERVE USERNAME (fixed logic + messages)
 ============================================================ */
 reserveBtn?.addEventListener("click", async () => {
-  // Must have myLead loaded
+  // If lead not loaded yet, don't show "loading..." forever; show a real message.
   if (!myLead){
-    setStatus(reserveStatus, "Loading your account… try again in a second.");
+    setStatus(reserveStatus, "Your account is still loading — try again in a moment.");
     return;
   }
 
-  // Gate at 25
   const count = Number(myLead.ref_count || 0);
   if (count < 25){
-    setStatus(reserveStatus, "You can’t reserve a username yet — get 25 invites to unlock.");
-    return;
-  }
-
-  const username = (usernameInput.value || "").toLowerCase().trim();
-
-  if (!username){
-    setStatus(reserveStatus, "Enter a username.");
-    return;
-  }
-
-  // rule check
-  if (!/^[a-z0-9_]{3,20}$/.test(username)){
-    setStatus(reserveStatus, "Invalid username. Use 3–20 chars: a–z, 0–9, underscore.");
+    setStatus(reserveStatus, "Locked — you need 25 invites to reserve a username.");
     return;
   }
 
   setStatus(reserveStatus, "Reserving…");
 
-  // Prefer RPC if you have it
-  try{
-    const { data, error } = await supabaseClient.rpc("reserve_username", { p_username: username });
-    if (error){
-      setStatus(reserveStatus, `Error: ${error.message}`);
-      return;
-    }
-    const reserved = data?.[0]?.username || username;
-    showReserved(reserved);
-    return;
-  } catch {
-    // fallback to direct insert
-  }
-
-  // Fallback insert
-  const { error: insErr } = await supabaseClient
-    .from("reserved_usernames")
-    .insert({
-      username,
-      owner_user_id: myLead.user_id,
-      owner_email: myLead.email
-    });
-
-  if (insErr){
-    setStatus(reserveStatus, `Error: ${insErr.message}`);
+  const username = (usernameInput.value || "").toLowerCase().trim();
+  if (!username){
+    setStatus(reserveStatus, "Enter a username.");
     return;
   }
 
-  showReserved(username);
+  const { data, error } = await supabaseClient.rpc("reserve_username", { p_username: username });
+
+  if (error){
+    setStatus(reserveStatus, `Error: ${error.message}`);
+    return;
+  }
+
+  const reserved = data?.[0]?.username || username;
+  showReserved(reserved);
 });
 
 /* ============================================================
@@ -647,21 +554,35 @@ async function boot(){
     return;
   }
 
+  myUser = session.user;
+
   authCard.classList.add("hidden");
   dash.classList.remove("hidden");
   logoutBtn.classList.remove("hidden");
 
-  await ensureMyLead();
+  // disable reserve until we know count
+  reserveBtn.disabled = true;
+  usernameInput.disabled = true;
+  if (reservedBox) reservedBox.classList.add("hidden");
+  reserveStatus.textContent = "Loading your account…";
 
-  // if they came from a ref link, clean it so it doesn't keep re-setting localStorage
-  cleanRefFromUrl();
+  try{
+    await ensureMyLead();
+    reserveStatus.textContent = ""; // will be set by tier UI
+  } catch (e){
+    reserveStatus.textContent = `Error: ${e?.message || "Failed to load your account."}`;
+  }
 
+  await loadMyReservedUsername();
   await loadLeaderboard();
   await loadInvited();
-  await refreshMyCount();
-  await loadMyReservedUsername();
-
   subscribeRealtime();
+
+  // Clean URL if someone opened referrals with ?ref=
+  if (window.location.search.includes("ref=")) {
+    const cleanUrl = window.location.pathname;
+    history.replaceState({}, "", cleanUrl);
+  }
 }
 
 boot();
