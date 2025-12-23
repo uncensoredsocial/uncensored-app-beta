@@ -16,19 +16,17 @@ window.__UNCENSORED_LAUNCH__ = {
   baseUrl: "https://uncensoredsocial.github.io/uncensored-app-beta/",
 
   /* ============================================================
-     ✅ NEW: Admin allowlist (ONLY these emails can use the real app
+     ✅ Admin allowlist (ONLY these emails can use the real app
      during pre-launch; everyone else gets redirected)
      ============================================================ */
   adminEmails: [
-    // TODO: put your real admin emails here (lowercase preferred)
-    "ssssss@gmail.com"
+    "ssssss@gmail.com",
     "eeeeee@gmail.com"
   ],
 
   /* ============================================================
-     ✅ NEW: Pages that should ALWAYS be accessible pre-launch
+     ✅ Pages that should ALWAYS be accessible pre-launch
      (public funnel pages). This prevents redirect loops.
-     Use pathnames that match your repo base.
      ============================================================ */
   publicPathsAllow: [
     "/uncensored-app-beta/",
@@ -38,23 +36,23 @@ window.__UNCENSORED_LAUNCH__ = {
     "/uncensored-app-beta/prelaunch.html",
     "/uncensored-app-beta/referrals.html",
 
-    // if you keep signup enabled for referrals:
+    // signup for referrals
     "/uncensored-app-beta/signup.html",
 
-    // donation page etc if you want them public:
+    // ✅ LOGIN PAGE MUST BE ALLOWED
+    "/uncensored-app-beta/login.html",
+
+    // optional
     "/uncensored-app-beta/donation.html"
   ],
 
   /* ============================================================
-     ✅ NEW: Admin bypass for ALL pages
-     If true, admins can access any page pre-launch (recommended).
+     ✅ Admin bypass for ALL pages
      ============================================================ */
   adminBypassAllPages: true,
 
   /* ============================================================
-     ✅ NEW: Optional extra admin-only pages you always want allowed,
-     even if you later tighten publicPathsAllow.
-     (Only used if your guard checks it.)
+     ✅ Optional extra admin-only pages
      ============================================================ */
   adminPathsAllowAll: [
     "/uncensored-app-beta/index.html",
