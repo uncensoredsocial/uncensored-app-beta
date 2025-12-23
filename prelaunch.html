@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Launching Soon — Uncensored Social</title>
+
+  <meta name="description" content="Uncensored Social is launching soon. Your account is created — check the countdown and earn rewards with referrals." />
+
+  <link rel="stylesheet" href="css/prelaunch.css" />
+
+  <!-- config first -->
+  <script src="js/launch-config.js"></script>
+</head>
+
+<body>
+  <div class="wrap">
+
+    <header class="top">
+      <div class="brand">
+        <img src="uncensored-logo.PNG" alt="Uncensored Social" class="brandLogo" />
+        <div class="brandText">
+          <div class="title">Uncensored Social</div>
+          <div class="sub">Launching Soon</div>
+        </div>
+      </div>
+
+      <button id="logoutBtn" class="btn ghost small hidden" type="button">Log out</button>
+    </header>
+
+    <main class="grid">
+
+      <!-- HERO -->
+      <section class="card hero">
+        <div class="heroBadge">Pre-Launch</div>
+        <h1 class="heroTitle">The platform isn’t ready yet.</h1>
+        <p class="heroSub muted">
+          Your account was created successfully. We’re finishing the build and fixing bugs before launch.
+        </p>
+
+        <div class="divider"></div>
+
+        <div class="countWrap">
+          <div class="countTop">
+            <div class="muted small">Launch countdown</div>
+            <div id="launchDateText" class="pill">Loading…</div>
+          </div>
+
+          <div class="countGrid" aria-label="Countdown">
+            <div class="countBox">
+              <div id="dd" class="countNum">--</div>
+              <div class="countLabel muted small">Days</div>
+            </div>
+            <div class="countBox">
+              <div id="hh" class="countNum">--</div>
+              <div class="countLabel muted small">Hours</div>
+            </div>
+            <div class="countBox">
+              <div id="mm" class="countNum">--</div>
+              <div class="countLabel muted small">Minutes</div>
+            </div>
+            <div class="countBox">
+              <div id="ss" class="countNum">--</div>
+              <div class="countLabel muted small">Seconds</div>
+            </div>
+          </div>
+
+          <div id="countdownNote" class="muted small countdownNote"></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="ctaRow">
+          <a class="btn primary" href="referrals.html">Go to Referral Dashboard</a>
+          <a class="btn ghost" href="waitlist.html">Back to Waitlist</a>
+        </div>
+
+        <div class="miniInfo">
+          <div class="miniLine">
+            <span class="dot"></span>
+            <span class="muted small">Earn rewards and reserve your username at 25 invites.</span>
+          </div>
+          <div class="miniLine">
+            <span class="dot"></span>
+            <span class="muted small">Premium Subscription + Verified unlock at 100 invites.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ACCOUNT STATUS -->
+      <section class="card">
+        <h2>Account status</h2>
+        <p class="muted small">
+          You can log in anytime to check referrals. You cannot access the full platform until launch.
+        </p>
+
+        <div class="divider"></div>
+
+        <div class="statusGrid">
+          <div class="statusTile">
+            <div class="statusLabel muted small">Signed in as</div>
+            <div id="signedInAs" class="statusValue">Not signed in</div>
+          </div>
+
+          <div class="statusTile">
+            <div class="statusLabel muted small">Access</div>
+            <div id="accessStatus" class="statusValue">Pre-Launch Only</div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="settings-list">
+          <a href="#" class="settings-link-card settings-link-danger" id="settingsLogoutBtn">
+            <div class="settings-link-text">
+              <div class="settings-link-title">Log out</div>
+              <div class="settings-link-description">
+                Sign out on this device.
+              </div>
+            </div>
+            <span class="settings-link-arrow">›</span>
+          </a>
+        </div>
+
+        <div id="authHint" class="muted small authHint"></div>
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- Supabase UMD (same approach as referrals for iOS/DuckDuckGo) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/prelaunch.js"></script>
+</body>
+</html>
