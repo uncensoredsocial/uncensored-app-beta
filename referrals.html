@@ -110,7 +110,7 @@
           <li><span class="tierNum">3</span> Early Access Priority</li>
           <li><span class="tierNum">10</span> Founder Badge</li>
           <li><span class="tierNum">25</span> Username Reservation</li>
-          <li><span class="tierNum">100</span> Lifetime Verified</li>
+          <li><span class="tierNum">100</span> Premium Subscription + Verified</li>
         </ul>
       </div>
 
@@ -124,6 +124,16 @@
         <div class="row">
           <input id="usernameInput" placeholder="username" autocomplete="off" autocapitalize="none" spellcheck="false" />
           <button id="reserveBtn" class="btn primary" type="button">Reserve</button>
+        </div>
+
+        <!-- ✅ Persistent reserved username box (shows after reserved) -->
+        <div id="reservedBox" class="reservedBox hidden">
+          <div class="reservedTop">
+            <div class="reservedTitle">Reserved username</div>
+            <div class="reservedBadge">Reserved</div>
+          </div>
+          <div id="reservedHandle" class="reservedHandle">@username</div>
+          <div class="muted small">This will be yours at launch.</div>
         </div>
 
         <div id="reserveStatus" class="status muted" aria-live="polite"></div>
