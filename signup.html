@@ -205,8 +205,14 @@
 
         /* MOBILE TWEAKS */
         @media (max-width: 480px) {
-            .auth-page { padding: 20px 12px; }
-            .auth-card { margin: 0 6px; padding: 28px 20px; }
+            .auth-page {
+                padding: 20px 12px;
+            }
+
+            .auth-card {
+                margin: 0 6px;
+                padding: 28px 20px;
+            }
         }
     </style>
 </head>
@@ -289,7 +295,7 @@
     <!-- ✅ Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <!-- ✅ Signup logic (self-contained; fixes “load failed”) -->
+    <!-- ✅ Signup logic (replaces old auth.js to stop the DB error) -->
     <script>
       (function () {
         const SUPABASE_URL = "https://hbbbsreonwhvqfvbszne.supabase.co";
@@ -306,107 +312,82 @@
         const usernameEl = document.getElementById("username");
         const emailEl = document.getElementById("email");
         const passEl = document.getElementById("password");
-        const confirmEl = document.getElementById("confirmPassword");
+        const pass2El = document.getElementById("confirmPassword");
 
         const errEl = document.getElementById("errorMessage");
         const okEl = document.getElementById("successMessage");
 
-        function showErr(msg) {
-          okEl.classList.add("hidden");
-          okEl.textContent = "";
+        function showErr(msg){
           errEl.textContent = msg || "Something went wrong.";
           errEl.classList.remove("hidden");
+          okEl.classList.add("hidden");
         }
-
-        function showOk(msg) {
-          errEl.classList.add("hidden");
-          errEl.textContent = "";
+        function showOk(msg){
           okEl.textContent = msg || "Success!";
           okEl.classList.remove("hidden");
-        }
-
-        function normUsername(u) {
-          return String(u || "").trim().toLowerCase().replace(/^@+/, "");
-        }
-
-        function validUsername(u) {
-          // 3-20 chars, letters/numbers/underscore only
-          return /^[a-z0-9_]{3,20}$/.test(u);
-        }
-
-        async function creditReferralIfAny() {
-          // ref-capture.js should store localStorage.pending_ref
-          const pendingRef = (localStorage.getItem("pending_ref") || "").trim() || null;
-          try {
-            // Uses your existing RPC from the referrals system
-            const { error } = await sb.rpc("create_my_lead", { p_referred_by: pendingRef });
-            if (!error && pendingRef) localStorage.removeItem("pending_ref");
-          } catch {
-            // don’t block signup if referral credit fails
-          }
+          errEl.classList.add("hidden");
         }
 
         form.addEventListener("submit", async (e) => {
           e.preventDefault();
 
-          const displayName = (displayNameEl.value || "").trim();
-          const username = normUsername(usernameEl.value);
-          const email = (emailEl.value || "").trim();
+          const display_name = (displayNameEl.value || "").trim();
+          const username = (usernameEl.value || "").trim().toLowerCase();
+          const email = (emailEl.value || "").trim().toLowerCase();
           const password = passEl.value || "";
-          const confirm = confirmEl.value || "";
+          const password2 = pass2El.value || "";
 
-          if (!displayName) return showErr("Enter a display name.");
-          if (!validUsername(username)) return showErr("Username must be 3–20 characters (a–z, 0–9, underscore).");
-          if (!email) return showErr("Enter an email.");
           if (password.length < 6) return showErr("Password must be at least 6 characters.");
-          if (password !== confirm) return showErr("Passwords do not match.");
+          if (password !== password2) return showErr("Passwords do not match.");
+          if (!display_name || !username || !email) return showErr("Please fill out all fields.");
+
+          // optional: simple username validation
+          if (!/^[a-z0-9_]{3,20}$/.test(username)) {
+            return showErr("Username must be 3–20 chars: letters, numbers, underscores.");
+          }
 
           btn.disabled = true;
           btn.textContent = "Creating…";
 
           try {
-            // Create auth user (email confirm should be OFF in Supabase settings)
+            // referral code saved by ref-capture.js or from querystring
+            const pendingRef =
+              (localStorage.getItem("pending_ref") || "").trim() ||
+              (new URLSearchParams(location.search).get("ref") || "").trim() ||
+              null;
+
+            // ✅ IMPORTANT: Confirm email should be OFF in Supabase Auth settings
             const { error: signUpErr } = await sb.auth.signUp({
               email,
               password,
               options: {
                 data: {
-                  display_name: displayName,
-                  username: username
+                  username,
+                  display_name,
+                  referred_by: pendingRef
                 }
               }
             });
 
             if (signUpErr) {
-              // Common: already registered
-              showErr(signUpErr.message);
-              btn.disabled = false;
-              btn.textContent = "Create Account";
-              return;
+              // common: user already exists
+              return showErr(signUpErr.message);
             }
 
-            // Immediately sign in so referrals dashboard + lead RPC can link correctly
+            // sign in immediately (no email confirmation)
             const { error: signInErr } = await sb.auth.signInWithPassword({ email, password });
-            if (signInErr) {
-              showErr(signInErr.message);
-              btn.disabled = false;
-              btn.textContent = "Create Account";
-              return;
-            }
+            if (signInErr) return showErr(signInErr.message);
 
-            // credit referral + create waitlist_leads row
-            await creditReferralIfAny();
+            // consume referral once the user successfully signs up
+            if (pendingRef) localStorage.removeItem("pending_ref");
 
-            showOk("Account created! Redirecting to the pre-launch page…");
-            setTimeout(() => {
-              window.location.href = prelaunch;
-            }, 650);
+            showOk("Account created! Redirecting…");
+            setTimeout(() => (window.location.href = prelaunch), 700);
           } catch (err) {
-            showErr(err?.message || "Load failed.");
+            showErr(err?.message || "Load failed");
           } finally {
-            // don’t re-enable if redirecting
-            btn.textContent = "Create Account";
             btn.disabled = false;
+            btn.textContent = "Create Account";
           }
         });
       })();
