@@ -9,17 +9,7 @@
     <script src="js/launch-config.js"></script>
 
     <!-- ✅ Referral capture (stores ?ref=CODE so it credits referrer later) -->
-    <script>
-      (function () {
-        try {
-          const params = new URLSearchParams(window.location.search);
-          const ref = params.get("ref");
-          if (ref && typeof ref === "string" && ref.trim()) {
-            localStorage.setItem("pending_ref", ref.trim());
-          }
-        } catch {}
-      })();
-    </script>
+    <script src="js/ref-capture.js"></script>
 
     <!-- Auth styles -->
     <link rel="stylesheet" href="css/auth-styles.css" />
@@ -189,7 +179,7 @@
             text-decoration: underline;
         }
 
-        /* Messages (used by auth.js) */
+        /* Messages */
         .auth-message {
             font-size: 14px;
             margin-bottom: 12px;
@@ -213,16 +203,10 @@
             display: none;
         }
 
-        /* MOBILE TWEAKS – more spacing from the sides */
+        /* MOBILE TWEAKS */
         @media (max-width: 480px) {
-            .auth-page {
-                padding: 20px 12px;
-            }
-
-            .auth-card {
-                margin: 0 6px;
-                padding: 28px 20px;
-            }
+            .auth-page { padding: 20px 12px; }
+            .auth-card { margin: 0 6px; padding: 28px 20px; }
         }
     </style>
 </head>
@@ -253,7 +237,7 @@
                 </li>
             </ul>
 
-            <!-- Messages for auth.js -->
+            <!-- Messages -->
             <div id="errorMessage" class="auth-message auth-error hidden"></div>
             <div id="successMessage" class="auth-message auth-success hidden"></div>
 
@@ -302,41 +286,129 @@
         </div>
     </div>
 
-    <!-- ✅ Supabase UMD (prevents “load failed” if auth.js expects window.supabase) -->
+    <!-- ✅ Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <!-- Auth logic -->
-    <script src="js/auth.js"></script>
-
-    <!-- ✅ Pre-launch redirect: after successful signup, go to prelaunch.html -->
+    <!-- ✅ Signup logic (self-contained; fixes “load failed”) -->
     <script>
       (function () {
+        const SUPABASE_URL = "https://hbbbsreonwhvqfvbszne.supabase.co";
+        const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
+        const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
         const cfg = window.__UNCENSORED_LAUNCH__ || {};
         const prelaunch = cfg.prelaunchPage || "prelaunch.html";
 
-        // Only do this pre-launch; on launch day, let your normal flow run.
-        if (cfg.enabled === true) return;
+        const form = document.getElementById("signupForm");
+        const btn = document.getElementById("signupBtn");
 
-        const successEl = document.getElementById("successMessage");
-        if (!successEl) return;
+        const displayNameEl = document.getElementById("displayName");
+        const usernameEl = document.getElementById("username");
+        const emailEl = document.getElementById("email");
+        const passEl = document.getElementById("password");
+        const confirmEl = document.getElementById("confirmPassword");
 
-        const observer = new MutationObserver(() => {
-          const txt = (successEl.textContent || "").toLowerCase();
+        const errEl = document.getElementById("errorMessage");
+        const okEl = document.getElementById("successMessage");
 
-          // Catch common “success” texts from auth.js
-          if (
-            txt.includes("success") ||
-            txt.includes("account created") ||
-            txt.includes("created") ||
-            txt.includes("welcome")
-          ) {
+        function showErr(msg) {
+          okEl.classList.add("hidden");
+          okEl.textContent = "";
+          errEl.textContent = msg || "Something went wrong.";
+          errEl.classList.remove("hidden");
+        }
+
+        function showOk(msg) {
+          errEl.classList.add("hidden");
+          errEl.textContent = "";
+          okEl.textContent = msg || "Success!";
+          okEl.classList.remove("hidden");
+        }
+
+        function normUsername(u) {
+          return String(u || "").trim().toLowerCase().replace(/^@+/, "");
+        }
+
+        function validUsername(u) {
+          // 3-20 chars, letters/numbers/underscore only
+          return /^[a-z0-9_]{3,20}$/.test(u);
+        }
+
+        async function creditReferralIfAny() {
+          // ref-capture.js should store localStorage.pending_ref
+          const pendingRef = (localStorage.getItem("pending_ref") || "").trim() || null;
+          try {
+            // Uses your existing RPC from the referrals system
+            const { error } = await sb.rpc("create_my_lead", { p_referred_by: pendingRef });
+            if (!error && pendingRef) localStorage.removeItem("pending_ref");
+          } catch {
+            // don’t block signup if referral credit fails
+          }
+        }
+
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+
+          const displayName = (displayNameEl.value || "").trim();
+          const username = normUsername(usernameEl.value);
+          const email = (emailEl.value || "").trim();
+          const password = passEl.value || "";
+          const confirm = confirmEl.value || "";
+
+          if (!displayName) return showErr("Enter a display name.");
+          if (!validUsername(username)) return showErr("Username must be 3–20 characters (a–z, 0–9, underscore).");
+          if (!email) return showErr("Enter an email.");
+          if (password.length < 6) return showErr("Password must be at least 6 characters.");
+          if (password !== confirm) return showErr("Passwords do not match.");
+
+          btn.disabled = true;
+          btn.textContent = "Creating…";
+
+          try {
+            // Create auth user (email confirm should be OFF in Supabase settings)
+            const { error: signUpErr } = await sb.auth.signUp({
+              email,
+              password,
+              options: {
+                data: {
+                  display_name: displayName,
+                  username: username
+                }
+              }
+            });
+
+            if (signUpErr) {
+              // Common: already registered
+              showErr(signUpErr.message);
+              btn.disabled = false;
+              btn.textContent = "Create Account";
+              return;
+            }
+
+            // Immediately sign in so referrals dashboard + lead RPC can link correctly
+            const { error: signInErr } = await sb.auth.signInWithPassword({ email, password });
+            if (signInErr) {
+              showErr(signInErr.message);
+              btn.disabled = false;
+              btn.textContent = "Create Account";
+              return;
+            }
+
+            // credit referral + create waitlist_leads row
+            await creditReferralIfAny();
+
+            showOk("Account created! Redirecting to the pre-launch page…");
             setTimeout(() => {
               window.location.href = prelaunch;
             }, 650);
+          } catch (err) {
+            showErr(err?.message || "Load failed.");
+          } finally {
+            // don’t re-enable if redirecting
+            btn.textContent = "Create Account";
+            btn.disabled = false;
           }
         });
-
-        observer.observe(successEl, { childList: true, subtree: true, characterData: true });
       })();
     </script>
 </body>
