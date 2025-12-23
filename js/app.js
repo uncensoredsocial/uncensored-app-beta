@@ -3,6 +3,7 @@
 // ===============================
 class App {
   constructor() {
+    this.sb = null; // supabase client
     this.setupEventListeners();
     this.checkAuthState();
     this.setActiveBottomNav();
@@ -54,7 +55,7 @@ class App {
 
   // ===============================
   // Feed mode toggle (Recent / Following)
-// ===============================
+  // ===============================
   toggleFeeds(e) {
     e.preventDefault();
 
@@ -104,15 +105,61 @@ class App {
   }
 
   // ===============================
-  // Auth state
+  // Supabase init (lazy)
   // ===============================
-  checkAuthState() {
-    let currentUser = null;
+  async ensureSupabase() {
+    if (this.sb) return this.sb;
+
+    // Supabase CDN must be included on app pages for this to work.
+    // (Or your launch-guard auto-load version will already inject it.)
+    if (!window.supabase) return null;
+
+    const SUPABASE_URL = "https://hbbbsreonwhvqfvbszne.supabase.co";
+    const SUPABASE_ANON =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
+
+    this.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    return this.sb;
+  }
+
+  // ===============================
+  // Auth state (Supabase)
+  // ===============================
+  async checkAuthState() {
+    const sb = await this.ensureSupabase();
+
+    // If Supabase not present, fall back to old behavior (won't crash)
+    if (!sb) {
+      let currentUser = null;
+      try {
+        currentUser =
+          typeof getCurrentUser === "function" ? getCurrentUser() : null;
+      } catch {
+        currentUser = null;
+      }
+
+      const protectedPages = ["profile.html", "messages.html"];
+      const currentPath = window.location.pathname;
+      const mustBeAuthed = protectedPages.some((page) =>
+        currentPath.includes(page)
+      );
+
+      if (!currentUser && mustBeAuthed) {
+        window.location.href = "login.html";
+        return;
+      }
+
+      this.updateAuthUI(currentUser);
+      return;
+    }
+
+    // ✅ Supabase user
+    let user = null;
     try {
-      currentUser =
-        typeof getCurrentUser === "function" ? getCurrentUser() : null;
+      const { data } = await sb.auth.getUser();
+      user = data?.user || null;
     } catch {
-      currentUser = null;
+      user = null;
     }
 
     // Pages that require login
@@ -122,12 +169,47 @@ class App {
       currentPath.includes(page)
     );
 
-    if (!currentUser && mustBeAuthed) {
+    if (!user && mustBeAuthed) {
       window.location.href = "login.html";
       return;
     }
 
-    this.updateAuthUI(currentUser);
+    // Load profile from public.users for avatar/etc.
+    let profile = null;
+    if (user?.id) {
+      try {
+        const { data } = await sb
+          .from("users")
+          .select("id, username, email, display_name, avatar_url, is_admin")
+          .eq("id", user.id)
+          .single();
+        profile = data || null;
+      } catch {
+        profile = null;
+      }
+    }
+
+    this.updateAuthUI(profile);
+
+    // Optional: update if auth changes while open
+    sb.auth.onAuthStateChange(async () => {
+      try {
+        const { data } = await sb.auth.getUser();
+        const u = data?.user || null;
+        if (!u) {
+          this.updateAuthUI(null);
+          return;
+        }
+        const { data: p } = await sb
+          .from("users")
+          .select("id, username, email, display_name, avatar_url, is_admin")
+          .eq("id", u.id)
+          .single();
+        this.updateAuthUI(p || null);
+      } catch {
+        this.updateAuthUI(null);
+      }
+    });
   }
 
   updateAuthUI(currentUser) {
