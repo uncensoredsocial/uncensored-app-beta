@@ -9,7 +9,17 @@
     <script src="js/launch-config.js"></script>
 
     <!-- ✅ Referral capture (stores ?ref=CODE so it credits referrer later) -->
-    <script src="js/ref-capture.js"></script>
+    <script>
+      (function () {
+        try {
+          const params = new URLSearchParams(window.location.search);
+          const ref = params.get("ref");
+          if (ref && typeof ref === "string" && ref.trim()) {
+            localStorage.setItem("pending_ref", ref.trim());
+          }
+        } catch {}
+      })();
+    </script>
 
     <!-- Auth styles -->
     <link rel="stylesheet" href="css/auth-styles.css" />
@@ -292,27 +302,37 @@
         </div>
     </div>
 
+    <!-- ✅ Supabase UMD (prevents “load failed” if auth.js expects window.supabase) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <!-- Auth logic -->
     <script src="js/auth.js"></script>
 
-    <!-- ✅ After auth.js succeeds, send them to prelaunch page (not referrals) -->
+    <!-- ✅ Pre-launch redirect: after successful signup, go to prelaunch.html -->
     <script>
       (function () {
         const cfg = window.__UNCENSORED_LAUNCH__ || {};
         const prelaunch = cfg.prelaunchPage || "prelaunch.html";
 
-        // auth.js already controls messages; we just watch for success text
+        // Only do this pre-launch; on launch day, let your normal flow run.
+        if (cfg.enabled === true) return;
+
         const successEl = document.getElementById("successMessage");
         if (!successEl) return;
 
         const observer = new MutationObserver(() => {
           const txt = (successEl.textContent || "").toLowerCase();
-          // If your auth.js uses different wording, this still catches most success cases
-          if (txt.includes("success") || txt.includes("created") || txt.includes("account")) {
-            // give a tiny moment so auth.js finishes any storage work
+
+          // Catch common “success” texts from auth.js
+          if (
+            txt.includes("success") ||
+            txt.includes("account created") ||
+            txt.includes("created") ||
+            txt.includes("welcome")
+          ) {
             setTimeout(() => {
               window.location.href = prelaunch;
-            }, 600);
+            }, 650);
           }
         });
 
