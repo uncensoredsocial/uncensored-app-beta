@@ -5,9 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Join the Uncensored Network</title>
 
-    <!-- ✅ Pre-launch gate (blocks signup.html until launch) -->
+    <!-- ✅ Pre-launch config (do NOT block signup; we need signups for referrals) -->
     <script src="js/launch-config.js"></script>
-    <script src="js/launch-guard.js"></script>
+
+    <!-- ✅ Referral capture (stores ?ref=CODE so it credits referrer later) -->
+    <script src="js/ref-capture.js"></script>
 
     <!-- Auth styles -->
     <link rel="stylesheet" href="css/auth-styles.css" />
@@ -290,7 +292,32 @@
         </div>
     </div>
 
-    <!-- Auth logic (won’t be reachable pre-launch because of redirect) -->
+    <!-- Auth logic -->
     <script src="js/auth.js"></script>
+
+    <!-- ✅ After auth.js succeeds, send them to prelaunch page (not referrals) -->
+    <script>
+      (function () {
+        const cfg = window.__UNCENSORED_LAUNCH__ || {};
+        const prelaunch = cfg.prelaunchPage || "prelaunch.html";
+
+        // auth.js already controls messages; we just watch for success text
+        const successEl = document.getElementById("successMessage");
+        if (!successEl) return;
+
+        const observer = new MutationObserver(() => {
+          const txt = (successEl.textContent || "").toLowerCase();
+          // If your auth.js uses different wording, this still catches most success cases
+          if (txt.includes("success") || txt.includes("created") || txt.includes("account")) {
+            // give a tiny moment so auth.js finishes any storage work
+            setTimeout(() => {
+              window.location.href = prelaunch;
+            }, 600);
+          }
+        });
+
+        observer.observe(successEl, { childList: true, subtree: true, characterData: true });
+      })();
+    </script>
 </body>
 </html>
