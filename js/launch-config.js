@@ -63,6 +63,6 @@ window.__UNCENSORED_LAUNCH__ = {
     "/uncensored-app-beta/settings.html",
     "/uncensored-app-beta/admin.html"
     "/uncensored-app-beta/post.html"
-    "/uncensored-app-beta/user.html
+    "/uncensored-app-beta/user.html"
   ]
 };
