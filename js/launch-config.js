@@ -6,7 +6,7 @@ window.__UNCENSORED_LAUNCH__ = {
   redirect: "waitlist.html",
 
   // Where logged-in users land after signup/login during pre-launch
-  prelaunchPage: "index.html",
+  prelaunchPage: "prelaunch.html",
 
   // Launch countdown (used by prelaunch page)
   launchDateISO: "2026-02-28T20:00:00Z",
