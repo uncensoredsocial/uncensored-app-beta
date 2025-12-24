@@ -15,27 +15,26 @@ window.__UNCENSORED_LAUNCH__ = {
   // Repo base (important for referrals)
   baseUrl: "https://uncensoredsocial.github.io/uncensored-app-beta/",
 
-  // ✅ Admin allowlist (lowercase)
+  // ✅ Admin allowlist
   adminEmails: [
     "ssssss@gmail.com",
     "eeeeee@gmail.com"
   ],
 
-  // ✅ Public pages that NEVER redirect
+  // ✅ Pages always accessible pre-launch (no redirect loops)
+  // NOTE: these MUST match window.location.pathname values on GitHub Pages
   publicPathsAllow: [
     "/uncensored-app-beta/",
     "/uncensored-app-beta/index.html",
 
     "/uncensored-app-beta/waitlist.html",
     "/uncensored-app-beta/prelaunch.html",
-    "/uncensored-app-beta/referrals.html",
-
     "/uncensored-app-beta/signup.html",
     "/uncensored-app-beta/login.html",
-
+    "/uncensored-app-beta/referrals.html",
     "/uncensored-app-beta/donation.html"
   ],
 
-  // ✅ Admin can use the full app pre-launch
+  // ✅ Admins can access EVERYTHING pre-launch
   adminBypassAllPages: true
 };
