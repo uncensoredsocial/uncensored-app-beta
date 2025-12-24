@@ -6,17 +6,36 @@ const NOTIF_API_BASE_URL =
     ? API_BASE_URL
     : "https://uncensored-app-beta-production.up.railway.app/api";
 
-// ✅ Wait for Supabase-auth to restore session + populate getCurrentUser()
-// Prevents false "logged out" on page load
-async function waitForUser(timeoutMs = 2500) {
+// ✅ Wait for auth.js to finish restoring token/currentUser across pages
+async function waitForUser(timeoutMs = 4000) {
   const start = Date.now();
+
+  // if auth.js exposes a ready promise, wait a beat (no UI changes)
+  try {
+    if (window.__AUTH_READY__ && typeof window.__AUTH_READY__.then === "function") {
+      // don't hang forever
+      await Promise.race([
+        window.__AUTH_READY__,
+        new Promise((r) => setTimeout(r, 800)),
+      ]);
+    }
+  } catch {}
+
   while (Date.now() - start < timeoutMs) {
     try {
-      const u = typeof getCurrentUser === "function" ? getCurrentUser() : null;
+      // ✅ prefer explicit loader if available
+      if (typeof window.ensureAuthUserLoaded === "function") {
+        const u = await window.ensureAuthUserLoaded();
+        if (u) return u;
+      }
+
+      const u = typeof window.getCurrentUser === "function" ? window.getCurrentUser() : null;
       if (u) return u;
     } catch {}
-    await new Promise((r) => setTimeout(r, 50));
+
+    await new Promise((r) => setTimeout(r, 60));
   }
+
   return null;
 }
 
@@ -44,8 +63,8 @@ class NotificationsManager {
   }
 
   async init() {
-    // ✅ wait for Supabase-auth bridge to populate local user
-    this.currentUser = await waitForUser(2500);
+    // ✅ wait for auth.js to populate local user
+    this.currentUser = await waitForUser(4000);
 
     if (!this.currentUser) {
       this.showLoggedOutState();
@@ -262,7 +281,6 @@ class NotificationsManager {
     } catch (err) {
       console.error("Failed to load notifications", err);
 
-      // If backend denies auth, show a nicer message
       if (this.emptyState) {
         this.emptyState.style.display = "block";
         this.emptyState.innerHTML = `
@@ -275,7 +293,7 @@ class NotificationsManager {
 
   // backend fetch
   async fetchNotificationsFeed() {
-    const token = await this.getAuthToken();
+    const token = this.getAuthTokenSync();
     if (!token) throw new Error("Missing auth token");
 
     const res = await fetch(`${NOTIF_API_BASE_URL}/notifications?limit=100`, {
@@ -286,16 +304,14 @@ class NotificationsManager {
     });
 
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data.error || `HTTP ${res.status}`);
-    }
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
 
     return data.notifications || [];
   }
 
   // Ask backend for each follower's is_following
   async enrichFollowerFollowStatus(followersArr) {
-    const token = await this.getAuthToken();
+    const token = this.getAuthTokenSync();
     if (!token) return;
 
     const uniqueUsernames = [
@@ -432,7 +448,7 @@ class NotificationsManager {
         const isFollowing = !!n.isFollowing;
         const btnText = isFollowing ? "Following" : "Follow";
 
-        // ✅ IMPORTANT: data-following attr is what your CSS uses now
+        // ✅ IMPORTANT: data-following attr is what notification-styles.css uses
         return `
         <div class="notification-item follower-item"
              data-type="followers"
@@ -447,14 +463,10 @@ class NotificationsManager {
           </div>
           <div class="notification-body">
             <div class="notification-text">
-              <strong>${this.escape(
-                n.user.displayName
-              )}</strong> started following you
+              <strong>${this.escape(n.user.displayName)}</strong> started following you
             </div>
             <div class="notification-meta">
-              @${this.escape(n.user.username)} · ${this.formatTime(
-                n.created_at
-              )}
+              @${this.escape(n.user.username)} · ${this.formatTime(n.created_at)}
             </div>
           </div>
 
@@ -475,11 +487,10 @@ class NotificationsManager {
   async handleFollowToggle(username, buttonEl) {
     if (!this.currentUser || !username || !buttonEl) return;
 
-    // ✅ prevent double taps per username
     if (this.followInFlight.has(username)) return;
     this.followInFlight.add(username);
 
-    const token = await this.getAuthToken();
+    const token = this.getAuthTokenSync();
     if (!token) {
       this.followInFlight.delete(username);
       return;
@@ -487,17 +498,14 @@ class NotificationsManager {
 
     const wasFollowing = buttonEl.dataset.following === "1";
 
-    // ✅ optimistic UI update (NO class changes, NO color changes)
+    // optimistic UI update
     buttonEl.dataset.following = wasFollowing ? "0" : "1";
     buttonEl.textContent = wasFollowing ? "Follow" : "Following";
 
     try {
       const res = await fetch(
         `${NOTIF_API_BASE_URL}/users/${encodeURIComponent(username)}/follow`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { method: "POST", headers: { Authorization: `Bearer ${token}` } }
       );
 
       const data = await res.json().catch(() => ({}));
@@ -505,11 +513,10 @@ class NotificationsManager {
 
       const serverFollowing = !!data.following;
 
-      // ✅ sync to server truth (still no rerender)
       buttonEl.dataset.following = serverFollowing ? "1" : "0";
       buttonEl.textContent = serverFollowing ? "Following" : "Follow";
 
-      // ✅ update cached state so filter switch doesn't revert it
+      // update cached state so filter switch doesn't revert it
       this.unified = (this.unified || []).map((n) => {
         if (n.type !== "followers") return n;
         if (n.user && n.user.username === username) {
@@ -525,7 +532,6 @@ class NotificationsManager {
         return n;
       });
     } catch (err) {
-      // revert if request failed
       buttonEl.dataset.following = wasFollowing ? "1" : "0";
       buttonEl.textContent = wasFollowing ? "Following" : "Follow";
       console.error("handleFollowToggle error", err);
@@ -536,46 +542,22 @@ class NotificationsManager {
 
   // ========== UTILITIES ==========
 
-  // ✅ Tries:
-  // 1) your global getAuthToken (if you still have it)
-  // 2) Supabase access_token from current session
-  // 3) legacy localStorage token keys
-  async getAuthToken() {
+  // ✅ IMPORTANT: backend expects YOUR backend JWT (stored in us_auth_token).
+  // Do NOT try to pull Supabase access_token here.
+  getAuthTokenSync() {
     try {
-      // 1) if something defines getAuthToken() globally, use it
       if (typeof window.getAuthToken === "function") {
         const t = window.getAuthToken();
         if (t) return t;
       }
-
-      // 2) Prefer Supabase session access token if available
-      // If your supabase-auth.js creates `window.sb`, use it
-      if (window.sb && window.sb.auth && typeof window.sb.auth.getSession === "function") {
-        const { data } = await window.sb.auth.getSession();
-        const access = data?.session?.access_token;
-        if (access) return access;
-      }
-
-      // Or if supabase-js is present, try a client (if your bridge didn’t expose one)
-      if (window.supabase && typeof window.supabase.createClient === "function") {
-        // If you do NOT expose window.sb, you can’t reliably create here without URL/key.
-        // So we only use window.sb above.
-      }
-
-      // 3) Legacy keys
       return (
         localStorage.getItem("us_auth_token") ||
-        localStorage.getItem("authToken") ||
         localStorage.getItem("token") ||
+        localStorage.getItem("authToken") ||
         null
       );
     } catch {
-      return (
-        localStorage.getItem("us_auth_token") ||
-        localStorage.getItem("authToken") ||
-        localStorage.getItem("token") ||
-        null
-      );
+      return null;
     }
   }
 
