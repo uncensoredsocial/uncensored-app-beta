@@ -18,7 +18,10 @@
     referrerpolicy="no-referrer"
   />
 
-  <!-- Desktop tweaks -->
+  <!-- Pre-launch config (load once) -->
+  <script src="js/launch-config.js"></script>
+
+  <!-- Desktop tweaks (keep yours) -->
   <style>
     @media (min-width: 900px) {
       .content-wrapper {
@@ -50,37 +53,16 @@
       font-size: 1.1rem;
       line-height: 1;
     }
-
-    /* ✅ Center logo group perfectly while keeping profile on left */
-    .logo-wrap {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      line-height: 1;
-      margin: 0;
-    }
-
-    .logo-img {
-      width: 26px;
-      height: 26px;
-      object-fit: contain;
-      display: block;
-    }
   </style>
-
-  <!-- Pre-launch config -->
-  <script src="js/launch-config.js"></script>
 </head>
 
 <body>
 
   <!-- ================= HEADER ================= -->
   <header class="header">
-
-    <!-- LEFT: profile picture (shows only when logged in) -->
+    <!-- LEFT: profile pic (shown when logged in) -->
     <div class="header-left">
-      <div class="profile-section" id="profileSection" style="display:none;">
+      <div class="profile-section" id="profileSection">
         <a href="profile.html" class="profile-icon" aria-label="Your profile">
           <img
             id="headerProfileImg"
@@ -92,29 +74,28 @@
       </div>
     </div>
 
-    <!-- CENTER: logo + text -->
-    <h1 class="logo">
-      <span class="logo-wrap">
-        <img src="uncensored-logo.PNG" alt="" class="logo-img" />
-        <span>Uncensored</span><span>Social</span>
-      </span>
+    <!-- CENTER: logo text (old style, centered) -->
+    <h1 class="logo" aria-label="Uncensored Social">
+      Uncensored<span>Social</span>
     </h1>
 
-    <!-- RIGHT: auth buttons or actions -->
-    <div class="header-actions">
+    <!-- RIGHT: auth buttons (shown when logged out) + refresh -->
+    <div style="display:flex; align-items:center; gap: 12px;">
       <div class="auth-buttons" id="authButtons">
         <a href="login.html" class="btn btn-sm btn-login">Log In</a>
         <a href="signup.html" class="btn btn-sm btn-signup">Sign Up</a>
       </div>
 
-      <button
-        class="btn btn-ghost btn-icon"
-        onclick="refreshFeed()"
-        title="Refresh"
-        aria-label="Refresh feed"
-      >
-        <span class="icon icon-refresh"></span>
-      </button>
+      <div class="header-actions">
+        <button
+          class="btn btn-ghost btn-icon"
+          onclick="refreshFeed()"
+          title="Refresh"
+          aria-label="Refresh feed"
+        >
+          <span class="icon icon-refresh"></span>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -149,7 +130,11 @@
             style="display:none"
           />
 
-          <button type="button" class="btn btn-secondary" id="addMediaBtn">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            id="addMediaBtn"
+          >
             Add image / video
           </button>
 
@@ -164,11 +149,17 @@
         </div>
       </div>
 
-      <!-- ===== FEED TABS ===== -->
+      <!-- ===== FEED TABS (ONLY 3) ===== -->
       <div class="feed-tabs" id="feedTabs">
-        <button class="feed-tab-btn active" data-feed-mode="recent">Recent</button>
-        <button class="feed-tab-btn" data-feed-mode="popular">Popular</button>
-        <button class="feed-tab-btn" data-feed-mode="trending">Trending</button>
+        <button class="feed-tab-btn active" data-feed-mode="recent">
+          Recent
+        </button>
+        <button class="feed-tab-btn" data-feed-mode="trending">
+          Trending
+        </button>
+        <button class="feed-tab-btn" data-feed-mode="following">
+          Following
+        </button>
       </div>
 
       <!-- ===== GUEST MESSAGE ===== -->
@@ -219,18 +210,15 @@
   </nav>
 
   <!-- ================= SCRIPTS ================= -->
-  <!-- ✅ Supabase FIRST -->
+
+  <!-- ✅ IMPORTANT: Supabase MUST load before auth.js -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- ✅ Auth bridge -->
   <script src="js/auth.js"></script>
-
-  <!-- App scripts -->
   <script src="js/feed.js"></script>
   <script src="js/app.js"></script>
 
-  <!-- Prelaunch guard -->
-  <script src="js/launch-config.js"></script>
+  <!-- Prelaunch guard (load after config + auth is okay) -->
   <script src="js/launch-guard.js"></script>
 
   <script>
