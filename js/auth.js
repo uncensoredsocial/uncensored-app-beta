@@ -1,487 +1,429 @@
-/// notifications.js
+// js/auth.js (SUPABASE AUTH VERSION)
+// Keeps the same global API: setAuthToken/getAuthToken/getCurrentUser/isLoggedIn/logout/etc.
 
-// API base (same pattern as your other pages)
-const NOTIF_API_BASE_URL =
-  typeof API_BASE_URL !== "undefined"
-    ? API_BASE_URL
-    : "https://uncensored-app-beta-production.up.railway.app/api";
+const TOKEN_KEY = 'us_auth_token';
+const USER_KEY = 'us_current_user';
 
-// ✅ Wait for auth.js to sync Supabase session -> localStorage + currentUser
-async function waitForAuthReady(timeoutMs = 3000) {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    try {
-      const u = typeof getCurrentUser === "function" ? getCurrentUser() : null;
-      const t =
-        typeof window.getAuthToken === "function"
-          ? window.getAuthToken()
-          : (localStorage.getItem("us_auth_token") || localStorage.getItem("token") || "");
+// Supabase project
+const SUPABASE_URL = "https://hbbbsreonwhvqfvbszne.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
 
-      // If we have a user OR at least a token, auth is “ready enough” for API calls
-      if (u || (t && String(t).trim())) return { user: u || null, token: String(t).trim() || null };
-    } catch {}
-    await new Promise((r) => setTimeout(r, 60));
+// Supabase stores session in localStorage under this key:
+const SB_STORAGE_KEY = "sb-hbbbsreonwhvqfvbszne-auth-token";
+
+// ===== Supabase client =====
+function getSb() {
+  if (!window.supabase) {
+    throw new Error("Supabase SDK not loaded. Add <script src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'></script> BEFORE auth.js");
   }
-  return { user: null, token: null };
+  if (!window.__sbClient) {
+    window.__sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+  }
+  return window.__sbClient;
 }
 
-class NotificationsManager {
-  constructor() {
-    this.listEl = document.getElementById("notificationsList");
-    this.emptyState = document.getElementById("notificationsEmpty");
-    this.filterButtons = document.querySelectorAll(".notif-filter-btn");
+// ===== Storage helpers =====
+function setAuthToken(token) {
+  localStorage.setItem(TOKEN_KEY, token);
+  try { localStorage.setItem('token', token); } catch (e) {}
+}
+function getAuthToken() {
+  return localStorage.getItem(TOKEN_KEY) || localStorage.getItem('token');
+}
+function clearAuthToken() {
+  localStorage.removeItem(TOKEN_KEY);
+  try { localStorage.removeItem('token'); } catch (e) {}
+}
 
-    this.likes = [];
-    this.comments = [];
-    this.followers = [];
-    this.unified = [];
-    this.currentFilter = "all";
-
-    this.currentUser = null;
-    this.followInFlight = new Set();
-
-    this.init();
+function setCurrentUser(user) {
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+function getCurrentUser() {
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
   }
+}
+function clearCurrentUser() {
+  localStorage.removeItem(USER_KEY);
+}
 
-  async init() {
-    // Wait for auth.js to populate token/current user
-    const ready = await waitForAuthReady(3500);
-    this.currentUser = ready.user;
+// ✅ IMPORTANT FIX:
+// If Supabase session exists, treat as logged in (even if TOKEN_KEY not set yet)
+function isLoggedIn() {
+  const t = (getAuthToken() || '').trim();
+  if (t) return true;
 
-    const token = await this.getAuthToken();
-    if (!token) {
-      this.showLoggedOutState();
-      return;
-    }
-
-    this.setupFilterBar();
-    this.setupEventDelegation();
-
-    await this.loadAllNotifications();
-  }
-
-  showLoggedOutState() {
-    if (this.listEl) this.listEl.innerHTML = "";
-    if (this.emptyState) {
-      this.emptyState.style.display = "block";
-      this.emptyState.innerHTML = `
-        <h3>Log in to see alerts</h3>
-        <p>Create an account or log in to receive notifications.</p>
-      `;
-    }
-  }
-
-  setupFilterBar() {
-    if (!this.filterButtons || !this.filterButtons.length) return;
-
-    this.filterButtons.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const filter = btn.dataset.filter || "all";
-        this.currentFilter = filter;
-
-        this.filterButtons.forEach((b) => b.classList.toggle("active", b === btn));
-        this.renderUnified();
-      });
-    });
-  }
-
-  setupEventDelegation() {
-    if (!this.listEl) return;
-
-    this.listEl.addEventListener("click", (e) => {
-      const item = e.target.closest(".notification-item");
-      if (!item) return;
-
-      const type = item.dataset.type;
-
-      // Follow/unfollow button should NOT trigger row click
-      if (type === "followers" && e.target.closest(".notification-follow-btn")) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const button = e.target.closest(".notification-follow-btn");
-        const username = item.dataset.username;
-        if (!username) return;
-
-        this.handleFollowToggle(username, button);
-        return;
-      }
-
-      // likes/comments -> post
-      if (type === "likes" || type === "comments") {
-        const postId = item.dataset.postId;
-        if (!postId) return;
-
-        window.location.href =
-          type === "comments"
-            ? `post.html?id=${encodeURIComponent(postId)}#comments`
-            : `post.html?id=${encodeURIComponent(postId)}`;
-        return;
-      }
-
-      // followers -> profile
-      if (type === "followers") {
-        const username = item.dataset.username;
-        if (!username) return;
-
-        const me = this.currentUser;
-        if (me && me.username === username) {
-          window.location.href = "profile.html";
-        } else {
-          window.location.href = `user.html?user=${encodeURIComponent(username)}`;
-        }
-      }
-    });
-  }
-
-  async loadAllNotifications() {
-    try {
-      const rawFeed = await this.fetchNotificationsFeed();
-
-      const likes = [];
-      const comments = [];
-      const followers = [];
-
-      (rawFeed || []).forEach((n) => {
-        const t = String(n.type || "").toLowerCase();
-
-        const actor = n.actor || {};
-        const actorUser = {
-          id: actor.id,
-          username: actor.username,
-          displayName: actor.display_name || actor.displayName || actor.username,
-          avatar: actor.avatar_url || actor.avatar || "default-profile.PNG",
-        };
-
-        if (t === "like") {
-          likes.push({
-            id: n.id,
-            created_at: n.created_at,
-            postId: n.post_id,
-            postContent: n.post_content || "",
-            user: actorUser,
-          });
-        } else if (t === "comment") {
-          comments.push({
-            id: n.id,
-            created_at: n.created_at,
-            postId: n.post_id,
-            postContent: n.post_content || "",
-            commentText: n.comment_text || "",
-            user: actorUser,
-          });
-        } else if (t === "follow") {
-          followers.push({
-            id: n.id,
-            created_at: n.created_at,
-            user: actorUser,
-            isFollowing: false,
-          });
-        }
-      });
-
-      this.likes = likes.filter((x) => x.user && x.user.id);
-      this.comments = comments.filter((x) => x.user && x.user.id && x.postId);
-      this.followers = followers.filter((x) => x.user && x.user.id && x.user.username);
-
-      if (this.followers.length) {
-        try {
-          await this.enrichFollowerFollowStatus(this.followers);
-        } catch (e) {
-          console.warn("Failed to enrich follower follow status:", e);
-        }
-      }
-
-      this.unified = [
-        ...this.likes.map((n) => ({ ...n, type: "likes" })),
-        ...this.comments.map((n) => ({ ...n, type: "comments" })),
-        ...this.followers.map((n) => ({ ...n, type: "followers" })),
-      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-      this.renderUnified();
-
-      const hasAny = this.unified.length > 0;
-      if (this.emptyState) {
-        this.emptyState.style.display = hasAny ? "none" : "block";
-        if (!hasAny) {
-          this.emptyState.innerHTML = `
-            <h3>No notifications yet</h3>
-            <p>When you get likes, comments, or new followers, they’ll appear here.</p>
-          `;
-        }
-      }
-    } catch (err) {
-      console.error("Failed to load notifications", err);
-      if (this.emptyState) {
-        this.emptyState.style.display = "block";
-        this.emptyState.innerHTML = `
-          <h3>Couldn’t load alerts</h3>
-          <p class="muted">If you just logged in, refresh this page.</p>
-        `;
-      }
-    }
-  }
-
-  async fetchNotificationsFeed() {
-    const token = await this.getAuthToken();
-    if (!token) throw new Error("Missing auth token");
-
-    const res = await fetch(`${NOTIF_API_BASE_URL}/notifications?limit=100`, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-    return data.notifications || [];
-  }
-
-  async enrichFollowerFollowStatus(followersArr) {
-    const token = await this.getAuthToken();
-    if (!token) return;
-
-    const uniqueUsernames = [
-      ...new Set(
-        followersArr
-          .map((f) => (f && f.user && f.user.username ? String(f.user.username) : ""))
-          .filter(Boolean)
-      ),
-    ];
-
-    if (!uniqueUsernames.length) return;
-
-    const results = await Promise.all(
-      uniqueUsernames.map(async (uname) => {
-        try {
-          const res = await fetch(`${NOTIF_API_BASE_URL}/users/${encodeURIComponent(uname)}`, {
-            method: "GET",
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) return { username: uname, is_following: false };
-          return { username: uname, is_following: !!data.is_following };
-        } catch {
-          return { username: uname, is_following: false };
-        }
-      })
-    );
-
-    const map = new Map(results.map((r) => [r.username, r.is_following]));
-    followersArr.forEach((f) => {
-      const uname = f?.user?.username;
-      if (!uname) return;
-      f.isFollowing = !!map.get(uname);
-    });
-  }
-
-  renderUnified() {
-    if (!this.listEl) return;
-
-    let items = this.unified;
-    if (this.currentFilter !== "all") items = items.filter((n) => n.type === this.currentFilter);
-
-    if (!items.length) {
-      const labelMap = { all: "notifications", likes: "likes", comments: "comments", followers: "followers" };
-      const label = labelMap[this.currentFilter] || "notifications";
-      this.listEl.innerHTML = `
-        <div class="notification-item">
-          <div class="notification-body">
-            <div class="notification-text">No ${this.escape(label)} yet.</div>
-          </div>
-        </div>
-      `;
-      return;
-    }
-
-    this.listEl.innerHTML = items
-      .map((n) => {
-        if (n.type === "likes") {
-          const postPreview =
-            n.postContent && n.postContent.length > 60 ? n.postContent.slice(0, 57) + "..." : n.postContent;
-
-          return `
-          <div class="notification-item" data-type="likes" data-post-id="${n.postId}">
-            <div class="notification-type-icon like">
-              <i class="fa-regular fa-heart"></i>
-            </div>
-            <div class="notification-avatar-wrapper">
-              <img src="${n.user.avatar}" class="notification-avatar" onerror="this.src='default-profile.PNG'">
-            </div>
-            <div class="notification-body">
-              <div class="notification-text">
-                <strong>${this.escape(n.user.displayName)}</strong> liked your post
-              </div>
-              <div class="notification-meta">
-                ${postPreview ? `"${this.escape(postPreview)}" · ` : ""}${this.formatTime(n.created_at)}
-              </div>
-            </div>
-          </div>
-        `;
-        }
-
-        if (n.type === "comments") {
-          const commentPreview =
-            n.commentText && n.commentText.length > 60 ? n.commentText.slice(0, 57) + "..." : n.commentText;
-
-          return `
-          <div class="notification-item" data-type="comments" data-post-id="${n.postId}">
-            <div class="notification-type-icon comment">
-              <i class="fa-regular fa-comment"></i>
-            </div>
-            <div class="notification-avatar-wrapper">
-              <img src="${n.user.avatar}" class="notification-avatar" onerror="this.src='default-profile.PNG'">
-            </div>
-            <div class="notification-body">
-              <div class="notification-text">
-                <strong>${this.escape(n.user.displayName)}</strong> commented on your post
-              </div>
-              <div class="notification-meta">
-                "${this.escape(commentPreview)}" · ${this.formatTime(n.created_at)}
-              </div>
-            </div>
-          </div>
-        `;
-        }
-
-        // followers
-        const isFollowing = !!n.isFollowing;
-        const btnText = isFollowing ? "Following" : "Follow";
-
-        return `
-        <div class="notification-item follower-item"
-             data-type="followers"
-             data-user-id="${n.user.id}"
-             data-username="${n.user.username}">
-          <div class="notification-type-icon follow">
-            <i class="fa-solid fa-user-plus"></i>
-          </div>
-          <div class="notification-avatar-wrapper">
-            <img src="${n.user.avatar}" class="notification-avatar" onerror="this.src='default-profile.PNG'">
-          </div>
-          <div class="notification-body">
-            <div class="notification-text">
-              <strong>${this.escape(n.user.displayName)}</strong> started following you
-            </div>
-            <div class="notification-meta">
-              @${this.escape(n.user.username)} · ${this.formatTime(n.created_at)}
-            </div>
-          </div>
-
-          <button class="notification-follow-btn"
-                  data-following="${isFollowing ? "1" : "0"}"
-                  type="button">
-            ${btnText}
-          </button>
-        </div>
-      `;
-      })
-      .join("");
-  }
-
-  async handleFollowToggle(username, buttonEl) {
-    if (!username || !buttonEl) return;
-
-    if (this.followInFlight.has(username)) return;
-    this.followInFlight.add(username);
-
-    const token = await this.getAuthToken();
-    if (!token) {
-      this.followInFlight.delete(username);
-      return;
-    }
-
-    const wasFollowing = buttonEl.dataset.following === "1";
-
-    // optimistic (no re-render)
-    buttonEl.dataset.following = wasFollowing ? "0" : "1";
-    buttonEl.textContent = wasFollowing ? "Follow" : "Following";
-
-    try {
-      const res = await fetch(`${NOTIF_API_BASE_URL}/users/${encodeURIComponent(username)}/follow`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Failed to follow toggle");
-
-      const serverFollowing = !!data.following;
-      buttonEl.dataset.following = serverFollowing ? "1" : "0";
-      buttonEl.textContent = serverFollowing ? "Following" : "Follow";
-
-      // keep state consistent when switching filters
-      this.unified = (this.unified || []).map((n) => {
-        if (n.type === "followers" && n.user?.username === username) return { ...n, isFollowing: serverFollowing };
-        return n;
-      });
-      this.followers = (this.followers || []).map((n) => {
-        if (n.user?.username === username) return { ...n, isFollowing: serverFollowing };
-        return n;
-      });
-    } catch (err) {
-      buttonEl.dataset.following = wasFollowing ? "1" : "0";
-      buttonEl.textContent = wasFollowing ? "Following" : "Follow";
-      console.error("handleFollowToggle error", err);
-    } finally {
-      this.followInFlight.delete(username);
-    }
-  }
-
-  // ✅ token getter that matches YOUR auth.js
-  async getAuthToken() {
-    try {
-      // 1) your auth.js global function
-      if (typeof window.getAuthToken === "function") {
-        const t = window.getAuthToken();
-        if (t && String(t).trim()) return String(t).trim();
-      }
-
-      // 2) auth.js creates window.__sbClient
-      if (window.__sbClient?.auth?.getSession) {
-        const { data } = await window.__sbClient.auth.getSession();
-        const access = data?.session?.access_token;
-        if (access) return access;
-      }
-
-      // 3) legacy keys
-      return (
-        localStorage.getItem("us_auth_token") ||
-        localStorage.getItem("authToken") ||
-        localStorage.getItem("token") ||
-        null
-      );
-    } catch {
-      return (
-        localStorage.getItem("us_auth_token") ||
-        localStorage.getItem("authToken") ||
-        localStorage.getItem("token") ||
-        null
-      );
-    }
-  }
-
-  escape(str) {
-    return String(str || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-
-  formatTime(ts) {
-    const d = new Date(ts);
-    if (isNaN(d)) return "";
-    const now = new Date();
-    const diffSec = (now - d) / 1000;
-    if (diffSec < 60) return "just now";
-    if (diffSec < 3600) return Math.floor(diffSec / 60) + "m";
-    if (diffSec < 86400) return Math.floor(diffSec / 3600) + "h";
-    if (diffSec < 604800) return Math.floor(diffSec / 86400) + "d";
-    return d.toLocaleDateString();
+  try {
+    const raw = localStorage.getItem(SB_STORAGE_KEY);
+    if (!raw) return false;
+    const obj = JSON.parse(raw);
+    const access = obj?.access_token || obj?.currentSession?.access_token;
+    return !!(access && String(access).trim());
+  } catch {
+    return false;
   }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  window.notificationsManager = new NotificationsManager();
+async function logout() {
+  try {
+    const sb = getSb();
+    await sb.auth.signOut();
+  } catch {}
+  clearAuthToken();
+  clearCurrentUser();
+  window.location.href = 'index.html';
+}
+
+// expose globally for other scripts
+window.setAuthToken = setAuthToken;
+window.getAuthToken = getAuthToken;
+window.setCurrentUser = setCurrentUser;
+window.getCurrentUser = getCurrentUser;
+window.isLoggedIn = isLoggedIn;
+window.logout = logout;
+
+// ======================================================
+// Redirect-back + require login helpers (unchanged)
+// ======================================================
+function saveReturnUrl(url) {
+  try {
+    const u = url || window.location.href;
+    if (u.includes('login.html') || u.includes('signup.html')) return;
+    sessionStorage.setItem('returnTo', u);
+  } catch (e) {}
+}
+
+function redirectAfterLogin(fallback = 'index.html') {
+  try {
+    const returnTo = sessionStorage.getItem('returnTo');
+    if (returnTo) {
+      sessionStorage.removeItem('returnTo');
+      window.location.href = returnTo;
+      return;
+    }
+  } catch (e) {}
+  window.location.href = fallback;
+}
+
+function requireLoginOrRedirect(message) {
+  const token = (getAuthToken() || '').trim();
+  if (!token && !isLoggedIn()) {
+    saveReturnUrl();
+    if (message) {
+      try { sessionStorage.setItem('authReason', message); } catch (e) {}
+    }
+    window.location.href = 'login.html';
+    return false;
+  }
+  return true;
+}
+
+window.saveReturnUrl = saveReturnUrl;
+window.redirectAfterLogin = redirectAfterLogin;
+window.requireLoginOrRedirect = requireLoginOrRedirect;
+
+window.getAuthReason = function () {
+  try {
+    const msg = sessionStorage.getItem('authReason');
+    if (msg) sessionStorage.removeItem('authReason');
+    return msg;
+  } catch (e) {
+    return null;
+  }
+};
+
+// ===== UI helpers =====
+function showAuthMessage(el, message, type = 'error') {
+  if (!el) return;
+  el.textContent = message;
+  el.classList.remove('hidden');
+  el.classList.toggle('auth-error', type === 'error');
+  el.classList.toggle('auth-success', type === 'success');
+}
+
+// ===== Admin check =====
+function isAdminEmail(email) {
+  const cfg = window.__UNCENSORED_LAUNCH__ || {};
+  const allow = (cfg.adminEmails || ["ssssss@gmail.com","eeeeee@gmail.com"]).map(e => String(e).toLowerCase());
+  return allow.includes(String(email || "").toLowerCase());
+}
+
+// ✅ NEW: bootstrap token immediately from Supabase storage (sync, no race)
+function bootstrapFromSupabaseStorage() {
+  try {
+    const raw = localStorage.getItem(SB_STORAGE_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    const access = obj?.access_token || obj?.currentSession?.access_token;
+    const user = obj?.user || obj?.currentSession?.user;
+
+    if (access && String(access).trim()) {
+      setAuthToken(String(access).trim());
+    }
+
+    // lightweight currentUser for header; real profile still loaded by syncSessionToLocal()
+    if (user?.id) {
+      const existing = getCurrentUser();
+      if (!existing || existing.id !== user.id) {
+        setCurrentUser({
+          id: user.id,
+          email: user.email || "",
+          username: (user.user_metadata?.username || "").toLowerCase() || null,
+          display_name: user.user_metadata?.display_name || null,
+          is_admin: isAdminEmail(user.email || "")
+        });
+      }
+    }
+
+    return { access, user };
+  } catch {
+    return null;
+  }
+}
+
+// ===== Sync session -> localStorage token + currentUser =====
+async function syncSessionToLocal() {
+  const sb = getSb();
+  const { data: sess } = await sb.auth.getSession();
+  const session = sess?.session || null;
+
+  if (!session) {
+    clearAuthToken();
+    clearCurrentUser();
+    return null;
+  }
+
+  setAuthToken(session.access_token);
+
+  const email = session.user?.email || "";
+  let profile = null;
+
+  try {
+    const { data, error } = await sb
+      .from("users")
+      .select("id,email,username,display_name,avatar_url,banner_url,bio,is_admin,is_verified,is_moderator,plan_slug")
+      .eq("id", session.user.id)
+      .maybeSingle();
+
+    if (!error && data) profile = data;
+  } catch {}
+
+  if (!profile) {
+    profile = {
+      id: session.user.id,
+      email,
+      username: (session.user.user_metadata?.username || "").toLowerCase() || null,
+      display_name: session.user.user_metadata?.display_name || null,
+      is_admin: isAdminEmail(email)
+    };
+  } else {
+    if (isAdminEmail(email)) profile.is_admin = true;
+  }
+
+  setCurrentUser(profile);
+  return profile;
+}
+
+// ===== SIGNUP =====
+async function handleSignup(e) {
+  e.preventDefault();
+
+  const displayNameInput = document.getElementById('displayName');
+  const usernameInput = document.getElementById('username');
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
+  const confirmPasswordInput = document.getElementById('confirmPassword');
+  const errorMessage = document.getElementById('errorMessage');
+  const successMessage = document.getElementById('successMessage');
+  const signupBtn = document.getElementById('signupBtn');
+
+  if (!displayNameInput || !usernameInput || !emailInput || !passwordInput || !confirmPasswordInput) return;
+
+  errorMessage?.classList.add('hidden');
+  successMessage?.classList.add('hidden');
+
+  const displayName = displayNameInput.value.trim();
+  const username = usernameInput.value.trim().toLowerCase();
+  const email = emailInput.value.trim().toLowerCase();
+  const password = passwordInput.value;
+  const confirmPassword = confirmPasswordInput.value;
+
+  if (!displayName || !username || !email || !password || !confirmPassword) {
+    showAuthMessage(errorMessage, 'Please fill in all fields.');
+    return;
+  }
+  if (!/^[a-z0-9_]{3,20}$/.test(username)) {
+    showAuthMessage(errorMessage, 'Username must be 3–20 chars: letters, numbers, underscores.');
+    return;
+  }
+  if (password !== confirmPassword) {
+    showAuthMessage(errorMessage, 'Passwords do not match.');
+    return;
+  }
+  if (password.length < 6) {
+    showAuthMessage(errorMessage, 'Password must be at least 6 characters.');
+    return;
+  }
+
+  try {
+    if (signupBtn) {
+      signupBtn.disabled = true;
+      signupBtn.textContent = 'Creating...';
+    }
+
+    const sb = getSb();
+
+    const pendingRef =
+      (localStorage.getItem("pending_ref") || "").trim() ||
+      (new URLSearchParams(location.search).get("ref") || "").trim() ||
+      null;
+
+    const { error: signUpErr } = await sb.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { username, display_name: displayName, referred_by: pendingRef }
+      }
+    });
+
+    if (signUpErr) throw new Error(signUpErr.message);
+
+    const { error: signInErr } = await sb.auth.signInWithPassword({ email, password });
+    if (signInErr) throw new Error(signInErr.message);
+
+    if (pendingRef) localStorage.removeItem("pending_ref");
+
+    await syncSessionToLocal();
+
+    showAuthMessage(successMessage, 'Account created! Redirecting...', 'success');
+
+    const cfg = window.__UNCENSORED_LAUNCH__ || {};
+    const prelaunch = cfg.prelaunchPage || 'prelaunch.html';
+
+    setTimeout(() => {
+      const user = getCurrentUser();
+      if (user?.is_admin === true) {
+        window.location.href = 'admin.html';
+      } else {
+        if (cfg.enabled === true) redirectAfterLogin('index.html');
+        else window.location.href = prelaunch;
+      }
+    }, 700);
+
+  } catch (err) {
+    console.error('Signup error:', err);
+    showAuthMessage(errorMessage, err.message || 'Signup failed.');
+  } finally {
+    if (signupBtn) {
+      signupBtn.disabled = false;
+      signupBtn.textContent = 'Create Account';
+    }
+  }
+}
+
+// ===== LOGIN =====
+async function handleLogin(e) {
+  e.preventDefault();
+
+  const identifierInput =
+    document.getElementById('loginIdentifier') ||
+    document.getElementById('loginEmail') ||
+    document.getElementById('email');
+
+  const passwordInput =
+    document.getElementById('loginPassword') ||
+    document.getElementById('password');
+
+  const errorMessage = document.getElementById('errorMessage');
+  const loginBtn = document.getElementById('loginBtn');
+
+  if (!identifierInput || !passwordInput) return;
+
+  errorMessage?.classList.add('hidden');
+
+  const identifier = identifierInput.value.trim().toLowerCase();
+  const password = passwordInput.value;
+
+  if (!identifier || !password) {
+    showAuthMessage(errorMessage, 'Please enter your email and password.');
+    return;
+  }
+
+  try {
+    if (loginBtn) {
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'Signing in...';
+    }
+
+    const sb = getSb();
+
+    if (!identifier.includes("@")) {
+      throw new Error("Use your email to log in (username login is disabled for now).");
+    }
+
+    const { error } = await sb.auth.signInWithPassword({ email: identifier, password });
+    if (error) throw new Error(error.message);
+
+    // ✅ immediately sync + set token
+    await syncSessionToLocal();
+
+    const cfg = window.__UNCENSORED_LAUNCH__ || {};
+    const prelaunch = cfg.prelaunchPage || 'prelaunch.html';
+
+    const user = getCurrentUser();
+    if (user?.is_admin === true) window.location.href = 'admin.html';
+    else {
+      if (cfg.enabled === true) redirectAfterLogin('index.html');
+      else window.location.href = prelaunch;
+    }
+
+  } catch (err) {
+    console.error('Login error:', err);
+    showAuthMessage(errorMessage, err.message || 'Login failed.');
+  } finally {
+    if (loginBtn) {
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Sign In';
+    }
+  }
+}
+
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded', async () => {
+  // ✅ bootstrap ASAP (prevents “logged out” race on Home)
+  bootstrapFromSupabaseStorage();
+
+  const signupForm = document.getElementById('signupForm');
+  const loginForm = document.getElementById('loginForm');
+
+  if (signupForm) signupForm.addEventListener('submit', handleSignup);
+  if (loginForm) {
+    loginForm.addEventListener('submit', handleLogin);
+
+    const reason = window.getAuthReason ? window.getAuthReason() : null;
+    const errorMessage = document.getElementById('errorMessage');
+    if (reason && errorMessage) showAuthMessage(errorMessage, reason, 'error');
+  }
+
+  // Keep localStorage in sync if already logged in
+  try { await syncSessionToLocal(); } catch {}
+
+  // Header auth/profile toggle
+  const authButtons = document.getElementById('authButtons');
+  const profileSection = document.getElementById('profileSection');
+  const headerProfileImg = document.getElementById('headerProfileImg');
+
+  if (authButtons || profileSection || headerProfileImg) {
+    const loggedIn = isLoggedIn();
+    if (authButtons) authButtons.style.display = loggedIn ? 'none' : 'flex';
+    if (profileSection) profileSection.style.display = loggedIn ? 'flex' : 'none';
+
+    if (loggedIn) {
+      const user = getCurrentUser();
+      if (user?.avatar_url && headerProfileImg) headerProfileImg.src = user.avatar_url;
+    }
+  }
 });
