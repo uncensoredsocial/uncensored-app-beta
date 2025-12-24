@@ -1,396 +1,343 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Join the Uncensored Network</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Join the Uncensored Network</title>
 
-    <!-- ✅ Pre-launch config (do NOT block signup; we need signups for referrals) -->
-    <script src="js/launch-config.js"></script>
+  <!-- ✅ Pre-launch config (do NOT block signup; we need signups for referrals) -->
+  <script src="js/launch-config.js"></script>
 
-    <!-- ✅ Referral capture (stores ?ref=CODE so it credits referrer later) -->
-    <script src="js/ref-capture.js"></script>
+  <!-- ✅ Referral capture (stores ?ref=CODE so it credits referrer later) -->
+  <script src="js/ref-capture.js"></script>
 
-    <!-- Auth styles -->
-    <link rel="stylesheet" href="css/auth-styles.css" />
+  <!-- Auth styles -->
+  <link rel="stylesheet" href="css/auth-styles.css" />
 
-    <!-- Font Awesome for icons -->
-    <link
-        rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-        integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
-        crossorigin="anonymous"
-        referrerpolicy="no-referrer"
-    />
+  <!-- Font Awesome for icons -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer"
+  />
 
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: #000;
-            color: #fff;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-        }
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      color: #fff;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
 
-        .auth-page {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
+    .auth-page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
 
-        /* App Title */
-        .auth-title {
-            font-size: 32px;
-            font-weight: 700;
-            margin-bottom: 10px;
-            text-align: center;
-        }
+    .auth-title {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    .auth-title span { color: #1d9bf0; }
 
-        .auth-title span {
-            color: #1d9bf0;
-        }
+    .auth-card {
+      width: 100%;
+      max-width: 420px;
+      background: #111;
+      border: 1px solid #222;
+      padding: 32px;
+      border-radius: 16px;
+      box-shadow: 0 0 25px rgba(0,0,0,0.6);
+    }
 
-        .auth-card {
-            width: 100%;
-            max-width: 420px;
-            background: #111;
-            border: 1px solid #222;
-            padding: 32px;
-            border-radius: 16px;
-            box-shadow: 0 0 25px rgba(0,0,0,0.6);
-        }
+    .auth-card h2 {
+      text-align: center;
+      font-size: 28px;
+      margin-bottom: 16px;
+    }
 
-        .auth-card h2 {
-            text-align: center;
-            font-size: 28px;
-            margin-bottom: 16px;
-        }
+    .benefits-list {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 20px;
+      text-align: center;
+    }
 
-        /* Benefits list */
-        .benefits-list {
-            list-style: none;
-            padding: 0;
-            margin: 0 0 20px;
-            text-align: center;
-        }
+    .benefit-item {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-size: 14px;
+      opacity: 0.9;
+    }
 
-        .benefit-item {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            margin-bottom: 8px;
-            font-size: 14px;
-            opacity: 0.9;
-        }
+    .benefit-item i {
+      color: #1d9bf0;
+      margin-top: 0;
+      min-width: 16px;
+    }
 
-        .benefit-item i {
-            color: #1d9bf0;
-            margin-top: 0;
-            min-width: 16px;
-        }
+    .input-group { width: 100%; margin-bottom: 18px; }
+    .input-group label {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 6px;
+      opacity: 0.8;
+    }
 
-        .input-group {
-            width: 100%;
-            margin-bottom: 18px;
-        }
+    .input-group input {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid #333;
+      background: #000;
+      color: #fff;
+      font-size: 16px;
+      outline: none;
+      transition: 0.2s;
+    }
+    .input-group input:focus { border-color: #1d9bf0; }
 
-        .input-group label {
-            display: block;
-            font-size: 14px;
-            margin-bottom: 6px;
-            opacity: 0.8;
-        }
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
 
-        .input-group input {
-            width: 100%;
-            padding: 14px;
-            border-radius: 12px;
-            border: 1px solid #333;
-            background: #000;
-            color: #fff;
-            font-size: 16px;
-            outline: none;
-            transition: 0.2s;
-        }
+    .checkbox-group input { width: 18px; height: 18px; }
+    .checkbox-group a { color: #1d9bf0; text-decoration: none; }
+    .checkbox-group a:hover { text-decoration: underline; }
 
-        .input-group input:focus {
-            border-color: #1d9bf0;
-        }
+    .auth-btn {
+      width: 100%;
+      padding: 14px;
+      background: #1d9bf0;
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+      margin-top: 10px;
+    }
+    .auth-btn:active { transform: scale(0.98); }
 
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 14px;
-            margin-bottom: 20px;
-        }
+    .auth-switch {
+      text-align: center;
+      margin-top: 18px;
+      opacity: 0.75;
+      font-size: 15px;
+    }
+    .auth-switch a {
+      color: #9b6bff;
+      font-weight: 600;
+      margin-left: 4px;
+      text-decoration: none;
+    }
+    .auth-switch a:hover { text-decoration: underline; }
 
-        .checkbox-group input {
-            width: 18px;
-            height: 18px;
-        }
+    .auth-message {
+      font-size: 14px;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      line-height: 1.25;
+    }
 
-        .checkbox-group a {
-            color: #1d9bf0;
-            text-decoration: none;
-        }
+    .auth-error {
+      background-color: rgba(255, 68, 68, 0.12);
+      border: 1px solid #ff4444;
+      color: #ff7878;
+    }
 
-        .checkbox-group a:hover {
-            text-decoration: underline;
-        }
+    .auth-success {
+      background-color: rgba(0, 200, 81, 0.12);
+      border: 1px solid #00c851;
+      color: #8df5b3;
+    }
 
-        .auth-btn {
-            width: 100%;
-            padding: 14px;
-            background: #1d9bf0;
-            border: none;
-            border-radius: 12px;
-            color: #fff;
-            font-size: 18px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: 0.2s;
-            margin-top: 10px;
-        }
+    .hidden { display: none; }
 
-        .auth-btn:active {
-            transform: scale(0.98);
-        }
-
-        .auth-switch {
-            text-align: center;
-            margin-top: 18px;
-            opacity: 0.75;
-            font-size: 15px;
-        }
-
-        .auth-switch a {
-            color: #9b6bff;
-            font-weight: 600;
-            margin-left: 4px;
-            text-decoration: none;
-        }
-
-        .auth-switch a:hover {
-            text-decoration: underline;
-        }
-
-        /* Messages */
-        .auth-message {
-            font-size: 14px;
-            margin-bottom: 12px;
-            padding: 8px 10px;
-            border-radius: 10px;
-        }
-
-        .auth-error {
-            background-color: rgba(255, 68, 68, 0.12);
-            border: 1px solid #ff4444;
-            color: #ff7878;
-        }
-
-        .auth-success {
-            background-color: rgba(0, 200, 81, 0.12);
-            border: 1px solid #00c851;
-            color: #8df5b3;
-        }
-
-        .hidden {
-            display: none;
-        }
-
-        /* MOBILE TWEAKS */
-        @media (max-width: 480px) {
-            .auth-page {
-                padding: 20px 12px;
-            }
-
-            .auth-card {
-                margin: 0 6px;
-                padding: 28px 20px;
-            }
-        }
-    </style>
+    @media (max-width: 480px) {
+      .auth-page { padding: 20px 12px; }
+      .auth-card { margin: 0 6px; padding: 28px 20px; }
+    }
+  </style>
 </head>
 
 <body>
-    <div class="auth-page">
+  <div class="auth-page">
+    <h1 class="auth-title">Uncensored<span>Social</span></h1>
 
-        <!-- App Title -->
-        <h1 class="auth-title">Uncensored<span>Social</span></h1>
+    <div class="auth-card">
+      <h2>Join the Uncensored Network</h2>
 
-        <!-- Signup Card -->
-        <div class="auth-card">
-            <h2>Join the Uncensored Network</h2>
+      <ul class="benefits-list">
+        <li class="benefit-item">
+          <i class="fa-solid fa-circle-check"></i>
+          <span>Fully uncensored free-speech community.</span>
+        </li>
+        <li class="benefit-item">
+          <i class="fa-solid fa-circle-check"></i>
+          <span>No IP tracking or ad-based profiling.</span>
+        </li>
+        <li class="benefit-item">
+          <i class="fa-solid fa-circle-check"></i>
+          <span>No data harvesting &amp; no selling your info.</span>
+        </li>
+      </ul>
 
-            <!-- Centered benefits -->
-            <ul class="benefits-list">
-                <li class="benefit-item">
-                    <i class="fa-solid fa-circle-check"></i>
-                    <span>Fully uncensored free-speech community.</span>
-                </li>
-                <li class="benefit-item">
-                    <i class="fa-solid fa-circle-check"></i>
-                    <span>No IP tracking or ad-based profiling.</span>
-                </li>
-                <li class="benefit-item">
-                    <i class="fa-solid fa-circle-check"></i>
-                    <span>No data harvesting &amp; no selling your info.</span>
-                </li>
-            </ul>
+      <div id="errorMessage" class="auth-message auth-error hidden"></div>
+      <div id="successMessage" class="auth-message auth-success hidden"></div>
 
-            <!-- Messages -->
-            <div id="errorMessage" class="auth-message auth-error hidden"></div>
-            <div id="successMessage" class="auth-message auth-success hidden"></div>
-
-            <form id="signupForm">
-                <div class="input-group">
-                    <label for="displayName">Display Name</label>
-                    <input type="text" id="displayName" placeholder="How people will see you" required>
-                </div>
-
-                <div class="input-group">
-                    <label for="username">Username</label>
-                    <input type="text" id="username" placeholder="Your unique handle" required>
-                </div>
-
-                <div class="input-group">
-                    <label for="email">Email</label>
-                    <input type="email" id="email" placeholder="your@email.com" required>
-                </div>
-
-                <div class="input-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" placeholder="At least 6 characters" required>
-                </div>
-
-                <div class="input-group">
-                    <label for="confirmPassword">Confirm Password</label>
-                    <input type="password" id="confirmPassword" placeholder="Enter password again" required>
-                </div>
-
-                <div class="checkbox-group">
-                    <input type="checkbox" id="agree" required>
-                    <label for="agree">
-                        I agree to the
-                        <a href="privacy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
-                        &
-                        <a href="terms.html" target="_blank" rel="noopener noreferrer">Terms of Service</a>
-                    </label>
-                </div>
-
-                <button type="submit" id="signupBtn" class="auth-btn">Create Account</button>
-            </form>
-
-            <p class="auth-switch">
-                Already have an account?<a href="login.html">Log in</a>
-            </p>
+      <form id="signupForm" autocomplete="on">
+        <div class="input-group">
+          <label for="displayName">Display Name</label>
+          <input type="text" id="displayName" placeholder="How people will see you" required />
         </div>
+
+        <div class="input-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" placeholder="Your unique handle" required autocapitalize="none" spellcheck="false" />
+        </div>
+
+        <div class="input-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" placeholder="your@email.com" required />
+        </div>
+
+        <div class="input-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="At least 6 characters" required />
+        </div>
+
+        <div class="input-group">
+          <label for="confirmPassword">Confirm Password</label>
+          <input type="password" id="confirmPassword" placeholder="Enter password again" required />
+        </div>
+
+        <div class="checkbox-group">
+          <input type="checkbox" id="agree" required />
+          <label for="agree">
+            I agree to the
+            <a href="privacy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+            &amp;
+            <a href="terms.html" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+          </label>
+        </div>
+
+        <button type="submit" id="signupBtn" class="auth-btn">Create Account</button>
+      </form>
+
+      <p class="auth-switch">
+        Already have an account?<a href="login.html">Log in</a>
+      </p>
     </div>
+  </div>
 
-    <!-- ✅ Supabase -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- ✅ Supabase SDK MUST be loaded before signup script -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <!-- ✅ Signup logic (replaces old auth.js to stop the DB error) -->
-    <script>
-      (function () {
-        const SUPABASE_URL = "https://hbbbsreonwhvqfvbszne.supabase.co";
-        const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
-        const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+  <script>
+    (function () {
+      const cfg = window.__UNCENSORED_LAUNCH__ || {};
+      const prelaunch = cfg.prelaunchPage || "prelaunch.html";
 
-        const cfg = window.__UNCENSORED_LAUNCH__ || {};
-        const prelaunch = cfg.prelaunchPage || "prelaunch.html";
+      const SUPABASE_URL = "https://hbbbsreonwhvqfvbszne.supabase.co";
+      const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
 
-        const form = document.getElementById("signupForm");
-        const btn = document.getElementById("signupBtn");
+      const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-        const displayNameEl = document.getElementById("displayName");
-        const usernameEl = document.getElementById("username");
-        const emailEl = document.getElementById("email");
-        const passEl = document.getElementById("password");
-        const pass2El = document.getElementById("confirmPassword");
+      const form = document.getElementById("signupForm");
+      const btn = document.getElementById("signupBtn");
 
-        const errEl = document.getElementById("errorMessage");
-        const okEl = document.getElementById("successMessage");
+      const displayNameEl = document.getElementById("displayName");
+      const usernameEl = document.getElementById("username");
+      const emailEl = document.getElementById("email");
+      const passEl = document.getElementById("password");
+      const pass2El = document.getElementById("confirmPassword");
 
-        function showErr(msg){
-          errEl.textContent = msg || "Something went wrong.";
-          errEl.classList.remove("hidden");
-          okEl.classList.add("hidden");
-        }
-        function showOk(msg){
-          okEl.textContent = msg || "Success!";
-          okEl.classList.remove("hidden");
-          errEl.classList.add("hidden");
-        }
+      const errEl = document.getElementById("errorMessage");
+      const okEl = document.getElementById("successMessage");
 
-        form.addEventListener("submit", async (e) => {
-          e.preventDefault();
+      function showErr(msg) {
+        errEl.textContent = msg || "Something went wrong.";
+        errEl.classList.remove("hidden");
+        okEl.classList.add("hidden");
+      }
+      function showOk(msg) {
+        okEl.textContent = msg || "Success!";
+        okEl.classList.remove("hidden");
+        errEl.classList.add("hidden");
+      }
 
-          const display_name = (displayNameEl.value || "").trim();
-          const username = (usernameEl.value || "").trim().toLowerCase();
-          const email = (emailEl.value || "").trim().toLowerCase();
-          const password = passEl.value || "";
-          const password2 = pass2El.value || "";
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
 
-          if (password.length < 6) return showErr("Password must be at least 6 characters.");
-          if (password !== password2) return showErr("Passwords do not match.");
-          if (!display_name || !username || !email) return showErr("Please fill out all fields.");
+        const display_name = (displayNameEl.value || "").trim();
+        const username = (usernameEl.value || "").trim().toLowerCase();
+        const email = (emailEl.value || "").trim().toLowerCase();
+        const password = passEl.value || "";
+        const password2 = pass2El.value || "";
 
-          // optional: simple username validation
-          if (!/^[a-z0-9_]{3,20}$/.test(username)) {
-            return showErr("Username must be 3–20 chars: letters, numbers, underscores.");
-          }
+        if (!display_name || !username || !email) return showErr("Please fill out all fields.");
+        if (!/^[a-z0-9_]{3,20}$/.test(username)) return showErr("Username must be 3–20 chars: letters, numbers, underscores.");
+        if (password.length < 6) return showErr("Password must be at least 6 characters.");
+        if (password !== password2) return showErr("Passwords do not match.");
 
-          btn.disabled = true;
-          btn.textContent = "Creating…";
+        btn.disabled = true;
+        btn.textContent = "Creating…";
 
-          try {
-            // referral code saved by ref-capture.js or from querystring
-            const pendingRef =
-              (localStorage.getItem("pending_ref") || "").trim() ||
-              (new URLSearchParams(location.search).get("ref") || "").trim() ||
-              null;
+        try {
+          const pendingRef =
+            (localStorage.getItem("pending_ref") || "").trim() ||
+            (new URLSearchParams(location.search).get("ref") || "").trim() ||
+            null;
 
-            // ✅ IMPORTANT: Confirm email should be OFF in Supabase Auth settings
-            const { error: signUpErr } = await sb.auth.signUp({
-              email,
-              password,
-              options: {
-                data: {
-                  username,
-                  display_name,
-                  referred_by: pendingRef
-                }
-              }
-            });
-
-            if (signUpErr) {
-              // common: user already exists
-              return showErr(signUpErr.message);
+          const { error: signUpErr } = await sb.auth.signUp({
+            email,
+            password,
+            options: {
+              data: { username, display_name, referred_by: pendingRef }
             }
+          });
 
-            // sign in immediately (no email confirmation)
-            const { error: signInErr } = await sb.auth.signInWithPassword({ email, password });
-            if (signInErr) return showErr(signInErr.message);
-
-            // consume referral once the user successfully signs up
-            if (pendingRef) localStorage.removeItem("pending_ref");
-
-            showOk("Account created! Redirecting…");
-            setTimeout(() => (window.location.href = prelaunch), 700);
-          } catch (err) {
-            showErr(err?.message || "Load failed");
-          } finally {
-            btn.disabled = false;
-            btn.textContent = "Create Account";
+          if (signUpErr) {
+            // This is where "Database error saving new user" appears
+            return showErr(signUpErr.message);
           }
-        });
-      })();
-    </script>
+
+          // Immediate sign-in (you want no confirmations)
+          const { error: signInErr } = await sb.auth.signInWithPassword({ email, password });
+          if (signInErr) return showErr(signInErr.message);
+
+          if (pendingRef) localStorage.removeItem("pending_ref");
+
+          showOk("Account created! Redirecting…");
+          setTimeout(() => (window.location.href = prelaunch), 700);
+
+        } catch (err) {
+          showErr(err?.message || "Load failed");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Create Account";
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
