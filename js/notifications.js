@@ -6,6 +6,20 @@ const NOTIF_API_BASE_URL =
     ? API_BASE_URL
     : "https://uncensored-app-beta-production.up.railway.app/api";
 
+// ✅ Wait for Supabase-auth to restore session + populate getCurrentUser()
+// Prevents false "logged out" on page load
+async function waitForUser(timeoutMs = 2500) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const u = typeof getCurrentUser === "function" ? getCurrentUser() : null;
+      if (u) return u;
+    } catch {}
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  return null;
+}
+
 class NotificationsManager {
   constructor() {
     // unified list + filter bar
@@ -30,12 +44,8 @@ class NotificationsManager {
   }
 
   async init() {
-    try {
-      this.currentUser =
-        typeof getCurrentUser === "function" ? getCurrentUser() : null;
-    } catch {
-      this.currentUser = null;
-    }
+    // ✅ wait for Supabase-auth bridge to populate local user
+    this.currentUser = await waitForUser(2500);
 
     if (!this.currentUser) {
       this.showLoggedOutState();
@@ -251,12 +261,21 @@ class NotificationsManager {
       }
     } catch (err) {
       console.error("Failed to load notifications", err);
+
+      // If backend denies auth, show a nicer message
+      if (this.emptyState) {
+        this.emptyState.style.display = "block";
+        this.emptyState.innerHTML = `
+          <h3>Couldn’t load alerts</h3>
+          <p class="muted">If you just logged in, try refreshing this page.</p>
+        `;
+      }
     }
   }
 
   // backend fetch
   async fetchNotificationsFeed() {
-    const token = this.getAuthToken();
+    const token = await this.getAuthToken();
     if (!token) throw new Error("Missing auth token");
 
     const res = await fetch(`${NOTIF_API_BASE_URL}/notifications?limit=100`, {
@@ -276,7 +295,7 @@ class NotificationsManager {
 
   // Ask backend for each follower's is_following
   async enrichFollowerFollowStatus(followersArr) {
-    const token = this.getAuthToken();
+    const token = await this.getAuthToken();
     if (!token) return;
 
     const uniqueUsernames = [
@@ -434,8 +453,8 @@ class NotificationsManager {
             </div>
             <div class="notification-meta">
               @${this.escape(n.user.username)} · ${this.formatTime(
-                  n.created_at
-                )}
+                n.created_at
+              )}
             </div>
           </div>
 
@@ -460,7 +479,7 @@ class NotificationsManager {
     if (this.followInFlight.has(username)) return;
     this.followInFlight.add(username);
 
-    const token = this.getAuthToken();
+    const token = await this.getAuthToken();
     if (!token) {
       this.followInFlight.delete(username);
       return;
@@ -517,9 +536,33 @@ class NotificationsManager {
 
   // ========== UTILITIES ==========
 
-  getAuthToken() {
+  // ✅ Tries:
+  // 1) your global getAuthToken (if you still have it)
+  // 2) Supabase access_token from current session
+  // 3) legacy localStorage token keys
+  async getAuthToken() {
     try {
-      if (typeof getAuthToken === "function") return getAuthToken();
+      // 1) if something defines getAuthToken() globally, use it
+      if (typeof window.getAuthToken === "function") {
+        const t = window.getAuthToken();
+        if (t) return t;
+      }
+
+      // 2) Prefer Supabase session access token if available
+      // If your supabase-auth.js creates `window.sb`, use it
+      if (window.sb && window.sb.auth && typeof window.sb.auth.getSession === "function") {
+        const { data } = await window.sb.auth.getSession();
+        const access = data?.session?.access_token;
+        if (access) return access;
+      }
+
+      // Or if supabase-js is present, try a client (if your bridge didn’t expose one)
+      if (window.supabase && typeof window.supabase.createClient === "function") {
+        // If you do NOT expose window.sb, you can’t reliably create here without URL/key.
+        // So we only use window.sb above.
+      }
+
+      // 3) Legacy keys
       return (
         localStorage.getItem("us_auth_token") ||
         localStorage.getItem("authToken") ||
@@ -527,7 +570,12 @@ class NotificationsManager {
         null
       );
     } catch {
-      return null;
+      return (
+        localStorage.getItem("us_auth_token") ||
+        localStorage.getItem("authToken") ||
+        localStorage.getItem("token") ||
+        null
+      );
     }
   }
 
