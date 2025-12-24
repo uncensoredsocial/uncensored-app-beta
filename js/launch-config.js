@@ -21,12 +21,10 @@ window.__UNCENSORED_LAUNCH__ = {
     "eeeeee@gmail.com"
   ],
 
-  // ✅ Pages always accessible pre-launch (no redirect loops)
-  // NOTE: these MUST match window.location.pathname values on GitHub Pages
+  // ✅ Pages always accessible pre-launch (public funnel pages)
+  // IMPORTANT: DO NOT include index.html here (index is admin-only prelaunch)
   publicPathsAllow: [
     "/uncensored-app-beta/",
-    "/uncensored-app-beta/index.html",
-
     "/uncensored-app-beta/waitlist.html",
     "/uncensored-app-beta/prelaunch.html",
     "/uncensored-app-beta/signup.html",
