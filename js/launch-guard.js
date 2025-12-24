@@ -4,15 +4,13 @@
   if (cfg.enabled === true) return;
 
   const redirect = cfg.redirect || "waitlist.html";
-  const admins = (cfg.adminEmails || []).map(e => String(e).toLowerCase());
   const path = window.location.pathname;
 
-  // ✅ Always allow public funnel pages
+  // ✅ Allow public pages always (no redirect loops)
   const allow = new Set(cfg.publicPathsAllow || []);
   if (allow.has(path)) return;
 
-  // If Supabase isn't loaded on this page, we can't check admin session.
-  // For safety, redirect.
+  // Must have supabase loaded BEFORE this script
   if (!window.supabase) {
     window.location.replace(redirect);
     return;
@@ -23,21 +21,41 @@
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
   try {
-    const { data } = await sb.auth.getUser();
-    const email = (data?.user?.email || "").toLowerCase();
+    // 1) Must be logged in
+    const { data: userData } = await sb.auth.getUser();
+    const user = userData?.user;
+    const email = (user?.email || "").toLowerCase();
 
-    // Not logged in => block
-    if (!email) {
+    if (!user || !email) {
       window.location.replace(redirect);
       return;
     }
 
-    // Admin bypass => allow everything
-    if (cfg.adminBypassAllPages === true && admins.includes(email)) return;
+    // 2) Quick allowlist bypass (optional)
+    const admins = (cfg.adminEmails || []).map(e => String(e).toLowerCase());
+    if (cfg.adminBypassAllPages === true && admins.includes(email)) {
+      return; // ✅ admin can access ANY page
+    }
 
-    // Non-admin logged in pre-launch => still blocked from the real app
-    window.location.replace(cfg.prelaunchPage || "prelaunch.html");
-  } catch {
+    // 3) Strong check: confirm is_admin from public.users
+    const { data: row, error } = await sb
+      .from("users")
+      .select("is_admin")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      window.location.replace(redirect);
+      return;
+    }
+
+    if (row?.is_admin === true) {
+      return; // ✅ admin can access ANY page
+    }
+
+    // Non-admin -> blocked prelaunch
+    window.location.replace(cfg.prelaunchPage || redirect);
+  } catch (e) {
     window.location.replace(redirect);
   }
 })();
