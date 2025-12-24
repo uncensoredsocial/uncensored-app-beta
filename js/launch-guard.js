@@ -1,22 +1,22 @@
-// js/launch-guard.js
+/// js/launch-guard.js
 (async function () {
   const cfg = window.__UNCENSORED_LAUNCH__ || {};
+
+  // ✅ If platform is live, do NOTHING
   if (cfg.enabled === true) return;
 
-  const redirect = cfg.redirect || "waitlist.html";
-  const prelaunch = cfg.prelaunchPage || "prelaunch.html";
+  const redirectGuest = cfg.redirect || "waitlist.html";
+  const redirectUser = cfg.prelaunchPage || "prelaunch.html";
 
   const path = window.location.pathname;
 
-  // Public allowlist (funnel pages)
+  // ✅ Always-allowed pages (no guards)
   const allow = new Set(cfg.publicPathsAllow || []);
+  if (allow.has(path)) return;
 
-  // Must have supabase loaded BEFORE this script
+  // Supabase must exist
   if (!window.supabase) {
-    // If you see this, add:
-    // <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    // BEFORE <script src="js/launch-guard.js"></script> on every protected page.
-    window.location.replace(redirect);
+    window.location.replace(redirectGuest);
     return;
   }
 
@@ -26,52 +26,29 @@
 
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-  const admins = new Set((cfg.adminEmails || []).map(e => String(e).toLowerCase()));
-
-  // pages that should bounce admins to index (so they don’t get stuck on funnel pages)
-  const adminBouncePaths = new Set([
-    "/uncensored-app-beta/",
-    "/uncensored-app-beta/waitlist.html",
-    "/uncensored-app-beta/prelaunch.html",
-    "/uncensored-app-beta/login.html",
-    "/uncensored-app-beta/signup.html",
-    "/uncensored-app-beta/donate.html",
-    "/uncensored-app-beta/referrals.html"
-  ]);
-
   try {
-    // Get current auth user
-    const { data: userData } = await sb.auth.getUser();
-    const user = userData?.user;
+    const { data } = await sb.auth.getUser();
+    const user = data?.user;
     const email = (user?.email || "").toLowerCase();
 
-    // 1) Not logged in
+    // ❌ Not logged in → waitlist
     if (!user || !email) {
-      // if public page, allow
-      if (allow.has(path)) return;
-
-      // otherwise block
-      window.location.replace(redirect);
+      window.location.replace(redirectGuest);
       return;
     }
 
-    // 2) Logged in admin (email allowlist) => allow everything
-    if (cfg.adminBypassAllPages === true && admins.has(email)) {
-      // If admin is on a funnel page, send them to index
-      if (adminBouncePaths.has(path)) {
-        window.location.replace("index.html");
-        return;
-      }
+    // ✅ ADMIN BYPASS — EXIT IMMEDIATELY
+    const admins = (cfg.adminEmails || []).map(e => e.toLowerCase());
+    if (admins.includes(email)) {
+      // ✅ Admins ALWAYS stay on index.html or wherever they navigated
       return;
     }
 
-    // 3) Logged in non-admin
-    // If they are on a public page, allow it (login/signup/referrals/prelaunch/etc)
-    if (allow.has(path)) return;
+    // 👤 Logged-in non-admin → prelaunch
+    window.location.replace(redirectUser);
 
-    // Otherwise, kick them to prelaunch
-    window.location.replace(prelaunch);
-  } catch (e) {
-    window.location.replace(redirect);
+  } catch (err) {
+    // Any unexpected error → waitlist
+    window.location.replace(redirectGuest);
   }
 })();
