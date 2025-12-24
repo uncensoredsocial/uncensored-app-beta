@@ -52,7 +52,7 @@
     }
   </style>
 
-  <!-- Pre-launch config -->
+  <!-- Pre-launch config (keep once) -->
   <script src="js/launch-config.js"></script>
 </head>
 
@@ -61,7 +61,7 @@
   <!-- ================= HEADER ================= -->
   <header class="header">
     <div class="header-left">
-      <!-- ✅ FIX: remove "hidden" so auth.js can show it -->
+      <!-- ✅ REMOVE "hidden" or it will NEVER show (hidden is display:none !important) -->
       <div class="profile-section" id="profileSection">
         <a href="profile.html" class="profile-icon">
           <img
@@ -199,14 +199,14 @@
 
   <!-- ================= SCRIPTS ================= -->
 
-  <!-- ✅ FIX: Supabase MUST load BEFORE auth.js -->
+  <!-- ✅ Supabase MUST load before auth.js -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script src="js/auth.js"></script>
   <script src="js/feed.js"></script>
   <script src="js/app.js"></script>
 
-  <!-- ✅ Prelaunch guard (launch-config.js is already in <head>) -->
+  <!-- ✅ Prelaunch guard -->
   <script src="js/launch-guard.js"></script>
 
   <script>
