@@ -1,15 +1,25 @@
-// js/auth.js (SUPABASE AUTH VERSION)
+// js/auth.js (HYBRID SAFE VERSION)
 // Keeps the same global API: setAuthToken/getAuthToken/getCurrentUser/isLoggedIn/logout/etc.
+// FIX: Do NOT wipe backend JWT token just because Supabase session is missing.
+// FIX: If backend token exists, load /api/auth/me to rebuild currentUser on every page.
 
-const TOKEN_KEY = 'us_auth_token';
-const USER_KEY = 'us_current_user';
+const TOKEN_KEY = "us_auth_token";
+const USER_KEY = "us_current_user";
 
-// ===== Supabase client =====
+// ===== API base (same pattern as other pages) =====
+const AUTH_API_BASE_URL =
+  typeof API_BASE_URL !== "undefined"
+    ? API_BASE_URL
+    : "https://uncensored-app-beta-production.up.railway.app/api";
+
+// ===== Supabase client (optional; used only if you actually logged in via Supabase) =====
 const SUPABASE_URL = "https://hbbbsreonwhvqfvbszne.supabase.co";
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
+const SUPABASE_ANON =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
 
 function getSb() {
-  if (!window.supabase) throw new Error("Supabase SDK not loaded. Add <script src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'></script> before auth.js");
+  // Supabase is optional for your app auth. If SDK isn't loaded, just skip Supabase sync.
+  if (!window.supabase) return null;
   if (!window.__sbClient) {
     window.__sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
   }
@@ -18,21 +28,34 @@ function getSb() {
 
 // ===== Storage helpers =====
 function setAuthToken(token) {
-  localStorage.setItem(TOKEN_KEY, token);
-  // compat
-  try { localStorage.setItem('token', token); } catch (e) {}
+  try {
+    localStorage.setItem(TOKEN_KEY, token);
+    // compat
+    localStorage.setItem("token", token);
+  } catch (e) {}
 }
+
 function getAuthToken() {
-  return localStorage.getItem(TOKEN_KEY) || localStorage.getItem('token');
+  try {
+    return localStorage.getItem(TOKEN_KEY) || localStorage.getItem("token");
+  } catch {
+    return null;
+  }
 }
+
 function clearAuthToken() {
-  localStorage.removeItem(TOKEN_KEY);
-  try { localStorage.removeItem('token'); } catch (e) {}
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem("token");
+  } catch (e) {}
 }
 
 function setCurrentUser(user) {
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  try {
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  } catch (e) {}
 }
+
 function getCurrentUser() {
   try {
     const raw = localStorage.getItem(USER_KEY);
@@ -41,27 +64,31 @@ function getCurrentUser() {
     return null;
   }
 }
+
 function clearCurrentUser() {
-  localStorage.removeItem(USER_KEY);
+  try {
+    localStorage.removeItem(USER_KEY);
+  } catch (e) {}
 }
 
 function isLoggedIn() {
-  // Supabase session could exist even if our token key is empty;
-  // but for compatibility, keep token-based truth:
-  return !!(getAuthToken() || '').trim();
+  // Your app is token-based (Railway JWT). That’s the source of truth.
+  return !!String(getAuthToken() || "").trim();
 }
 
 async function logout() {
+  // If supabase is present, sign out there too (doesn't hurt).
   try {
     const sb = getSb();
-    await sb.auth.signOut();
+    if (sb) await sb.auth.signOut();
   } catch {}
+
   clearAuthToken();
   clearCurrentUser();
-  window.location.href = 'index.html';
+  window.location.href = "index.html";
 }
 
-// expose globally for feed.js / profile.js
+// expose globally
 window.setAuthToken = setAuthToken;
 window.getAuthToken = getAuthToken;
 window.setCurrentUser = setCurrentUser;
@@ -75,16 +102,16 @@ window.logout = logout;
 function saveReturnUrl(url) {
   try {
     const u = url || window.location.href;
-    if (u.includes('login.html') || u.includes('signup.html')) return;
-    sessionStorage.setItem('returnTo', u);
+    if (u.includes("login.html") || u.includes("signup.html")) return;
+    sessionStorage.setItem("returnTo", u);
   } catch (e) {}
 }
 
-function redirectAfterLogin(fallback = 'index.html') {
+function redirectAfterLogin(fallback = "index.html") {
   try {
-    const returnTo = sessionStorage.getItem('returnTo');
+    const returnTo = sessionStorage.getItem("returnTo");
     if (returnTo) {
-      sessionStorage.removeItem('returnTo');
+      sessionStorage.removeItem("returnTo");
       window.location.href = returnTo;
       return;
     }
@@ -93,13 +120,15 @@ function redirectAfterLogin(fallback = 'index.html') {
 }
 
 function requireLoginOrRedirect(message) {
-  const token = (getAuthToken() || '').trim();
+  const token = String(getAuthToken() || "").trim();
   if (!token) {
     saveReturnUrl();
     if (message) {
-      try { sessionStorage.setItem('authReason', message); } catch (e) {}
+      try {
+        sessionStorage.setItem("authReason", message);
+      } catch (e) {}
     }
-    window.location.href = 'login.html';
+    window.location.href = "login.html";
     return false;
   }
   return true;
@@ -111,283 +140,181 @@ window.requireLoginOrRedirect = requireLoginOrRedirect;
 
 window.getAuthReason = function () {
   try {
-    const msg = sessionStorage.getItem('authReason');
-    if (msg) sessionStorage.removeItem('authReason');
+    const msg = sessionStorage.getItem("authReason");
+    if (msg) sessionStorage.removeItem("authReason");
     return msg;
   } catch (e) {
     return null;
   }
 };
 
-// ===== UI helpers =====
-function showAuthMessage(el, message, type = 'error') {
-  if (!el) return;
-  el.textContent = message;
-  el.classList.remove('hidden');
-  el.classList.toggle('auth-error', type === 'error');
-  el.classList.toggle('auth-success', type === 'success');
-}
+// ======================================================
+// FIX #1: If you have a backend token, refresh current user from Railway
+// ======================================================
+async function refreshUserFromBackend() {
+  const token = String(getAuthToken() || "").trim();
+  if (!token) return null;
 
-// ===== Admin check =====
-function isAdminEmail(email) {
-  const cfg = window.__UNCENSORED_LAUNCH__ || {};
-  const allow = (cfg.adminEmails || ["ssssss@gmail.com","eeeeee@gmail.com"]).map(e => String(e).toLowerCase());
-  return allow.includes(String(email || "").toLowerCase());
-}
+  try {
+    const res = await fetch(`${AUTH_API_BASE_URL}/auth/me`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-// ===== Sync session -> localStorage token + currentUser =====
-async function syncSessionToLocal() {
-  const sb = getSb();
-  const { data: sess } = await sb.auth.getSession();
-  const session = sess?.session || null;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      // Token invalid/expired -> logout cleanly
+      if (res.status === 401) {
+        clearAuthToken();
+        clearCurrentUser();
+      }
+      return null;
+    }
 
-  if (!session) {
-    clearAuthToken();
-    clearCurrentUser();
+    // Normalize shape to what your frontend expects
+    const user = {
+      id: data.id,
+      username: data.username,
+      email: data.email,
+      display_name: data.display_name,
+      avatar_url: data.avatar_url || null,
+      banner_url: data.banner_url || null,
+      bio: data.bio || "",
+      created_at: data.created_at,
+      posts_count: data.posts_count ?? 0,
+      followers_count: data.followers_count ?? 0,
+      following_count: data.following_count ?? 0,
+      // keep extra fields if backend sends them
+      ...data,
+    };
+
+    setCurrentUser(user);
+    return user;
+  } catch (e) {
     return null;
   }
+}
 
-  // store access token for your existing API calls / scripts
-  setAuthToken(session.access_token);
-
-  // pull profile from public.users if it exists
-  const email = session.user?.email || "";
-  let profile = null;
+// ======================================================
+// FIX #2: OPTIONAL Supabase sync — but NEVER clears your backend token
+// ======================================================
+async function syncSupabaseSessionToLocalSafe() {
+  const sb = getSb();
+  if (!sb) return null;
 
   try {
-    const { data, error } = await sb
-      .from("users")
-      .select("id,email,username,display_name,avatar_url,banner_url,bio,is_admin,is_verified,is_moderator,plan_slug")
-      .eq("id", session.user.id)
-      .maybeSingle();
+    const { data: sess } = await sb.auth.getSession();
+    const session = sess?.session || null;
 
-    if (!error && data) profile = data;
+    if (!session) {
+      // ✅ IMPORTANT: do NOT clear backend token/user here
+      return null;
+    }
+
+    // If you truly want to use Supabase auth tokens for your backend, you’d need to change backend JWT verification.
+    // So we DO NOT overwrite your backend JWT token here.
+    // We only use Supabase to optionally populate currentUser if it’s missing.
+    const email = session.user?.email || "";
+
+    // Try to load profile from your public.users (if you use it)
+    let profile = null;
+    try {
+      const { data, error } = await sb
+        .from("users")
+        .select(
+          "id,email,username,display_name,avatar_url,banner_url,bio,is_admin,is_verified,is_moderator,plan_slug"
+        )
+        .eq("id", session.user.id)
+        .maybeSingle();
+
+      if (!error && data) profile = data;
+    } catch {}
+
+    if (!profile) {
+      profile = {
+        id: session.user.id,
+        email,
+        username: (session.user.user_metadata?.username || "").toLowerCase() || null,
+        display_name: session.user.user_metadata?.display_name || null,
+      };
+    }
+
+    // Only setCurrentUser if you don't already have one
+    if (!getCurrentUser()) setCurrentUser(profile);
+
+    return profile;
+  } catch {
+    return null;
+  }
+}
+
+// ======================================================
+// FIX #3: One global "ready" promise all pages can wait for
+// ======================================================
+let __authReadyResolve;
+window.__AUTH_READY__ = new Promise((resolve) => {
+  __authReadyResolve = resolve;
+});
+
+async function ensureAuthUserLoaded() {
+  // If we already have a user object, still try to refresh silently.
+  // (This keeps avatar/name updated and fixes "null user" pages.)
+  const token = String(getAuthToken() || "").trim();
+
+  // 1) If backend token exists, backend is source of truth.
+  if (token) {
+    const u = await refreshUserFromBackend();
+    if (u) return u;
+    // if backend refresh fails but token still exists, keep whatever is cached
+    return getCurrentUser();
+  }
+
+  // 2) No backend token -> optionally try Supabase session (does NOT clear anything)
+  const su = await syncSupabaseSessionToLocalSafe();
+  return su || getCurrentUser();
+}
+
+window.ensureAuthUserLoaded = ensureAuthUserLoaded;
+
+// ======================================================
+// UI helpers (unchanged)
+// ======================================================
+function showAuthMessage(el, message, type = "error") {
+  if (!el) return;
+  el.textContent = message;
+  el.classList.remove("hidden");
+  el.classList.toggle("auth-error", type === "error");
+  el.classList.toggle("auth-success", type === "success");
+}
+
+// ======================================================
+// INIT
+// ======================================================
+(async () => {
+  // Kick auth loading ASAP (NOT waiting for DOMContentLoaded)
+  try {
+    await ensureAuthUserLoaded();
+  } catch {}
+  try {
+    if (typeof __authReadyResolve === "function") __authReadyResolve(true);
+  } catch {}
+})();
+
+document.addEventListener("DOMContentLoaded", async () => {
+  // Keep local user refreshed once DOM exists (safe)
+  try {
+    await ensureAuthUserLoaded();
   } catch {}
 
-  // fallback minimal user object
-  if (!profile) {
-    profile = {
-      id: session.user.id,
-      email,
-      username: (session.user.user_metadata?.username || "").toLowerCase() || null,
-      display_name: session.user.user_metadata?.display_name || null,
-      is_admin: isAdminEmail(email)
-    };
-  } else {
-    // ensure admin true if email allowlisted
-    if (isAdminEmail(email)) profile.is_admin = true;
-  }
-
-  setCurrentUser(profile);
-  return profile;
-}
-
-// ===== SIGNUP (Supabase Auth) =====
-async function handleSignup(e) {
-  e.preventDefault();
-
-  const displayNameInput = document.getElementById('displayName');
-  const usernameInput = document.getElementById('username');
-  const emailInput = document.getElementById('email');
-  const passwordInput = document.getElementById('password');
-  const confirmPasswordInput = document.getElementById('confirmPassword');
-  const errorMessage = document.getElementById('errorMessage');
-  const successMessage = document.getElementById('successMessage');
-  const signupBtn = document.getElementById('signupBtn');
-
-  if (!displayNameInput || !usernameInput || !emailInput || !passwordInput || !confirmPasswordInput) return;
-
-  errorMessage?.classList.add('hidden');
-  successMessage?.classList.add('hidden');
-
-  const displayName = displayNameInput.value.trim();
-  const username = usernameInput.value.trim().toLowerCase();
-  const email = emailInput.value.trim().toLowerCase();
-  const password = passwordInput.value;
-  const confirmPassword = confirmPasswordInput.value;
-
-  if (!displayName || !username || !email || !password || !confirmPassword) {
-    showAuthMessage(errorMessage, 'Please fill in all fields.');
-    return;
-  }
-  if (!/^[a-z0-9_]{3,20}$/.test(username)) {
-    showAuthMessage(errorMessage, 'Username must be 3–20 chars: letters, numbers, underscores.');
-    return;
-  }
-  if (password !== confirmPassword) {
-    showAuthMessage(errorMessage, 'Passwords do not match.');
-    return;
-  }
-  if (password.length < 6) {
-    showAuthMessage(errorMessage, 'Password must be at least 6 characters.');
-    return;
-  }
-
-  try {
-    if (signupBtn) {
-      signupBtn.disabled = true;
-      signupBtn.textContent = 'Creating...';
-    }
-
-    const sb = getSb();
-
-    const pendingRef =
-      (localStorage.getItem("pending_ref") || "").trim() ||
-      (new URLSearchParams(location.search).get("ref") || "").trim() ||
-      null;
-
-    const { error: signUpErr } = await sb.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          username,
-          display_name: displayName,
-          referred_by: pendingRef
-        }
-      }
-    });
-
-    if (signUpErr) throw new Error(signUpErr.message);
-
-    // Immediately sign in (since you want no confirmations)
-    const { error: signInErr } = await sb.auth.signInWithPassword({ email, password });
-    if (signInErr) throw new Error(signInErr.message);
-
-    if (pendingRef) localStorage.removeItem("pending_ref");
-
-    const user = await syncSessionToLocal();
-
-    showAuthMessage(successMessage, 'Account created! Redirecting...', 'success');
-
-    const cfg = window.__UNCENSORED_LAUNCH__ || {};
-    const prelaunch = cfg.prelaunchPage || 'prelaunch.html';
-
-    setTimeout(() => {
-      if (user?.is_admin === true) {
-        window.location.href = 'admin.html';
-      } else {
-        // during prelaunch send to prelaunch page; on launch day go back
-        if (cfg.enabled === true) {
-          redirectAfterLogin('index.html');
-        } else {
-          window.location.href = prelaunch;
-        }
-      }
-    }, 700);
-
-  } catch (err) {
-    console.error('Signup error:', err);
-    showAuthMessage(errorMessage, err.message || 'Signup failed.');
-  } finally {
-    if (signupBtn) {
-      signupBtn.disabled = false;
-      signupBtn.textContent = 'Create Account';
-    }
-  }
-}
-
-// ===== LOGIN (Supabase Auth) =====
-async function handleLogin(e) {
-  e.preventDefault();
-
-  const identifierInput =
-    document.getElementById('loginIdentifier') ||
-    document.getElementById('loginEmail') ||
-    document.getElementById('email');
-
-  const passwordInput =
-    document.getElementById('loginPassword') ||
-    document.getElementById('password');
-
-  const errorMessage = document.getElementById('errorMessage');
-  const loginBtn = document.getElementById('loginBtn');
-
-  if (!identifierInput || !passwordInput) return;
-
-  errorMessage?.classList.add('hidden');
-
-  const identifier = identifierInput.value.trim().toLowerCase();
-  const password = passwordInput.value;
-
-  if (!identifier || !password) {
-    showAuthMessage(errorMessage, 'Please enter your email and password.');
-    return;
-  }
-
-  try {
-    if (loginBtn) {
-      loginBtn.disabled = true;
-      loginBtn.textContent = 'Signing in...';
-    }
-
-    const sb = getSb();
-
-    // Supabase Auth logs in with email (not username) unless you build a custom lookup.
-    // If user typed a username, show a clear message.
-    if (!identifier.includes("@")) {
-      throw new Error("Use your email to log in (username login is disabled for now).");
-    }
-
-    const { error } = await sb.auth.signInWithPassword({
-      email: identifier,
-      password
-    });
-
-    if (error) throw new Error(error.message);
-
-    const user = await syncSessionToLocal();
-
-    const cfg = window.__UNCENSORED_LAUNCH__ || {};
-    const prelaunch = cfg.prelaunchPage || 'prelaunch.html';
-
-    if (user?.is_admin === true) {
-      window.location.href = 'admin.html';
-    } else {
-      if (cfg.enabled === true) {
-        redirectAfterLogin('index.html');
-      } else {
-        window.location.href = prelaunch;
-      }
-    }
-
-  } catch (err) {
-    console.error('Login error:', err);
-    showAuthMessage(errorMessage, err.message || 'Login failed.');
-  } finally {
-    if (loginBtn) {
-      loginBtn.disabled = false;
-      loginBtn.textContent = 'Sign In';
-    }
-  }
-}
-
-// ===== INIT =====
-document.addEventListener('DOMContentLoaded', async () => {
-  const signupForm = document.getElementById('signupForm');
-  const loginForm = document.getElementById('loginForm');
-
-  if (signupForm) signupForm.addEventListener('submit', handleSignup);
-  if (loginForm) {
-    loginForm.addEventListener('submit', handleLogin);
-
-    const reason = window.getAuthReason ? window.getAuthReason() : null;
-    const errorMessage = document.getElementById('errorMessage');
-    if (reason && errorMessage) showAuthMessage(errorMessage, reason, 'error');
-  }
-
-  // Keep localStorage in sync if already logged in
-  try { await syncSessionToLocal(); } catch {}
-
-  // Header auth/profile toggle
-  const authButtons = document.getElementById('authButtons');
-  const profileSection = document.getElementById('profileSection');
-  const headerProfileImg = document.getElementById('headerProfileImg');
+  // Header auth/profile toggle (unchanged behavior)
+  const authButtons = document.getElementById("authButtons");
+  const profileSection = document.getElementById("profileSection");
+  const headerProfileImg = document.getElementById("headerProfileImg");
 
   if (authButtons || profileSection || headerProfileImg) {
     const loggedIn = isLoggedIn();
-    if (authButtons) authButtons.style.display = loggedIn ? 'none' : 'flex';
-    if (profileSection) profileSection.style.display = loggedIn ? 'flex' : 'none';
+    if (authButtons) authButtons.style.display = loggedIn ? "none" : "flex";
+    if (profileSection) profileSection.style.display = loggedIn ? "flex" : "none";
 
     if (loggedIn) {
       const user = getCurrentUser();
