@@ -120,34 +120,24 @@
     <!-- ✅ Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <!-- ✅ IMPORTANT: prevent old "returnTo" sending you to donation.html -->
-    <script>
-      (function () {
-        try {
-          const rt = sessionStorage.getItem("returnTo") || "";
-          if (rt.includes("donation.html")) sessionStorage.removeItem("returnTo");
-        } catch (e) {}
-      })();
-    </script>
-
-    <!-- ✅ Login logic for Supabase -->
+    <!-- ✅ Login logic -->
     <script>
       (function () {
         const cfg = window.__UNCENSORED_LAUNCH__ || {};
 
-        // ✅ admins (hard-set + also allow launch-config override)
+        // ✅ Hard-set your admin emails (and also allow launch-config override)
         const fallbackAdmins = ["ssssss@gmail.com", "eeeeee@gmail.com"];
-        const admins = new Set(
-          (Array.isArray(cfg.adminEmails) && cfg.adminEmails.length ? cfg.adminEmails : fallbackAdmins)
-            .map(e => String(e).toLowerCase().trim())
-        );
+        const adminList = (Array.isArray(cfg.adminEmails) && cfg.adminEmails.length)
+          ? cfg.adminEmails
+          : fallbackAdmins;
 
+        const admins = new Set(adminList.map(e => String(e).toLowerCase().trim()));
         const prelaunchPage = cfg.prelaunchPage || "prelaunch.html";
 
-        // ✅ CORRECT Supabase project + anon key (this fixes "Invalid API key")
+        // ✅ Supabase project
         const SUPABASE_URL = "https://hbbbsreonwhvqfvbszne.supabase.co";
         const SUPABASE_ANON =
-          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
+          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmJzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
 
         const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
@@ -169,23 +159,13 @@
           errEl.classList.add("hidden");
         }
 
-        async function postLoginRedirect(emailLower){
-          // Launch day: everyone goes to the app
-          if (cfg.enabled === true) {
-            window.location.replace("index.html");
-            return;
-          }
+        function clearAllReturnTargets() {
+          // wipe every common redirect key that might exist anywhere in your codebase
+          const ssKeys = ["returnTo", "authReason", "redirectTo", "postLoginRedirect", "next", "afterLogin"];
+          const lsKeys = ["returnTo", "authReason", "redirectTo", "postLoginRedirect", "next", "afterLogin", "pending_redirect"];
 
-          // Pre-launch: admins can access everything
-          if (admins.has(emailLower)) {
-            showOk("Admin login successful. Redirecting…");
-            setTimeout(() => window.location.replace("index.html"), 350);
-            return;
-          }
-
-          // Pre-launch: normal users go to prelaunch
-          showOk("Login successful. The platform isn’t live yet — redirecting…");
-          setTimeout(() => window.location.replace(prelaunchPage), 350);
+          try { ssKeys.forEach(k => sessionStorage.removeItem(k)); } catch (e) {}
+          try { lsKeys.forEach(k => localStorage.removeItem(k)); } catch (e) {}
         }
 
         form.addEventListener("submit", async (e) => {
@@ -210,7 +190,26 @@
             }
 
             const loggedEmail = (data?.user?.email || email).toLowerCase();
-            await postLoginRedirect(loggedEmail);
+
+            // ✅ Kill any saved "send me back to donation" redirects
+            clearAllReturnTargets();
+
+            // ✅ Launch day: everyone goes to app
+            if (cfg.enabled === true) {
+              window.location.replace("index.html");
+              return;
+            }
+
+            // ✅ Pre-launch: admins go to real app (and should be allowed everywhere by launch-guard)
+            if (admins.has(loggedEmail)) {
+              showOk("Admin login successful. Redirecting…");
+              setTimeout(() => window.location.replace("index.html"), 300);
+              return;
+            }
+
+            // ✅ Pre-launch: normal users go to prelaunch page
+            showOk("Login successful. The platform isn’t live yet — redirecting…");
+            setTimeout(() => window.location.replace(prelaunchPage), 300);
           } catch (err) {
             showErr(err?.message || "Load failed");
           } finally {
