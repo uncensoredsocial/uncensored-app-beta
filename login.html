@@ -120,16 +120,34 @@
     <!-- ✅ Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+    <!-- ✅ IMPORTANT: stop "returnTo" sending you back to donation.html -->
+    <script>
+      (function () {
+        try {
+          const rt = sessionStorage.getItem("returnTo") || "";
+          if (rt.includes("donation.html")) sessionStorage.removeItem("returnTo");
+          // If you want to be extra safe, uncomment this:
+          // sessionStorage.removeItem("returnTo");
+        } catch (e) {}
+      })();
+    </script>
+
     <!-- ✅ Login logic for Supabase -->
     <script>
       (function () {
         const cfg = window.__UNCENSORED_LAUNCH__ || {};
-        const admins = (cfg.adminEmails || []).map(e => String(e).toLowerCase());
+
+        // ✅ hard-override admins (so it works even if launch-config is stale)
+        const admins = new Set(
+          (cfg.adminEmails && cfg.adminEmails.length ? cfg.adminEmails : ["ssssss@gmail.com", "eeeeee@gmail.com"])
+            .map(e => String(e).toLowerCase().trim())
+        );
+
         const prelaunchPage = cfg.prelaunchPage || "prelaunch.html";
 
         const SUPABASE_URL = "https://hbbbsreonwhvqfvbszne.supabase.co";
         const SUPABASE_ANON =
-          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
+          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmJzcmVvbndodnFmdmJzem5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MzQ1NjMsImV4cCI6MjA4MDc5NDU2M30.SCZHntv9gPaDGJBib3ubUKuVvZKT2-BXc8QtadjX1DA";
 
         const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
@@ -141,14 +159,33 @@
         const btn = document.getElementById("loginBtn");
 
         function showErr(msg){
-          errEl.textContent = msg;
+          errEl.textContent = msg || "Login failed.";
           errEl.classList.remove("hidden");
           okEl.classList.add("hidden");
         }
         function showOk(msg){
-          okEl.textContent = msg;
+          okEl.textContent = msg || "Success!";
           okEl.classList.remove("hidden");
           errEl.classList.add("hidden");
+        }
+
+        async function postLoginRedirect(emailLower){
+          // On launch day, everyone goes to the app
+          if (cfg.enabled === true) {
+            window.location.replace("index.html");
+            return;
+          }
+
+          // Pre-launch: admins can access the real app
+          if (admins.has(emailLower)) {
+            showOk("Admin login successful. Redirecting…");
+            setTimeout(() => window.location.replace("index.html"), 350);
+            return;
+          }
+
+          // Pre-launch: normal users go to prelaunch
+          showOk("Login successful. The platform isn’t live yet — redirecting…");
+          setTimeout(() => window.location.replace(prelaunchPage), 350);
         }
 
         form.addEventListener("submit", async (e) => {
@@ -166,25 +203,14 @@
           btn.textContent = "Signing in…";
 
           try {
-            const { error } = await sb.auth.signInWithPassword({ email, password });
+            const { data, error } = await sb.auth.signInWithPassword({ email, password });
             if (error) {
               showErr(error.message);
               return;
             }
 
-            // Decide where to go pre-launch
-            if (cfg.enabled === true) {
-              window.location.replace("index.html");
-              return;
-            }
-
-            if (admins.includes(email)) {
-              showOk("Admin login successful. Redirecting…");
-              setTimeout(() => window.location.replace("index.html"), 400);
-            } else {
-              showOk("Login successful. The platform isn’t live yet — redirecting…");
-              setTimeout(() => window.location.replace(prelaunchPage), 400);
-            }
+            const loggedEmail = (data?.user?.email || email).toLowerCase();
+            await postLoginRedirect(loggedEmail);
           } catch (err) {
             showErr(err?.message || "Load failed");
           } finally {
