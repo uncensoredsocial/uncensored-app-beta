@@ -14,7 +14,7 @@
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-    integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIft+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+    integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
     crossorigin="anonymous"
     referrerpolicy="no-referrer"
   />
@@ -59,7 +59,10 @@
   <!-- ============== HEADER (Alerts ONLY, perfectly centered) ============== -->
   <header class="header notifications-header">
     <div class="header-left"></div>
+
+    <!-- ✅ ONLY TITLE THAT EXISTS -->
     <h1 class="notifications-header-title">Alerts</h1>
+
     <div class="header-actions"></div>
   </header>
 
@@ -67,6 +70,7 @@
   <div class="content-wrapper">
     <main class="main-content notifications-main">
 
+      <!-- (kept for accessibility, hidden by your CSS) -->
       <h2 class="notifications-page-title">Alerts</h2>
 
       <!-- Filter tabs -->
@@ -121,17 +125,9 @@
     </a>
   </nav>
 
-  <!-- Scripts (ORDER MATTERS) -->
+  <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <!-- prelaunch config + guard -->
-  <script src="js/launch-config.js"></script>
-  <script src="js/launch-guard.js"></script>
-
-  <!-- ✅ THIS is what makes every page know you're logged in -->
-  <script src="js/supabase-auth.js"></script>
-
-  <!-- your app/page scripts -->
+  <script src="js/auth.js"></script>
   <script src="js/app.js"></script>
   <script src="js/notifications.js"></script>
 </body>
