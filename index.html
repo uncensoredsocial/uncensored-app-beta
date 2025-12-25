@@ -119,6 +119,15 @@
       align-items: center;
       margin-top: 0.5rem;
     }
+
+    /* Fix for profile section */
+    .profile-section {
+      display: none !important; /* Will be shown by JS when logged in */
+    }
+
+    .auth-buttons {
+      display: flex !important;
+    }
   </style>
 
   <!-- Pre-launch config (load once) -->
@@ -131,13 +140,14 @@
   <header class="header">
     <div class="header-left">
       <!-- Profile (shows only when logged in; auth.js toggles it) -->
-      <div class="profile-section hidden" id="profileSection">
+      <div class="profile-section" id="profileSection" style="display: none;">
         <a href="profile.html" class="profile-icon" aria-label="Your profile">
           <img
             id="headerProfileImg"
             src="default-profile.PNG"
             alt="Profile"
             loading="lazy"
+            onerror="this.src='default-profile.PNG'"
           />
         </a>
       </div>
@@ -162,7 +172,7 @@
         aria-label="Refresh feed"
         type="button"
       >
-        <span class="icon icon-refresh"></span>
+        <i class="fas fa-sync-alt"></i>
       </button>
     </div>
   </header>
@@ -180,6 +190,7 @@
             class="post-avatar"
             id="postUserAvatar"
             loading="lazy"
+            onerror="this.src='default-profile.PNG'"
           />
 
           <textarea
@@ -203,7 +214,7 @@
             class="btn btn-secondary"
             id="addMediaBtn"
           >
-            Add image / video
+            <i class="fas fa-image"></i> Add image / video
           </button>
 
           <span id="mediaFileName" class="media-filename"></span>
@@ -212,7 +223,7 @@
         <div class="post-actions-bar">
           <span id="charCounter" class="char-counter">0/280</span>
           <button class="btn btn-primary" id="postButton" disabled>
-            Post
+            <i class="fas fa-paper-plane"></i> Post
           </button>
         </div>
       </div>
@@ -282,137 +293,57 @@
   <!-- ✅ Feed.js (updated version) -->
   <script src="js/feed.js"></script>
 
-  <!-- ✅ Simplified app.js (without auth conflicts) -->
-  <script>
-    // ===============================
-    // Simplified App Functionality (No Auth Conflicts)
-    // ===============================
-    class App {
-      constructor() {
-        if (document.readyState === "loading") {
-          document.addEventListener("DOMContentLoaded", () => this.init());
-        } else {
-          this.init();
-        }
-      }
-
-      init() {
-        this.setupEventListeners();
-        this.setActiveBottomNav();
-        
-        // Wait for auth to initialize, then load feed
-        setTimeout(() => {
-          this.safeLoadFeed();
-        }, 500);
-      }
-
-      setupEventListeners() {
-        // Feed tabs
-        const feedTabs = document.getElementById("feedTabs");
-        if (feedTabs) {
-          feedTabs.addEventListener("click", (e) => {
-            const btn = e.target.closest(".feed-tab-btn");
-            if (!btn) return;
-
-            const mode = btn.getAttribute("data-feed-mode");
-            if (!mode) return;
-
-            // UI active state
-            feedTabs.querySelectorAll(".feed-tab-btn").forEach((b) => {
-              b.classList.toggle("active", b === btn);
-            });
-
-            // Tell FeedManager
-            this.safeSwitchFeedMode(mode);
-          });
-        }
-      }
-
-      safeSwitchFeedMode(mode) {
-        if (!window.feedManager) {
-          console.warn("feedManager not ready yet.");
-          return;
-        }
-
-        if (typeof window.feedManager.switchMode === "function") {
-          window.feedManager.switchMode(mode);
-        } else if (typeof window.feedManager.loadPosts === "function") {
-          window.feedManager.currentMode = mode;
-          window.feedManager.page = 1;
-          window.feedManager.hasMore = true;
-          window.feedManager.loadPosts(true);
-        }
-      }
-
-      safeLoadFeed() {
-        const feedContainer = document.getElementById("feedContainer");
-        if (!feedContainer) return;
-
-        if (!window.feedManager) {
-          setTimeout(() => {
-            if (window.feedManager && typeof window.feedManager.loadPosts === "function") {
-              window.feedManager.loadPosts(true);
-            }
-          }, 800);
-          return;
-        }
-
-        if (typeof window.feedManager.loadPosts === "function") {
-          setTimeout(() => {
-            window.feedManager.loadPosts(true);
-          }, 300);
-        }
-      }
-
-      setActiveBottomNav() {
-        const navItems = document.querySelectorAll(".bottom-nav .nav-item");
-        if (!navItems.length) return;
-
-        const path = window.location.pathname.split("/").pop() || "index.html";
-
-        navItems.forEach((item) => {
-          const href = item.getAttribute("href") || "";
-          item.classList.remove("active");
-
-          if ((path === "" || path === "index.html") && href.includes("index.html")) {
-            item.classList.add("active");
-          } else if (path === "search.html" && href.includes("search.html")) {
-            item.classList.add("active");
-          } else if (path === "notifications.html" && href.includes("notifications.html")) {
-            item.classList.add("active");
-          } else if (path === "messages.html" && href.includes("messages.html")) {
-            item.classList.add("active");
-          }
-        });
-      }
-    }
-
-    // Initialize app
-    window.app = new App();
-  </script>
-
   <!-- ✅ Launch guard (after everything else) -->
   <script src="js/launch-guard.js"></script>
 
-  <!-- ✅ Fix for feed tabs duplicates -->
   <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      const feedTabs = document.getElementById("feedTabs");
-      if (!feedTabs) return;
-
-      // Ensure only 3 tabs
-      const buttons = feedTabs.querySelectorAll(".feed-tab-btn");
-      if (buttons.length !== 3) {
-        feedTabs.innerHTML = `
-          <button class="feed-tab-btn active" data-feed-mode="recent">Recent</button>
-          <button class="feed-tab-btn" data-feed-mode="trending">Trending</button>
-          <button class="feed-tab-btn" data-feed-mode="following">Following</button>
-        `;
-      }
+    // ===============================
+    // Initialize Feed Manager
+    // ===============================
+    document.addEventListener('DOMContentLoaded', function() {
+      // Wait a bit for auth to initialize
+      setTimeout(function() {
+        if (window.feedManager && typeof window.feedManager.init === 'function') {
+          window.feedManager.init();
+        } else {
+          console.error('Feed manager not found');
+        }
+      }, 1000);
     });
 
+    // ===============================
+    // Bottom Nav Active State
+    // ===============================
+    function setActiveBottomNav() {
+      const navItems = document.querySelectorAll('.bottom-nav .nav-item');
+      if (!navItems.length) return;
+
+      const path = window.location.pathname.split('/').pop() || 'index.html';
+
+      navItems.forEach((item) => {
+        const href = item.getAttribute('href') || '';
+        item.classList.remove('active');
+
+        if ((path === '' || path === 'index.html') && href.includes('index.html')) {
+          item.classList.add('active');
+        } else if (path === 'search.html' && href.includes('search.html')) {
+          item.classList.add('active');
+        } else if (path === 'notifications.html' && href.includes('notifications.html')) {
+          item.classList.add('active');
+        } else if (path === 'messages.html' && href.includes('messages.html')) {
+          item.classList.add('active');
+        }
+      });
+    }
+
+    // Initialize bottom nav
+    document.addEventListener('DOMContentLoaded', setActiveBottomNav);
+
+    // ===============================
+    // Refresh Feed Function
+    // ===============================
     function refreshFeed() {
-      if (window.feedManager) {
+      if (window.feedManager && typeof window.feedManager.loadPosts === 'function') {
         window.feedManager.page = 1;
         window.feedManager.hasMore = true;
         window.feedManager.loadPosts(true);
