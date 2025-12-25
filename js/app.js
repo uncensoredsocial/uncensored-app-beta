@@ -1,14 +1,35 @@
 // ===============================
-// Global App Functionality
+// Global App Functionality (Uncensored Social)
 // ===============================
 class App {
   constructor() {
     this.sb = null; // supabase client
-    this.setupEventListeners();
-    this.checkAuthState();
-    this.setActiveBottomNav();
+    this.isLoggedIn = false;
+    this.currentUser = null; // profile-ish object (may be fallback)
+
+    // Run when DOM is ready (safer on iOS Safari)
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", () => this.init());
+    } else {
+      this.init();
+    }
   }
 
+  async init() {
+    this.setupEventListeners();
+    this.setActiveBottomNav();
+
+    // Check auth and update UI (also triggers feed load)
+    await this.checkAuthState();
+
+    // If feedManager exists, make sure it's loaded at least once
+    this.safeInitFeedUI();
+    this.safeLoadFeed(true);
+  }
+
+  // ===============================
+  // Event Listeners
+  // ===============================
   setupEventListeners() {
     // Sidebar toggle
     const profileMenuBtn = document.getElementById("profileMenuBtn");
@@ -16,28 +37,38 @@ class App {
     const sidebarOverlay = document.getElementById("sidebarOverlay");
 
     if (profileMenuBtn) {
-      profileMenuBtn.addEventListener("click", this.toggleSidebar.bind(this));
+      profileMenuBtn.addEventListener("click", () => this.toggleSidebar());
     }
-
     if (closeSidebar) {
-      closeSidebar.addEventListener("click", this.toggleSidebar.bind(this));
+      closeSidebar.addEventListener("click", () => this.toggleSidebar());
     }
-
     if (sidebarOverlay) {
-      sidebarOverlay.addEventListener("click", this.toggleSidebar.bind(this));
+      sidebarOverlay.addEventListener("click", () => this.toggleSidebar());
     }
 
-    // Feeds toggle (if you ever use a single button to flip modes)
-    const feedsToggle = document.getElementById("feedsToggle");
-    if (feedsToggle) {
-      feedsToggle.addEventListener("click", this.toggleFeeds.bind(this));
+    // Feed tabs (Recent / Trending / Following)
+    // Use ONE delegated listener so you don't get duplicate handlers.
+    const feedTabs = document.getElementById("feedTabs");
+    if (feedTabs) {
+      feedTabs.addEventListener("click", (e) => {
+        const btn = e.target.closest(".feed-tab-btn");
+        if (!btn) return;
+
+        const mode = btn.getAttribute("data-feed-mode");
+        if (!mode) return;
+
+        // UI active state
+        feedTabs.querySelectorAll(".feed-tab-btn").forEach((b) => {
+          b.classList.toggle("active", b === btn);
+        });
+
+        // Tell FeedManager
+        this.safeSwitchFeedMode(mode);
+      });
     }
 
     // Keyboard shortcuts
-    document.addEventListener(
-      "keydown",
-      this.handleKeyboardShortcuts.bind(this)
-    );
+    document.addEventListener("keydown", (e) => this.handleKeyboardShortcuts(e));
   }
 
   // ===============================
@@ -45,46 +76,18 @@ class App {
   // ===============================
   toggleSidebar() {
     const sidebar = document.getElementById("sidebar");
-    const sidebarOverlay = document.getElementById("sidebarOverlay");
+    const overlay = document.getElementById("sidebarOverlay");
+    if (!sidebar || !overlay) return;
 
-    if (sidebar && sidebarOverlay) {
-      sidebar.classList.toggle("open");
-      sidebarOverlay.classList.toggle("open");
-    }
-  }
-
-  // ===============================
-  // Feed mode toggle (Recent / Following)
-  // ===============================
-  toggleFeeds(e) {
-    e.preventDefault();
-
-    // Only run if the new FeedManager exists
-    if (!window.feedManager) return;
-
-    const feedsToggle = document.getElementById("feedsToggle");
-    const currentMode = window.feedManager.currentMode || "recent";
-    const newMode = currentMode === "recent" ? "following" : "recent";
-
-    if (typeof window.feedManager.switchMode === "function") {
-      window.feedManager.switchMode(newMode);
-    } else if (typeof window.feedManager.loadPosts === "function") {
-      // Fallback if switchMode ever changes
-      window.feedManager.currentMode = newMode;
-      window.feedManager.loadPosts(true);
-    }
-
-    if (feedsToggle) {
-      const label = newMode === "recent" ? "Recent" : "Following";
-      feedsToggle.innerHTML = `<span>📰</span> Feed: ${label}`;
-    }
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("open");
   }
 
   // ===============================
   // Keyboard shortcuts
   // ===============================
   handleKeyboardShortcuts(e) {
-    // Ctrl/Cmd + Enter to post from the composer
+    // Ctrl/Cmd + Enter to post
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       const postInput = document.getElementById("postInput");
       if (
@@ -98,10 +101,8 @@ class App {
       }
     }
 
-    // Escape to close sidebar
-    if (e.key === "Escape") {
-      this.toggleSidebar();
-    }
+    // Escape closes sidebar
+    if (e.key === "Escape") this.toggleSidebar();
   }
 
   // ===============================
@@ -110,9 +111,10 @@ class App {
   async ensureSupabase() {
     if (this.sb) return this.sb;
 
-    // Supabase CDN must be included on app pages for this to work.
-    // (Or your launch-guard auto-load version will already inject it.)
-    if (!window.supabase) return null;
+    if (!window.supabase || typeof window.supabase.createClient !== "function") {
+      console.warn("Supabase SDK not found on window.");
+      return null;
+    }
 
     const SUPABASE_URL = "https://hbbbsreonwhvqfvbszne.supabase.co";
     const SUPABASE_ANON =
@@ -123,128 +125,241 @@ class App {
   }
 
   // ===============================
-  // Auth state (Supabase)
+  // Auth State (Supabase is source of truth)
   // ===============================
   async checkAuthState() {
     const sb = await this.ensureSupabase();
 
-    // If Supabase not present, fall back to old behavior (won't crash)
+    // If Supabase not present, fall back to legacy getCurrentUser (won't crash)
     if (!sb) {
-      let currentUser = null;
+      let legacyUser = null;
       try {
-        currentUser =
-          typeof getCurrentUser === "function" ? getCurrentUser() : null;
+        legacyUser = typeof getCurrentUser === "function" ? getCurrentUser() : null;
       } catch {
-        currentUser = null;
+        legacyUser = null;
       }
 
-      const protectedPages = ["profile.html", "messages.html"];
-      const currentPath = window.location.pathname;
-      const mustBeAuthed = protectedPages.some((page) =>
-        currentPath.includes(page)
-      );
+      this.isLoggedIn = !!legacyUser;
+      this.currentUser = legacyUser || null;
+      this.updateAuthUI(this.currentUser, this.isLoggedIn);
 
-      if (!currentUser && mustBeAuthed) {
-        window.location.href = "login.html";
-        return;
-      }
-
-      this.updateAuthUI(currentUser);
+      // still try to load feed
+      this.safeLoadFeed(true);
       return;
     }
 
-    // ✅ Supabase user
-    let user = null;
+    // ✅ Supabase auth user
+    let authUser = null;
     try {
       const { data } = await sb.auth.getUser();
-      user = data?.user || null;
+      authUser = data?.user || null;
     } catch {
-      user = null;
+      authUser = null;
     }
+
+    const isLoggedIn = !!authUser;
+    this.isLoggedIn = isLoggedIn;
 
     // Pages that require login
     const protectedPages = ["profile.html", "messages.html"];
     const currentPath = window.location.pathname;
-    const mustBeAuthed = protectedPages.some((page) =>
-      currentPath.includes(page)
-    );
+    const mustBeAuthed = protectedPages.some((page) => currentPath.includes(page));
 
-    if (!user && mustBeAuthed) {
+    if (!isLoggedIn && mustBeAuthed) {
       window.location.href = "login.html";
       return;
     }
 
-    // Load profile from public.users for avatar/etc.
+    // Try to load profile row from public.users (optional)
     let profile = null;
-    if (user?.id) {
+    if (authUser?.id) {
       try {
-        const { data } = await sb
+        const { data, error } = await sb
           .from("users")
           .select("id, username, email, display_name, avatar_url, is_admin")
-          .eq("id", user.id)
+          .eq("id", authUser.id)
           .single();
-        profile = data || null;
+
+        if (!error) profile = data || null;
       } catch {
         profile = null;
       }
     }
 
-    this.updateAuthUI(profile);
+    // ✅ Always provide a UI user when logged in (even if profile fetch fails)
+    const uiUser =
+      profile ||
+      (authUser
+        ? {
+            id: authUser.id,
+            username: authUser.email?.split("@")[0] || null,
+            email: authUser.email || null,
+            display_name: null,
+            avatar_url: null,
+            is_admin: false,
+          }
+        : null);
 
-    // Optional: update if auth changes while open
+    this.currentUser = uiUser;
+    this.updateAuthUI(this.currentUser, this.isLoggedIn);
+
+    // After auth check, ensure feed loads
+    this.safeInitFeedUI();
+    this.safeLoadFeed(true);
+
+    // Update on auth changes while page is open
     sb.auth.onAuthStateChange(async () => {
       try {
         const { data } = await sb.auth.getUser();
         const u = data?.user || null;
-        if (!u) {
-          this.updateAuthUI(null);
+        const loggedIn = !!u;
+
+        this.isLoggedIn = loggedIn;
+
+        if (!loggedIn) {
+          this.currentUser = null;
+          this.updateAuthUI(null, false);
+          this.safeInitFeedUI();
+          this.safeLoadFeed(true);
           return;
         }
-        const { data: p } = await sb
-          .from("users")
-          .select("id, username, email, display_name, avatar_url, is_admin")
-          .eq("id", u.id)
-          .single();
-        this.updateAuthUI(p || null);
+
+        let p = null;
+        try {
+          const { data: pd } = await sb
+            .from("users")
+            .select("id, username, email, display_name, avatar_url, is_admin")
+            .eq("id", u.id)
+            .single();
+          p = pd || null;
+        } catch {
+          p = null;
+        }
+
+        const uiU =
+          p ||
+          {
+            id: u.id,
+            username: u.email?.split("@")[0] || null,
+            email: u.email || null,
+            display_name: null,
+            avatar_url: null,
+            is_admin: false,
+          };
+
+        this.currentUser = uiU;
+        this.updateAuthUI(uiU, true);
+
+        this.safeInitFeedUI();
+        this.safeLoadFeed(true);
       } catch {
-        this.updateAuthUI(null);
+        this.currentUser = null;
+        this.isLoggedIn = false;
+        this.updateAuthUI(null, false);
+        this.safeInitFeedUI();
+        this.safeLoadFeed(true);
       }
     });
   }
 
-  updateAuthUI(currentUser) {
-    // Show / hide auth-dependent elements
-    const authDependentElements = document.querySelectorAll(".auth-dependent");
-    authDependentElements.forEach((el) => {
-      el.style.display = currentUser ? "block" : "none";
+  // ===============================
+  // Auth UI updates
+  // ===============================
+  updateAuthUI(currentUser, isLoggedIn) {
+    // Show/hide composer + any auth-dependent elements
+    document.querySelectorAll(".auth-dependent").forEach((el) => {
+      el.style.display = isLoggedIn ? "block" : "none";
     });
 
-    // Update profile images (header + generic avatars)
-    const profileImages = document.querySelectorAll(
-      ".profile-icon img, .post-avatar, #postUserAvatar"
-    );
-
-    profileImages.forEach((img) => {
-      if (currentUser && currentUser.avatar_url) {
-        img.src = currentUser.avatar_url;
-      } else if (img.id === "postUserAvatar") {
-        // Fallback to your default avatar for composer
-        img.src = "default-profile.PNG";
-      }
-    });
-
-    // Header left auth buttons vs profile icon
+    // Header: profile icon vs auth buttons
     const profileSection = document.getElementById("profileSection");
     const authButtons = document.getElementById("authButtons");
 
     if (profileSection && authButtons) {
-      if (currentUser) {
+      if (isLoggedIn) {
         profileSection.style.display = "flex";
         authButtons.style.display = "none";
       } else {
         profileSection.style.display = "none";
         authButtons.style.display = "flex";
       }
+    }
+
+    // Set avatar URLs
+    const avatarUrl =
+      isLoggedIn && currentUser?.avatar_url
+        ? currentUser.avatar_url
+        : "default-profile.PNG";
+
+    const headerImg = document.getElementById("headerProfileImg");
+    if (headerImg) headerImg.src = avatarUrl;
+
+    const composerImg = document.getElementById("postUserAvatar");
+    if (composerImg) composerImg.src = avatarUrl;
+
+    document.querySelectorAll(".post-avatar").forEach((img) => {
+      img.src = avatarUrl;
+    });
+  }
+
+  // ===============================
+  // Feed helpers (works with your feed.js FeedManager)
+  // ===============================
+  safeInitFeedUI() {
+    // Make sure tabs exist and are exactly 3 on index (prevents duplicates)
+    const feedTabs = document.getElementById("feedTabs");
+    if (!feedTabs) return;
+
+    const buttons = feedTabs.querySelectorAll(".feed-tab-btn");
+    if (buttons.length !== 3) {
+      // If something injected extra buttons, rebuild safely
+      feedTabs.innerHTML = `
+        <button class="feed-tab-btn active" data-feed-mode="recent">Recent</button>
+        <button class="feed-tab-btn" data-feed-mode="trending">Trending</button>
+        <button class="feed-tab-btn" data-feed-mode="following">Following</button>
+      `;
+      // re-bind handled by delegated listener already attached in setupEventListeners()
+    }
+  }
+
+  safeSwitchFeedMode(mode) {
+    if (!window.feedManager) {
+      console.warn("feedManager not ready yet.");
+      return;
+    }
+
+    // Prefer switchMode
+    if (typeof window.feedManager.switchMode === "function") {
+      window.feedManager.switchMode(mode);
+      return;
+    }
+
+    // Fallback
+    window.feedManager.currentMode = mode;
+    if (typeof window.feedManager.loadPosts === "function") {
+      window.feedManager.page = 1;
+      window.feedManager.hasMore = true;
+      window.feedManager.loadPosts(true);
+    }
+  }
+
+  safeLoadFeed(force = false) {
+    // Only attempt on pages that have feedContainer
+    const feedContainer = document.getElementById("feedContainer");
+    if (!feedContainer) return;
+
+    if (!window.feedManager) {
+      // feed.js might not have initialized yet; try again shortly
+      setTimeout(() => {
+        if (window.feedManager && typeof window.feedManager.loadPosts === "function") {
+          window.feedManager.loadPosts(!!force);
+        }
+      }, 120);
+      return;
+    }
+
+    if (typeof window.feedManager.loadPosts === "function") {
+      window.feedManager.loadPosts(!!force);
     }
   }
 
@@ -261,26 +376,13 @@ class App {
       const href = item.getAttribute("href") || "";
       item.classList.remove("active");
 
-      // Home
-      if (
-        (path === "" || path === "index.html") &&
-        href.includes("index.html")
-      ) {
+      if ((path === "" || path === "index.html") && href.includes("index.html")) {
         item.classList.add("active");
-      }
-      // Search
-      else if (path === "search.html" && href.includes("search.html")) {
+      } else if (path === "search.html" && href.includes("search.html")) {
         item.classList.add("active");
-      }
-      // Notifications
-      else if (
-        path === "notifications.html" &&
-        href.includes("notifications.html")
-      ) {
+      } else if (path === "notifications.html" && href.includes("notifications.html")) {
         item.classList.add("active");
-      }
-      // Messages
-      else if (path === "messages.html" && href.includes("messages.html")) {
+      } else if (path === "messages.html" && href.includes("messages.html")) {
         item.classList.add("active");
       }
     });
@@ -290,20 +392,21 @@ class App {
 // ===============================
 // Initialize app
 // ===============================
-const app = new App();
+window.app = new App();
 
 // ===============================
 // Service worker registration
+// (Use relative path for GitHub Pages)
 // ===============================
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/sw.js")
+      .register("sw.js")
       .then((registration) => {
         console.log("SW registered: ", registration);
       })
-      .catch((registrationError) => {
-        console.log("SW registration failed: ", registrationError);
+      .catch((err) => {
+        console.log("SW registration failed: ", err);
       });
   });
 }
