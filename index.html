@@ -18,10 +18,7 @@
     referrerpolicy="no-referrer"
   />
 
-  <!-- Pre-launch config (load once) -->
-  <script src="js/launch-config.js"></script>
-
-  <!-- Desktop tweaks (keep yours) -->
+  <!-- Desktop tweaks -->
   <style>
     @media (min-width: 900px) {
       .content-wrapper {
@@ -35,6 +32,7 @@
       }
     }
 
+    /* keep bottom nav visible at tablet sizes if you want */
     @media (min-width: 768px) {
       .bottom-nav {
         display: flex !important;
@@ -54,48 +52,48 @@
       line-height: 1;
     }
   </style>
+
+  <!-- Pre-launch config (load once) -->
+  <script src="js/launch-config.js"></script>
 </head>
 
 <body>
 
   <!-- ================= HEADER ================= -->
   <header class="header">
-    <!-- LEFT: profile pic (shown when logged in) -->
     <div class="header-left">
-      <div class="profile-section" id="profileSection">
+      <!-- Profile (shows only when logged in; auth.js toggles it) -->
+      <div class="profile-section hidden" id="profileSection">
         <a href="profile.html" class="profile-icon" aria-label="Your profile">
           <img
             id="headerProfileImg"
             src="default-profile.PNG"
             alt="Profile"
-            onerror="this.src='default-profile.PNG'"
           />
         </a>
       </div>
-    </div>
 
-    <!-- CENTER: logo text (old style, centered) -->
-    <h1 class="logo" aria-label="Uncensored Social">
-      Uncensored<span>Social</span>
-    </h1>
-
-    <!-- RIGHT: auth buttons (shown when logged out) + refresh -->
-    <div style="display:flex; align-items:center; gap: 12px;">
+      <!-- Auth buttons (show only when logged out; auth.js toggles it) -->
       <div class="auth-buttons" id="authButtons">
         <a href="login.html" class="btn btn-sm btn-login">Log In</a>
         <a href="signup.html" class="btn btn-sm btn-signup">Sign Up</a>
       </div>
+    </div>
 
-      <div class="header-actions">
-        <button
-          class="btn btn-ghost btn-icon"
-          onclick="refreshFeed()"
-          title="Refresh"
-          aria-label="Refresh feed"
-        >
-          <span class="icon icon-refresh"></span>
-        </button>
-      </div>
+    <!-- Center logo -->
+    <h1 class="logo" aria-label="Uncensored Social">
+      Uncensored<span>Social</span>
+    </h1>
+
+    <div class="header-actions">
+      <button
+        class="btn btn-ghost btn-icon"
+        onclick="refreshFeed()"
+        title="Refresh"
+        aria-label="Refresh feed"
+      >
+        <span class="icon icon-refresh"></span>
+      </button>
     </div>
   </header>
 
@@ -111,7 +109,6 @@
             alt="You"
             class="post-avatar"
             id="postUserAvatar"
-            onerror="this.src='default-profile.PNG'"
           />
 
           <textarea
@@ -149,10 +146,10 @@
         </div>
       </div>
 
-      <!-- ===== FEED TABS (ONLY 3) ===== -->
+      <!-- ===== FEED TABS (exactly 3) ===== -->
       <div class="feed-tabs" id="feedTabs">
         <button class="feed-tab-btn active" data-feed-mode="recent">
-          Recent
+          New
         </button>
         <button class="feed-tab-btn" data-feed-mode="trending">
           Trending
@@ -211,14 +208,15 @@
 
   <!-- ================= SCRIPTS ================= -->
 
-  <!-- ✅ IMPORTANT: Supabase MUST load before auth.js -->
+  <!-- ✅ MUST load Supabase SDK BEFORE auth.js -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+  <!-- App scripts -->
   <script src="js/auth.js"></script>
   <script src="js/feed.js"></script>
   <script src="js/app.js"></script>
 
-  <!-- Prelaunch guard (load after config + auth is okay) -->
+  <!-- Prelaunch guard (after auth is available) -->
   <script src="js/launch-guard.js"></script>
 
   <script>
