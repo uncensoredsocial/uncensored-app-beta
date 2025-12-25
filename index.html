@@ -51,6 +51,74 @@
       font-size: 1.1rem;
       line-height: 1;
     }
+
+    /* Error states */
+    .error-message {
+      text-align: center;
+      padding: 2rem;
+      color: #ff6b6b;
+    }
+
+    .error-message button {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      background: #3b0f0f;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .char-counter.error {
+      color: #ff6b6b;
+    }
+
+    .char-counter.warning {
+      color: #f39c12;
+    }
+
+    /* Post creation */
+    .post-creation {
+      background: #1a1a1a;
+      border-radius: 12px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border: 1px solid #333;
+    }
+
+    .post-input {
+      width: 100%;
+      min-height: 80px;
+      background: transparent;
+      border: none;
+      color: white;
+      font-size: 1rem;
+      resize: vertical;
+      font-family: inherit;
+    }
+
+    .post-input:focus {
+      outline: none;
+    }
+
+    .post-media-row {
+      margin-top: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .media-filename {
+      color: #888;
+      font-size: 0.9rem;
+    }
+
+    .post-actions-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 0.5rem;
+    }
   </style>
 
   <!-- Pre-launch config (load once) -->
@@ -104,7 +172,7 @@
     <main class="main-content">
 
       <!-- ===== POST CREATION ===== -->
-      <div class="post-creation auth-dependent" id="postCreation">
+      <div class="post-creation auth-dependent" id="postCreation" style="display: none;">
         <div class="post-input-container">
           <img
             src="default-profile.PNG"
@@ -157,7 +225,7 @@
       </div>
 
       <!-- ===== GUEST MESSAGE ===== -->
-      <div class="guest-message" id="guestMessage">
+      <div class="guest-message" id="guestMessage" style="display: none;">
         <div class="guest-content">
           <h2>Join the Conversation</h2>
           <p>Create an account to post, like, and interact.</p>
@@ -205,31 +273,142 @@
 
   <!-- ================= SCRIPTS ================= -->
 
-  <!-- ✅ MUST load Supabase SDK BEFORE auth.js -->
+  <!-- ✅ MUST load Supabase SDK FIRST -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- App scripts -->
-  <script src="js/auth.js"></script>
-  <script src="js/feed.js"></script>
-  <script src="js/app.js"></script>
+  <!-- ✅ Load ONLY the new supabase-auth.js (REMOVE old auth.js) -->
+  <script src="js/supabase-auth.js"></script>
 
-  <!-- Prelaunch guard (after auth is available) -->
+  <!-- ✅ Feed.js (updated version) -->
+  <script src="js/feed.js"></script>
+
+  <!-- ✅ Simplified app.js (without auth conflicts) -->
+  <script>
+    // ===============================
+    // Simplified App Functionality (No Auth Conflicts)
+    // ===============================
+    class App {
+      constructor() {
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", () => this.init());
+        } else {
+          this.init();
+        }
+      }
+
+      init() {
+        this.setupEventListeners();
+        this.setActiveBottomNav();
+        
+        // Wait for auth to initialize, then load feed
+        setTimeout(() => {
+          this.safeLoadFeed();
+        }, 500);
+      }
+
+      setupEventListeners() {
+        // Feed tabs
+        const feedTabs = document.getElementById("feedTabs");
+        if (feedTabs) {
+          feedTabs.addEventListener("click", (e) => {
+            const btn = e.target.closest(".feed-tab-btn");
+            if (!btn) return;
+
+            const mode = btn.getAttribute("data-feed-mode");
+            if (!mode) return;
+
+            // UI active state
+            feedTabs.querySelectorAll(".feed-tab-btn").forEach((b) => {
+              b.classList.toggle("active", b === btn);
+            });
+
+            // Tell FeedManager
+            this.safeSwitchFeedMode(mode);
+          });
+        }
+      }
+
+      safeSwitchFeedMode(mode) {
+        if (!window.feedManager) {
+          console.warn("feedManager not ready yet.");
+          return;
+        }
+
+        if (typeof window.feedManager.switchMode === "function") {
+          window.feedManager.switchMode(mode);
+        } else if (typeof window.feedManager.loadPosts === "function") {
+          window.feedManager.currentMode = mode;
+          window.feedManager.page = 1;
+          window.feedManager.hasMore = true;
+          window.feedManager.loadPosts(true);
+        }
+      }
+
+      safeLoadFeed() {
+        const feedContainer = document.getElementById("feedContainer");
+        if (!feedContainer) return;
+
+        if (!window.feedManager) {
+          setTimeout(() => {
+            if (window.feedManager && typeof window.feedManager.loadPosts === "function") {
+              window.feedManager.loadPosts(true);
+            }
+          }, 800);
+          return;
+        }
+
+        if (typeof window.feedManager.loadPosts === "function") {
+          setTimeout(() => {
+            window.feedManager.loadPosts(true);
+          }, 300);
+        }
+      }
+
+      setActiveBottomNav() {
+        const navItems = document.querySelectorAll(".bottom-nav .nav-item");
+        if (!navItems.length) return;
+
+        const path = window.location.pathname.split("/").pop() || "index.html";
+
+        navItems.forEach((item) => {
+          const href = item.getAttribute("href") || "";
+          item.classList.remove("active");
+
+          if ((path === "" || path === "index.html") && href.includes("index.html")) {
+            item.classList.add("active");
+          } else if (path === "search.html" && href.includes("search.html")) {
+            item.classList.add("active");
+          } else if (path === "notifications.html" && href.includes("notifications.html")) {
+            item.classList.add("active");
+          } else if (path === "messages.html" && href.includes("messages.html")) {
+            item.classList.add("active");
+          }
+        });
+      }
+    }
+
+    // Initialize app
+    window.app = new App();
+  </script>
+
+  <!-- ✅ Launch guard (after everything else) -->
   <script src="js/launch-guard.js"></script>
 
-  <!-- ✅ Dedupe any accidentally injected feed tabs (removes the 4th tab) -->
+  <!-- ✅ Fix for feed tabs duplicates -->
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       const feedTabs = document.getElementById("feedTabs");
       if (!feedTabs) return;
 
-      const seen = new Set();
-      [...feedTabs.querySelectorAll(".feed-tab-btn")].forEach((btn) => {
-        const key = (btn.dataset.feedMode || btn.textContent || "")
-          .trim()
-          .toLowerCase();
-        if (seen.has(key)) btn.remove();
-        else seen.add(key);
-      });
+      // Ensure only 3 tabs
+      const buttons = feedTabs.querySelectorAll(".feed-tab-btn");
+      if (buttons.length !== 3) {
+        feedTabs.innerHTML = `
+          <button class="feed-tab-btn active" data-feed-mode="recent">Recent</button>
+          <button class="feed-tab-btn" data-feed-mode="trending">Trending</button>
+          <button class="feed-tab-btn" data-feed-mode="following">Following</button>
+        `;
+      }
     });
 
     function refreshFeed() {
@@ -237,6 +416,8 @@
         window.feedManager.page = 1;
         window.feedManager.hasMore = true;
         window.feedManager.loadPosts(true);
+      } else {
+        location.reload();
       }
     }
   </script>
