@@ -52,77 +52,9 @@
       line-height: 1;
     }
 
-    /* Error states */
-    .error-message {
-      text-align: center;
-      padding: 2rem;
-      color: #ff6b6b;
-    }
-
-    .error-message button {
-      margin-top: 1rem;
-      padding: 0.5rem 1rem;
-      background: #3b0f0f;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    .char-counter.error {
-      color: #ff6b6b;
-    }
-
-    .char-counter.warning {
-      color: #f39c12;
-    }
-
-    /* Post creation */
-    .post-creation {
-      background: #1a1a1a;
-      border-radius: 12px;
-      padding: 1rem;
-      margin-bottom: 1rem;
-      border: 1px solid #333;
-    }
-
-    .post-input {
-      width: 100%;
-      min-height: 80px;
-      background: transparent;
-      border: none;
-      color: white;
-      font-size: 1rem;
-      resize: vertical;
-      font-family: inherit;
-    }
-
-    .post-input:focus {
-      outline: none;
-    }
-
-    .post-media-row {
-      margin-top: 0.5rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .media-filename {
-      color: #888;
-      font-size: 0.9rem;
-    }
-
-    .post-actions-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 0.5rem;
-    }
-
     /* Fix for profile section */
     .profile-section {
-      display: none !important; /* Will be shown by JS when logged in */
+      display: none !important;
     }
 
     .auth-buttons {
@@ -139,7 +71,7 @@
   <!-- ================= HEADER ================= -->
   <header class="header">
     <div class="header-left">
-      <!-- Profile (shows only when logged in; auth.js toggles it) -->
+      <!-- Profile (shows only when logged in) -->
       <div class="profile-section" id="profileSection" style="display: none;">
         <a href="profile.html" class="profile-icon" aria-label="Your profile">
           <img
@@ -152,28 +84,20 @@
         </a>
       </div>
 
-      <!-- Auth buttons (show only when logged out; auth.js toggles it) -->
+      <!-- Auth buttons (show only when logged out) -->
       <div class="auth-buttons" id="authButtons">
         <a href="login.html" class="btn btn-sm btn-login">Log In</a>
         <a href="signup.html" class="btn btn-sm btn-signup">Sign Up</a>
       </div>
     </div>
 
-    <!-- Center logo (TEXT ONLY) -->
+    <!-- Center logo -->
     <h1 class="logo" aria-label="Uncensored Social">
       Uncensored<span>Social</span>
     </h1>
 
     <div class="header-actions">
-      <button
-        class="btn btn-ghost btn-icon"
-        onclick="refreshFeed()"
-        title="Refresh"
-        aria-label="Refresh feed"
-        type="button"
-      >
-        <i class="fas fa-sync-alt"></i>
-      </button>
+      <!-- Empty for now -->
     </div>
   </header>
 
@@ -214,7 +138,7 @@
             class="btn btn-secondary"
             id="addMediaBtn"
           >
-            <i class="fas fa-image"></i> Add image / video
+            Add image / video
           </button>
 
           <span id="mediaFileName" class="media-filename"></span>
@@ -223,7 +147,7 @@
         <div class="post-actions-bar">
           <span id="charCounter" class="char-counter">0/280</span>
           <button class="btn btn-primary" id="postButton" disabled>
-            <i class="fas fa-paper-plane"></i> Post
+            Post
           </button>
         </div>
       </div>
@@ -287,34 +211,27 @@
   <!-- ✅ MUST load Supabase SDK FIRST -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- ✅ Load ONLY the new supabase-auth.js (REMOVE old auth.js) -->
+  <!-- ✅ Load supabase-auth.js -->
   <script src="js/supabase-auth.js"></script>
 
-  <!-- ✅ Feed.js (updated version) -->
+  <!-- ✅ Feed.js -->
   <script src="js/feed.js"></script>
 
-  <!-- ✅ Launch guard (after everything else) -->
+  <!-- ✅ Launch guard -->
   <script src="js/launch-guard.js"></script>
 
   <script>
-    // ===============================
-    // Initialize Feed Manager
-    // ===============================
-    document.addEventListener('DOMContentLoaded', function() {
-      // Wait a bit for auth to initialize
-      setTimeout(function() {
-        if (window.feedManager && typeof window.feedManager.init === 'function') {
-          window.feedManager.init();
-        } else {
-          console.error('Feed manager not found');
-        }
-      }, 1000);
-    });
+    // Simple refresh function
+    function refreshFeed() {
+      if (window.feedManager && typeof window.feedManager.loadPosts === 'function') {
+        window.feedManager.page = 1;
+        window.feedManager.hasMore = true;
+        window.feedManager.loadPosts(true);
+      }
+    }
 
-    // ===============================
-    // Bottom Nav Active State
-    // ===============================
-    function setActiveBottomNav() {
+    // Bottom nav active state
+    document.addEventListener('DOMContentLoaded', function() {
       const navItems = document.querySelectorAll('.bottom-nav .nav-item');
       if (!navItems.length) return;
 
@@ -334,23 +251,14 @@
           item.classList.add('active');
         }
       });
-    }
 
-    // Initialize bottom nav
-    document.addEventListener('DOMContentLoaded', setActiveBottomNav);
-
-    // ===============================
-    // Refresh Feed Function
-    // ===============================
-    function refreshFeed() {
-      if (window.feedManager && typeof window.feedManager.loadPosts === 'function') {
-        window.feedManager.page = 1;
-        window.feedManager.hasMore = true;
-        window.feedManager.loadPosts(true);
-      } else {
-        location.reload();
-      }
-    }
+      // Initialize feed after a delay
+      setTimeout(function() {
+        if (window.feedManager && typeof window.feedManager.init === 'function') {
+          window.feedManager.init();
+        }
+      }, 1000);
+    });
   </script>
 
 </body>
