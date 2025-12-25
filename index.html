@@ -69,6 +69,7 @@
             id="headerProfileImg"
             src="default-profile.PNG"
             alt="Profile"
+            loading="lazy"
           />
         </a>
       </div>
@@ -80,7 +81,7 @@
       </div>
     </div>
 
-    <!-- Center logo -->
+    <!-- Center logo (TEXT ONLY) -->
     <h1 class="logo" aria-label="Uncensored Social">
       Uncensored<span>Social</span>
     </h1>
@@ -91,6 +92,7 @@
         onclick="refreshFeed()"
         title="Refresh"
         aria-label="Refresh feed"
+        type="button"
       >
         <span class="icon icon-refresh"></span>
       </button>
@@ -109,6 +111,7 @@
             alt="You"
             class="post-avatar"
             id="postUserAvatar"
+            loading="lazy"
           />
 
           <textarea
@@ -146,17 +149,11 @@
         </div>
       </div>
 
-      <!-- ===== FEED TABS (exactly 3) ===== -->
+      <!-- ===== FEED TABS (EXACTLY 3) ===== -->
       <div class="feed-tabs" id="feedTabs">
-        <button class="feed-tab-btn active" data-feed-mode="recent">
-          New
-        </button>
-        <button class="feed-tab-btn" data-feed-mode="trending">
-          Trending
-        </button>
-        <button class="feed-tab-btn" data-feed-mode="following">
-          Following
-        </button>
+        <button class="feed-tab-btn active" data-feed-mode="recent">Recent</button>
+        <button class="feed-tab-btn" data-feed-mode="trending">Trending</button>
+        <button class="feed-tab-btn" data-feed-mode="following">Following</button>
       </div>
 
       <!-- ===== GUEST MESSAGE ===== -->
@@ -219,7 +216,22 @@
   <!-- Prelaunch guard (after auth is available) -->
   <script src="js/launch-guard.js"></script>
 
+  <!-- ✅ Dedupe any accidentally injected feed tabs (removes the 4th tab) -->
   <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const feedTabs = document.getElementById("feedTabs");
+      if (!feedTabs) return;
+
+      const seen = new Set();
+      [...feedTabs.querySelectorAll(".feed-tab-btn")].forEach((btn) => {
+        const key = (btn.dataset.feedMode || btn.textContent || "")
+          .trim()
+          .toLowerCase();
+        if (seen.has(key)) btn.remove();
+        else seen.add(key);
+      });
+    });
+
     function refreshFeed() {
       if (window.feedManager) {
         window.feedManager.page = 1;
